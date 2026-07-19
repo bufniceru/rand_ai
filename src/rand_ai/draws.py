@@ -5,6 +5,7 @@ import pickle
 from collections.abc import Iterator
 from pathlib import Path
 from random import SystemRandom
+from typing import BinaryIO
 
 from rand_ai.draw import Draw
 
@@ -42,8 +43,22 @@ class Draws:
 
     def save_pickle(self, file_path: str | Path) -> None:
         """Serialize this collection to a pickle file on disk."""
-        with Path(file_path).open("wb") as pickle_file:
+        path = Path(file_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("wb") as pickle_file:
             pickle.dump(self, pickle_file)
+
+    @classmethod
+    def load_trusted_pickle(cls, source: BinaryIO) -> "Draws":
+        """Load a Draws object from a trusted pickle binary stream.
+
+        Pickle can execute arbitrary code during loading. Never pass data from
+        an unknown or untrusted source to this method.
+        """
+        loaded_object = pickle.load(source)
+        if not isinstance(loaded_object, cls):
+            raise TypeError("Pickle must contain a Draws instance")
+        return loaded_object
 
     def log_draws(self) -> None:
         """Log every stored draw at INFO level in insertion order."""

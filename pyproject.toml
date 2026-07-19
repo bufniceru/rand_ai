@@ -6,20 +6,38 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "numpy>=2.5.1",
+    "pandas>=3.0.3",
+    "plotly>=6.9.0",
+    "scipy>=1.18.0",
+    "streamlit>=1.59.2",
 ]
 
 [dependency-groups]
 dev = [
+    "hatchling>=1.31.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.15.22",
     "ty>=0.0.61",
 ]
 
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rand_ai"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "--cov=rand_ai.draw --cov=rand_ai.draws --cov-report=term-missing --cov-fail-under=100"
+addopts = "--cov=rand_ai --cov-report=term-missing --cov-fail-under=100"
 log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "%(levelname)s %(message)s"
+
+[tool.coverage.run]
+omit = [
+    "*/rand_ai/__main__.py",
+    "*/rand_ai/dashboard.py",
+]

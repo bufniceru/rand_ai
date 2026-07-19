@@ -2,6 +2,7 @@
 
 import logging
 import pickle
+from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import cast
@@ -138,6 +139,36 @@ class TestDrawsRandomGeneration:
 
 class TestDrawsPersistenceAndLogging:
     """Test large collection persistence and logging without print."""
+
+    def test_save_pickle_creates_parent_directories(self) -> None:
+        """Verify persistence creates a missing destination directory tree."""
+        draws = Draws()
+        draws.add(Draw())
+
+        with TemporaryDirectory(dir=Path.cwd()) as temporary_directory:
+            pickle_path = Path(temporary_directory) / "nested" / "data" / "draws.pkl"
+            draws.save_pickle(pickle_path)
+
+            with pickle_path.open("rb") as pickle_file:
+                restored = Draws.load_trusted_pickle(pickle_file)
+        assert len(restored) == 1
+
+    def test_loads_trusted_pickle_stream(self) -> None:
+        """Verify trusted binary streams restore Draws instances."""
+        draws = Draws()
+        draws.add(Draw())
+
+        restored = Draws.load_trusted_pickle(BytesIO(pickle.dumps(draws)))
+
+        assert isinstance(restored, Draws)
+        assert len(restored) == 1
+
+    def test_rejects_trusted_pickle_with_wrong_object_type(self) -> None:
+        """Verify trusted pickle content must contain a Draws instance."""
+        payload = BytesIO(pickle.dumps({"not": "draws"}))
+
+        with pytest.raises(TypeError, match="Pickle must contain a Draws instance"):
+            Draws.load_trusted_pickle(payload)
 
     def test_generates_pickles_and_logs_10000_draws(
         self, caplog: pytest.LogCaptureFixture

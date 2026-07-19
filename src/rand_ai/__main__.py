@@ -1,6 +1,6 @@
 """Run a simple demonstration of the Draw class."""
 
-from src.rand_ai.draw import Draw
+from rand_ai.draw import Draw
 
 
 def main() -> None:
