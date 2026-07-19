@@ -1,0 +1,76 @@
+"""Define a typed collection of Draw instances."""
+
+import logging
+import pickle
+from collections.abc import Iterator
+from pathlib import Path
+from random import SystemRandom
+
+from rand_ai.draw import Draw
+
+_LOGGER = logging.getLogger(__name__)
+_RANDOM = SystemRandom()
+
+
+class Draws:
+    """Store an ordered collection of draws added one at a time."""
+
+    __slots__ = ("_draws",)
+
+    _draws: list[Draw]
+
+    def __init__(self) -> None:
+        """Initialize an empty collection of draws."""
+        self._draws = []
+
+    def add(self, draw: Draw) -> None:
+        """Add one Draw instance to the end of the collection."""
+        if not isinstance(draw, Draw):
+            raise TypeError("Value must be a Draw instance")
+        self._draws.append(draw)
+
+    def generate_random(self, number_of_draws: int) -> None:
+        """Append the requested number of securely randomized draws."""
+        if type(number_of_draws) is not int:
+            raise TypeError("Number of draws must be an integer")
+        if number_of_draws < 0:
+            raise ValueError("Number of draws cannot be negative")
+
+        for _ in range(number_of_draws):
+            numbers = _RANDOM.sample(range(1, 50), 6)
+            self.add(Draw(*numbers))
+
+    def save_pickle(self, file_path: str | Path) -> None:
+        """Serialize this collection to a pickle file on disk."""
+        with Path(file_path).open("wb") as pickle_file:
+            pickle.dump(self, pickle_file)
+
+    def log_draws(self) -> None:
+        """Log every stored draw at INFO level in insertion order."""
+        for index, draw in enumerate(self._draws, start=1):
+            numbers = (
+                draw.num1,
+                draw.num2,
+                draw.num3,
+                draw.num4,
+                draw.num5,
+                draw.num6,
+            )
+            _LOGGER.info("Draw %d: %s", index, numbers)
+
+    @property
+    def draws(self) -> tuple[Draw, ...]:
+        """Return an immutable snapshot of the stored draws."""
+        return tuple(self._draws)
+
+    def __len__(self) -> int:
+        """Return the number of stored draws."""
+        return len(self._draws)
+
+    def __iter__(self) -> Iterator[Draw]:
+        """Iterate over the stored draws in insertion order."""
+        return iter(self._draws)
+
+    def __getitem__(self, index: int) -> Draw:
+        """Return the draw stored at an integer index."""
+        return self._draws[index]

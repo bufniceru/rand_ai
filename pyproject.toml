@@ -19,4 +19,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "--cov=rand_ai.draw --cov-report=term-missing --cov-fail-under=100"
+addopts = "--cov=rand_ai.draw --cov=rand_ai.draws --cov-report=term-missing --cov-fail-under=100"
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(levelname)s %(message)s"
