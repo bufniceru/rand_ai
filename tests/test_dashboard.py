@@ -73,7 +73,7 @@ class TestDashboardUpload:
             "Export",
         ]
         assert len(dashboard.metric) == 4
-        assert len(dashboard.get("plotly_chart")) == 14
+        assert len(dashboard.get("plotly_chart")) == 21
         assert len(dashboard.get("download_button")) == 1
         assert any("do not predict" in warning.value for warning in dashboard.warning)
 

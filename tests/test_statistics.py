@@ -201,11 +201,18 @@ class TestDrawsStatisticsTables:
         """Verify exact space grids, summaries, extrema, and invariant totals."""
         statistics = DrawsStatistics(_sample_draws())
         frequencies = statistics.space_frequencies()
+        distance_frequencies = statistics.distance_frequencies().set_index("distance")
         descriptive = statistics.space_descriptive().set_index("variable")
         extremes = statistics.space_extreme_distributions()
 
         assert len(frequencies) == 6 * 44
         assert frequencies["count"].sum() == 18
+        assert len(distance_frequencies) == 44
+        assert distance_frequencies["occurrences"].sum() == 18
+        assert distance_frequencies.loc[0, "occurrences"] == 6
+        assert distance_frequencies.loc[8, "occurrences"] == 5
+        assert distance_frequencies.loc[9, "occurrences"] == 3
+        assert distance_frequencies["occurrence_percentage"].sum() == pytest.approx(100)
         assert descriptive.loc["space_sum", "mean"] == 43
         assert descriptive.loc["space_sum", "std"] == 0
         assert set(extremes["measure"]) == {"minimum_space", "maximum_space"}
@@ -341,6 +348,7 @@ class TestDrawsRandomnessAndExports:
             "draw_structure_distributions",
             "pair_cooccurrence",
             "space_frequencies",
+            "distance_frequencies",
             "space_descriptive",
             "space_extreme_distributions",
             "number_correlations_pearson",

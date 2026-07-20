@@ -9,7 +9,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from rand_ai.statistics import CorrelationMethod, DrawsStatistics
+from rand_ai.statistics import SPACE_NAMES, CorrelationMethod, DrawsStatistics
 
 
 def _heatmap(
@@ -172,6 +172,50 @@ def _space_frequency_figure(statistics: DrawsStatistics) -> go.Figure:
     )
 
 
+def _distance_frequency_figure(statistics: DrawsStatistics) -> go.Figure:
+    """Build aggregate occurrence counts for distance values 0 through 43."""
+    frequencies = statistics.distance_frequencies()
+    figure = px.bar(
+        frequencies,
+        x="distance",
+        y="occurrences",
+        title="Distance occurrences across all six positions",
+        labels={
+            "distance": "Distance (0–43)",
+            "occurrences": "Occurrences",
+            "occurrence_percentage": "Share of occurrences (%)",
+        },
+        hover_data={"occurrence_percentage": ":.2f"},
+    )
+    figure.update_xaxes(range=(-0.5, 43.5), dtick=1)
+    return figure
+
+
+def _distance_position_frequency_figures(
+    statistics: DrawsStatistics,
+) -> dict[str, go.Figure]:
+    """Build one occurrence chart for each individual distance position."""
+    frequencies = statistics.space_frequencies()
+    figures: dict[str, go.Figure] = {}
+    for position in SPACE_NAMES:
+        position_frequencies = frequencies[frequencies["position"] == position]
+        figure = px.bar(
+            position_frequencies,
+            x="space",
+            y="count",
+            title=f"{position} distance occurrences",
+            labels={
+                "space": "Distance (0–43)",
+                "count": "Occurrences",
+                "percentage": "Draws with this distance (%)",
+            },
+            hover_data={"percentage": ":.2f"},
+        )
+        figure.update_xaxes(range=(-0.5, 43.5), dtick=1)
+        figures[f"{position}_frequencies"] = figure
+    return figures
+
+
 def _space_box_figure(statistics: DrawsStatistics) -> go.Figure:
     """Build sampled space box plots with an explicit sample-size title."""
     sampled_spaces = statistics.sampled_spaces()
@@ -274,11 +318,13 @@ def build_figures(
         "number_trends": _trend_figure(
             statistics, selected_numbers=selected_numbers, trend_bins=trend_bins
         ),
+        "distance_frequencies": _distance_frequency_figure(statistics),
         "space_frequencies": _space_frequency_figure(statistics),
         "space_box_plots": _space_box_figure(statistics),
         "space_extremes": _space_extremes_figure(statistics),
         "matching_pairs": _matching_pairs_figure(statistics),
     }
+    figures.update(_distance_position_frequency_figures(statistics))
     figures.update(_correlation_figures(statistics, correlation_method))
     return figures
 

@@ -308,6 +308,18 @@ class DrawsStatistics:
             }
         )
 
+    def distance_frequencies(self) -> pd.DataFrame:
+        """Return exact aggregate frequencies for distance values 0 through 43."""
+        counts = np.bincount(self._spaces.ravel(), minlength=44).astype(np.int64)
+        occurrence_count = self._draw_count * 6
+        return pd.DataFrame(
+            {
+                "distance": np.arange(44, dtype=np.int64),
+                "occurrences": counts,
+                "occurrence_percentage": counts / occurrence_count * 100,
+            }
+        )
+
     def space_descriptive(self) -> pd.DataFrame:
         """Return descriptive statistics for spaces and their extrema."""
         minimum = self._spaces.min(axis=1).reshape(-1, 1)
@@ -474,6 +486,7 @@ class DrawsStatistics:
             "draw_structure_distributions": self.draw_structure_distributions(),
             "pair_cooccurrence": self.pair_cooccurrence(),
             "space_frequencies": self.space_frequencies(),
+            "distance_frequencies": self.distance_frequencies(),
             "space_descriptive": self.space_descriptive(),
             "space_extreme_distributions": self.space_extreme_distributions(),
             "number_correlations_pearson": pearson["numbers"],

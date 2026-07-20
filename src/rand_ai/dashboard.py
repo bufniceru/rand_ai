@@ -104,8 +104,23 @@ def _render_spaces(
     """Render exact and sampled analysis of the six circular spaces."""
     st.caption(
         "Every draw has six circular spaces whose values sum to 43. "
+        "The distance chart counts every occurrence, including repeated distance "
+        "values within the same draw. "
         f"Box plots use a deterministic sample of {statistics.sample_size:,} draws."
     )
+    _render_plot(figures["distance_frequencies"], key="spaces-distance-frequency")
+    st.subheader("Occurrences by distance position")
+    for first_position in range(1, 7, 2):
+        columns = st.columns(2)
+        for column, position in zip(
+            columns, (first_position, first_position + 1), strict=True
+        ):
+            distance_name = f"dist{position}"
+            with column:
+                _render_plot(
+                    figures[f"{distance_name}_frequencies"],
+                    key=f"spaces-{distance_name}-frequency",
+                )
     _render_plot(figures["space_frequencies"], key="spaces-frequency")
     _render_plot(figures["space_box_plots"], key="spaces-box")
     _render_plot(figures["space_extremes"], key="spaces-extremes")

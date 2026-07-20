@@ -38,6 +38,13 @@ class TestPlotlyFigures:
             "position_frequencies",
             "pair_cooccurrence",
             "number_trends",
+            "distance_frequencies",
+            "dist1_frequencies",
+            "dist2_frequencies",
+            "dist3_frequencies",
+            "dist4_frequencies",
+            "dist5_frequencies",
+            "dist6_frequencies",
             "space_frequencies",
             "space_box_plots",
             "space_extremes",
@@ -59,6 +66,31 @@ class TestPlotlyFigures:
         assert figures["space_frequencies"].data[0].z.shape == (6, 44)
         assert figures["number_correlations"].data[0].z.shape == (6, 6)
         assert figures["number_space_correlations"].data[0].z.shape == (6, 6)
+
+    def test_distance_frequency_counts_repeated_occurrences(self) -> None:
+        """Verify aggregate distance bars include all values and repetitions."""
+        statistics = _statistics()
+        figure = build_figures(statistics, trend_bins=2)["distance_frequencies"]
+
+        assert list(figure.data[0].x) == list(range(44))
+        assert sum(figure.data[0].y) == statistics.draw_count * 6
+        assert figure.data[0].y[0] == 6
+        assert figure.data[0].y[8] == 5
+        assert figure.layout.xaxis.range == (-0.5, 43.5)
+
+    def test_individual_distance_frequency_figures_are_isolated(self) -> None:
+        """Verify each distance-position chart counts only its own occurrences."""
+        statistics = _statistics()
+        figures = build_figures(statistics, trend_bins=2)
+
+        for position in range(1, 7):
+            figure = figures[f"dist{position}_frequencies"]
+            assert list(figure.data[0].x) == list(range(44))
+            assert sum(figure.data[0].y) == statistics.draw_count
+            assert figure.layout.xaxis.range == (-0.5, 43.5)
+
+        assert figures["dist1_frequencies"].data[0].y[43] == 1
+        assert figures["dist6_frequencies"].data[0].y[8] == 2
 
     def test_box_plot_and_trend_are_bounded(self) -> None:
         """Verify expensive figures contain only sampled or binned values."""
