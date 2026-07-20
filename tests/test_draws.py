@@ -9,7 +9,7 @@ from typing import cast
 
 import pytest
 
-from rand_ai import Draw, Draws
+from rand_ai import Ball, Draw, Draws
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _RANDOM_DRAWS_PICKLE_PATH = _PROJECT_ROOT / "data" / "draws.pkl"
@@ -57,6 +57,23 @@ class TestDrawsAdd:
         draws.add(second)
 
         assert draws.draws == (first, second)
+
+    def test_populates_ball_gaps_from_prior_draws(self) -> None:
+        """Verify gaps count intervening draws and elapsed initial history."""
+        draws = Draws()
+        first = Draw(1, 2, 3, 4, 5, 6)
+        second = Draw(1, 7, 8, 9, 10, 11)
+        third = Draw(2, 12, 13, 14, 15, 16)
+
+        draws.add(first)
+        draws.add(second)
+        draws.add(third)
+
+        assert tuple(ball.gap for ball in first.balls) == (0, 0, 0, 0, 0, 0)
+        assert second.num1.gap == 0
+        assert tuple(ball.gap for ball in second.balls[1:]) == (1, 1, 1, 1, 1)
+        assert third.num1.gap == 1
+        assert tuple(ball.gap for ball in third.balls[1:]) == (2, 2, 2, 2, 2)
 
     @pytest.mark.parametrize("invalid_value", (None, 1, "draw", [], object()))
     def test_rejects_values_that_are_not_draws(self, invalid_value: object) -> None:
@@ -112,14 +129,8 @@ class TestDrawsRandomGeneration:
 
         assert len(draws) == 25
         for draw in draws:
-            numbers = (
-                draw.num1,
-                draw.num2,
-                draw.num3,
-                draw.num4,
-                draw.num5,
-                draw.num6,
-            )
+            assert all(isinstance(ball, Ball) for ball in draw.balls)
+            numbers = tuple(ball.value for ball in draw.balls)
             assert tuple(sorted(numbers)) == numbers
             assert len(set(numbers)) == 6
             assert all(1 <= number <= 49 for number in numbers)
@@ -194,3 +205,7 @@ class TestDrawsPersistenceAndLogging:
         assert len(caplog.records) == 10_000
         assert caplog.records[0].getMessage().startswith("Draw 1: ")
         assert caplog.records[-1].getMessage().startswith("Draw 10000: ")
+        assert all(
+            record.getMessage().count("Ball(value=") == 6
+            for record in caplog.records
+        )

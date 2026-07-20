@@ -60,14 +60,7 @@ class DrawsStatistics:
         for index, draw in enumerate(draws):
             if not isinstance(draw, Draw):
                 raise TypeError("Draws collection contains a non-Draw value")
-            values = (
-                draw.num1,
-                draw.num2,
-                draw.num3,
-                draw.num4,
-                draw.num5,
-                draw.num6,
-            )
+            values = tuple(ball.value for ball in draw.balls)
             if (
                 values != tuple(sorted(values))
                 or len(set(values)) != 6

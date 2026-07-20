@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from rand_ai import Draw, Draws, DrawsStatistics
+from rand_ai import Ball, Draw, Draws, DrawsStatistics
 from rand_ai.statistics import CorrelationMethod
 
 
@@ -90,7 +90,7 @@ class TestDrawsStatisticsInitialization:
     def test_rejects_invalid_mutated_draw(self) -> None:
         """Verify snapshot validation catches a corrupted slotted Draw."""
         draw = Draw()
-        setattr(draw, "_num6", 5)
+        setattr(draw, "_num6", Ball(5))
         draws = Draws()
         draws.add(draw)
 

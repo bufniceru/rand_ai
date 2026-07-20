@@ -4,11 +4,16 @@ from typing import cast
 
 import pytest
 
-from rand_ai.draw import Draw
+from rand_ai import Ball, Draw
 
 
 PROPERTY_NAMES = ("num1", "num2", "num3", "num4", "num5", "num6")
 DISTANCE_NAMES = ("dist1", "dist2", "dist3", "dist4", "dist5", "dist6")
+
+
+def _values(draw: Draw) -> tuple[int, ...]:
+    """Return the integer value stored by each Ball in a Draw."""
+    return tuple(ball.value for ball in draw.balls)
 
 
 class TestDrawInitialization:
@@ -18,40 +23,20 @@ class TestDrawInitialization:
         """Verify that constructor defaults are the first six integers."""
         draw = Draw()
 
-        assert tuple(getattr(draw, name) for name in PROPERTY_NAMES) == (
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-        )
+        assert _values(draw) == (1, 2, 3, 4, 5, 6)
 
     def test_constructor_sets_all_values(self) -> None:
         """Verify that valid constructor values are stored."""
         draw = Draw(1, 2, 10, 20, 30, 49)
 
-        assert tuple(getattr(draw, name) for name in PROPERTY_NAMES) == (
-            1,
-            2,
-            10,
-            20,
-            30,
-            49,
-        )
+        assert _values(draw) == (1, 2, 10, 20, 30, 49)
 
     def test_constructor_sorts_numbers_in_ascending_order(self) -> None:
         """Verify that unordered constructor values are sorted."""
         draw = Draw(49, 1, 30, 10, 40, 20)
 
-        assert tuple(getattr(draw, name) for name in PROPERTY_NAMES) == (
-            1,
-            10,
-            20,
-            30,
-            40,
-            49,
-        )
+        assert _values(draw) == (1, 10, 20, 30, 40, 49)
+        assert all(isinstance(ball, Ball) for ball in draw.balls)
 
     @pytest.mark.parametrize(
         "numbers",
@@ -118,6 +103,20 @@ class TestDrawProperties:
         with pytest.raises(AttributeError):
             setattr(draw, property_name, 10)
 
+    def test_balls_property_is_read_only(self) -> None:
+        """Verify the complete Ball tuple cannot be replaced."""
+        draw = Draw()
+
+        with pytest.raises(AttributeError):
+            setattr(draw, "balls", ())
+
+    def test_rejects_wrong_number_of_internal_gaps(self) -> None:
+        """Verify gap population requires one gap for every Ball."""
+        draw = Draw()
+
+        with pytest.raises(ValueError, match="exactly six gap values"):
+            draw._set_gaps((0,))
+
 
 class TestDrawDistances:
     """Test calculated gaps between the draw numbers."""
@@ -161,6 +160,13 @@ class TestDrawDistances:
         )
 
         assert sum(distances) + 6 == 49
+
+    def test_each_ball_has_left_and_right_circular_distances(self) -> None:
+        """Verify neighboring Balls share the same intervening distance."""
+        draw = Draw(1, 10, 20, 30, 40, 49)
+
+        assert tuple(ball.left_dist for ball in draw.balls) == (0, 8, 9, 9, 9, 8)
+        assert tuple(ball.right_dist for ball in draw.balls) == (8, 9, 9, 9, 8, 0)
 
     @pytest.mark.parametrize("distance_name", DISTANCE_NAMES)
     def test_distance_properties_are_read_only(self, distance_name: str) -> None:

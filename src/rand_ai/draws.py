@@ -16,19 +16,33 @@ _RANDOM = SystemRandom()
 class Draws:
     """Store an ordered collection of draws added one at a time."""
 
-    __slots__ = ("_draws",)
+    __slots__ = ("_draws", "_last_drawn")
 
     _draws: list[Draw]
+    _last_drawn: list[int | None]
 
     def __init__(self) -> None:
         """Initialize an empty collection of draws."""
         self._draws = []
+        self._last_drawn = [None] * 50
 
     def add(self, draw: Draw) -> None:
         """Add one Draw instance to the end of the collection."""
         if not isinstance(draw, Draw):
             raise TypeError("Value must be a Draw instance")
+        draw_index = len(self._draws)
+        gaps: list[int] = []
+        for ball in draw.balls:
+            last_drawn = self._last_drawn[ball.value]
+            gaps.append(
+                draw_index
+                if last_drawn is None
+                else draw_index - last_drawn - 1
+            )
+        draw._set_gaps(tuple(gaps))
         self._draws.append(draw)
+        for ball in draw.balls:
+            self._last_drawn[ball.value] = draw_index
 
     def generate_random(self, number_of_draws: int) -> None:
         """Append the requested number of securely randomized draws."""
@@ -63,15 +77,7 @@ class Draws:
     def log_draws(self) -> None:
         """Log every stored draw at INFO level in insertion order."""
         for index, draw in enumerate(self._draws, start=1):
-            numbers = (
-                draw.num1,
-                draw.num2,
-                draw.num3,
-                draw.num4,
-                draw.num5,
-                draw.num6,
-            )
-            _LOGGER.info("Draw %d: %s", index, numbers)
+            _LOGGER.info("Draw %d: %s", index, draw.balls)
 
     @property
     def draws(self) -> tuple[Draw, ...]:

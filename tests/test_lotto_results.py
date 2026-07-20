@@ -13,7 +13,7 @@ _LOTTO_RESULTS_PICKLE_PATH = _PROJECT_ROOT / "data" / "lotto_results.pkl"
 
 def _numbers(draw: Draw) -> tuple[int, ...]:
     """Return the six numbers from one draw."""
-    return tuple(getattr(draw, f"num{position}") for position in range(1, 7))
+    return tuple(ball.value for ball in draw.balls)
 
 
 def test_lotto_results_yaml_creates_draws_pickle() -> None:
