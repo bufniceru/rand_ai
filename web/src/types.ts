@@ -219,6 +219,13 @@ export interface ExportResult {
   path?: string;
 }
 
+export type PossibleDrawNumberState = "possible" | "for-sure";
+
+export interface PossibleDrawNumberRequest {
+  number: number;
+  state: PossibleDrawNumberState;
+}
+
 export interface DesktopApi {
   openDataset(): Promise<DatasetSelection | null>;
   getReportPlugins(): Promise<ReportPluginState>;
@@ -238,6 +245,13 @@ export interface DesktopApi {
   openLastSeenGapDialog(): Promise<void>;
   openCombinedPredictionDialog(): Promise<void>;
   openPossibleDrawDialog(): Promise<void>;
+  sendPredictionNumberToPossibleDraw(
+    request: PossibleDrawNumberRequest,
+  ): Promise<void>;
+  showForSureLimitError(number: number): Promise<void>;
+  onPossibleDrawNumber(
+    callback: (request: PossibleDrawNumberRequest) => void,
+  ): () => void;
   openDrawEditorDialog(): Promise<void>;
   getDrawEditorData(): Promise<DrawEditorData>;
   saveDraw(request: DrawSaveRequest): Promise<DrawEditorData>;

@@ -949,6 +949,61 @@ ipcMain.handle("possible-draw:open", () => {
   createPossibleDrawWindow();
 });
 
+ipcMain.handle("possible-draw:add-number", (_event, request) => {
+  const number = Number(request?.number);
+  const state = request?.state;
+  if (!Number.isInteger(number) || number < 1 || number > 49) {
+    throw new RangeError("Possible Draw numbers must be integers from 1 through 49.");
+  }
+  if (!["possible", "for-sure"].includes(state)) {
+    throw new TypeError("Possible Draw state must be possible or for-sure.");
+  }
+  if (!enabledReportIds.has("possible-draw")) {
+    dialog.showMessageBox(combinedPredictionWindow ?? mainWindow, {
+      type: "error",
+      title: "Possible Draw unavailable",
+      message: "Possible Draw is disabled.",
+      detail: "Enable Possible Draw in Settings before sending prediction numbers.",
+    });
+    return;
+  }
+  if (!activePredictionData) {
+    dialog.showMessageBox(combinedPredictionWindow ?? mainWindow, {
+      type: "error",
+      title: "Possible Draw unavailable",
+      message: "Analyze a dataset first.",
+      detail: "Prediction numbers can be sent after the active dataset is analyzed.",
+    });
+    return;
+  }
+
+  createPossibleDrawWindow();
+  const target = possibleDrawWindow;
+  if (!target || target.isDestroyed()) return;
+  const deliver = () => {
+    if (!target.isDestroyed()) {
+      target.webContents.send("possible-draw:number-requested", { number, state });
+      if (target.isMinimized()) target.restore();
+      target.focus();
+    }
+  };
+  if (target.webContents.isLoading()) {
+    target.webContents.once("did-finish-load", deliver);
+  } else {
+    deliver();
+  }
+});
+
+ipcMain.handle("possible-draw:for-sure-limit-error", (event, requestedNumber) => {
+  const parent = BrowserWindow.fromWebContents(event.sender) ?? possibleDrawWindow ?? mainWindow;
+  return dialog.showMessageBox(parent, {
+    type: "error",
+    title: "For Sure limit reached",
+    message: "No more than six numbers can be marked For Sure.",
+    detail: `Number ${requestedNumber} was not added. Remove a For Sure number before trying again.`,
+  });
+});
+
 ipcMain.handle("draw-editor:open", () => {
   createDrawEditorWindow();
 });

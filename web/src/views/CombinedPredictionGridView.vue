@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import type {
+  PossibleDrawNumberState,
   PredictionSuite,
   StrategyNumberPrediction,
   StrategyPrediction,
@@ -13,6 +14,7 @@ const props = defineProps<{
 const referenceOffset = ref(0);
 const selectedStrategyId = ref("all");
 const mutedStrategyIds = ref<Set<string>>(new Set());
+let numberActionTimer: ReturnType<typeof setTimeout> | null = null;
 
 const maximumOffset = computed(() => Math.max(0, props.predictionSuites.length - 1));
 const selectedIndex = computed(() =>
@@ -136,7 +138,7 @@ function cellTitle(
 ): string {
   const outcome = actualNumbers.value.has(entry.number) ? " — drawn next" : "";
   const details = entry.details.length > 0 ? ` — ${entry.details.join(" · ")}` : "";
-  return `Number ${entry.number}: rank ${entry.rank}, ${strategy.name} score ${scoreLabel(entry)}${details}${outcome}`;
+  return `Number ${entry.number}: rank ${entry.rank}, ${strategy.name} score ${scoreLabel(entry)}${details}${outcome} — Ctrl+Click: Possible; Ctrl+Double-click: For Sure`;
 }
 
 function allCellTitle(cell: (typeof allReportCells.value)[number]): string {
@@ -146,7 +148,7 @@ function allCellTitle(cell: (typeof allReportCells.value)[number]): string {
     cell.reports.length >= 3
       ? ` — high agreement (${cell.reports.length} strategies)`
       : "";
-  return `Number ${cell.number}${outcome}${consensus} — predicted by ${reports || "no report"}`;
+  return `Number ${cell.number}${outcome}${consensus} — predicted by ${reports || "no report"} — Ctrl+Click: Possible; Ctrl+Double-click: For Sure`;
 }
 
 function sectorStyle(cell: (typeof allReportCells.value)[number]): Record<string, string> {
@@ -161,6 +163,39 @@ function sectorStyle(cell: (typeof allReportCells.value)[number]): Record<string
   );
   return { background: `conic-gradient(${sectors.join(", ")})` };
 }
+
+function clearNumberActionTimer(): void {
+  if (numberActionTimer !== null) {
+    clearTimeout(numberActionTimer);
+    numberActionTimer = null;
+  }
+}
+
+function sendNumberToPossibleDraw(
+  number: number,
+  state: PossibleDrawNumberState,
+): void {
+  void window.randAiDesktop?.sendPredictionNumberToPossibleDraw({ number, state });
+}
+
+function handlePredictionClick(event: MouseEvent, number: number): void {
+  if (!event.ctrlKey) return;
+  event.preventDefault();
+  clearNumberActionTimer();
+  numberActionTimer = setTimeout(() => {
+    sendNumberToPossibleDraw(number, "possible");
+    numberActionTimer = null;
+  }, 350);
+}
+
+function handlePredictionDoubleClick(event: MouseEvent, number: number): void {
+  if (!event.ctrlKey) return;
+  event.preventDefault();
+  clearNumberActionTimer();
+  sendNumberToPossibleDraw(number, "for-sure");
+}
+
+onBeforeUnmount(clearNumberActionTimer);
 </script>
 
 <template>
@@ -304,6 +339,8 @@ function sectorStyle(cell: (typeof allReportCells.value)[number]): Record<string
               :style="sectorStyle(cell)"
               :title="allCellTitle(cell)"
               role="gridcell"
+              @click="handlePredictionClick($event, cell.number)"
+              @dblclick="handlePredictionDoubleClick($event, cell.number)"
             >
               <strong>{{ cell.number }}</strong>
             </article>
@@ -324,6 +361,8 @@ function sectorStyle(cell: (typeof allReportCells.value)[number]): Record<string
                 :class="{ 'is-drawn': actualNumbers.has(entry.number) }"
                 :title="cellTitle(entry, selectedStrategy)"
                 role="gridcell"
+                @click="handlePredictionClick($event, entry.number)"
+                @dblclick="handlePredictionDoubleClick($event, entry.number)"
               >
                 <span class="prediction-rank">#{{ entry.rank }}</span>
                 <strong>{{ entry.number }}</strong>

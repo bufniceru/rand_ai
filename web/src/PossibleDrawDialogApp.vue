@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type {
   CombinedPredictionDialogData,
+  PossibleDrawNumberRequest,
   RelationshipEdge,
   StrategyId,
   StrategyNumberPrediction,
@@ -37,6 +38,7 @@ const lastSeenIndex = ref(0);
 const errorMessage = ref("");
 let clickTimer: ReturnType<typeof setTimeout> | null = null;
 let unsubscribeData: (() => void) | null = null;
+let unsubscribeNumberRequest: (() => void) | null = null;
 
 const latestSuite = computed(() => dialogData.value?.predictionSuites.at(-1) ?? null);
 const strategies = computed(() => latestSuite.value?.strategies ?? []);
@@ -214,7 +216,37 @@ function toggleSelected(number: number): void {
   } else if (selectedNumbers.value.length < 6) {
     selectedNumbers.value = [...selectedNumbers.value, number].sort((left, right) => left - right);
     uncertainNumbers.value = uncertainNumbers.value.filter((item) => item !== number);
+  } else {
+    void window.randAiDesktop?.showForSureLimitError(number);
   }
+}
+
+function applyPredictionNumber(request: PossibleDrawNumberRequest): void {
+  const number = request.number;
+  if (!Number.isInteger(number) || number < 1 || number > 49) return;
+  clearClickTimer();
+  focusedNumber.value = number;
+  droppedNumbers.value = droppedNumbers.value.filter((item) => item !== number);
+
+  if (request.state === "possible") {
+    selectedNumbers.value = selectedNumbers.value.filter((item) => item !== number);
+    if (!uncertainSet.value.has(number)) {
+      uncertainNumbers.value = [...uncertainNumbers.value, number].sort(
+        (left, right) => left - right,
+      );
+    }
+    return;
+  }
+
+  if (selectedSet.value.has(number)) return;
+  if (selectedNumbers.value.length >= 6) {
+    void window.randAiDesktop?.showForSureLimitError(number);
+    return;
+  }
+  uncertainNumbers.value = uncertainNumbers.value.filter((item) => item !== number);
+  selectedNumbers.value = [...selectedNumbers.value, number].sort(
+    (left, right) => left - right,
+  );
 }
 
 function handleClick(event: MouseEvent, number: number): void {
@@ -329,6 +361,9 @@ onMounted(async () => {
     return;
   }
   unsubscribeData = window.randAiDesktop.onCombinedPredictionData(acceptData);
+  unsubscribeNumberRequest = window.randAiDesktop.onPossibleDrawNumber(
+    applyPredictionNumber,
+  );
   try {
     const data = await window.randAiDesktop.getCombinedPredictionData();
     if (data) acceptData(data);
@@ -341,6 +376,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   clearClickTimer();
   unsubscribeData?.();
+  unsubscribeNumberRequest?.();
 });
 </script>
 
@@ -398,7 +434,7 @@ onBeforeUnmount(() => {
                 lastSeen: showLastSeen && highlightedLastSeen?.number === number,
               }"
               :aria-pressed="selectedSet.has(number)"
-              :title="`Number ${number}: click to select, double-click to exclude, Ctrl+double-click for uncertain`"
+              :title="`Number ${number}: click for For Sure, double-click to exclude, Ctrl+double-click for Possible`"
               @click="handleClick($event, number)"
               @dblclick="handleDoubleClick($event, number)"
             >
@@ -406,7 +442,7 @@ onBeforeUnmount(() => {
             </button>
           </div>
           <p class="possible-help">
-            Click to select up to six · Double-click to exclude · Ctrl+double-click to mark uncertain
+            For Sure: click, maximum six · Exclude: double-click · Possible: Ctrl+double-click, no six-number limit
           </p>
         </section>
 

@@ -17,6 +17,15 @@ contextBridge.exposeInMainWorld("randAiDesktop", {
   openLastSeenGapDialog: () => ipcRenderer.invoke("last-seen-gap:open"),
   openCombinedPredictionDialog: () => ipcRenderer.invoke("combined-prediction:open"),
   openPossibleDrawDialog: () => ipcRenderer.invoke("possible-draw:open"),
+  sendPredictionNumberToPossibleDraw: (request) =>
+    ipcRenderer.invoke("possible-draw:add-number", request),
+  showForSureLimitError: (number) =>
+    ipcRenderer.invoke("possible-draw:for-sure-limit-error", number),
+  onPossibleDrawNumber: (callback) => {
+    const listener = (_event, request) => callback(request);
+    ipcRenderer.on("possible-draw:number-requested", listener);
+    return () => ipcRenderer.removeListener("possible-draw:number-requested", listener);
+  },
   openDrawEditorDialog: () => ipcRenderer.invoke("draw-editor:open"),
   getDrawEditorData: () => ipcRenderer.invoke("draw-editor:data"),
   saveDraw: (request) => ipcRenderer.invoke("draw-editor:save", request),
