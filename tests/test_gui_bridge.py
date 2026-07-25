@@ -103,8 +103,7 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
     assert payload["combinedPredictions"][-1]["actualNumbers"] == []
     assert len(payload["combinedPredictions"][-1]["numbers"]) == 49
     assert payload["combinedPredictions"][-1]["topNumbers"] == [
-        item["number"]
-        for item in payload["combinedPredictions"][-1]["numbers"][:6]
+        item["number"] for item in payload["combinedPredictions"][-1]["numbers"][:6]
     ]
     latest_suite = payload["predictionSuites"][-1]
     assert latest_suite["referenceDrawNumber"] == 3
@@ -114,18 +113,36 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
         "Fresh",
         "EMD",
         "Rand",
+        "FRnd",
+        "Chi²",
         "Entr",
         "Mark",
         "MKFR",
         "Baye",
+        "Grid",
+        "Mix",
         "SVC",
         "TBL",
+        "CIS",
     ]
     assert all(
         len(strategy["numbers"]) == 49
         and len(strategy["topNumbers"]) == 6
+        and strategy["efficacy"]["evaluatedDraws"] == 2
+        and strategy["efficacy"]["expectedRandomHits"] == pytest.approx(72 / 49)
         for strategy in latest_suite["strategies"]
     )
+    random_efficacy = latest_suite["strategies"][3]["efficacy"]
+    assert random_efficacy["strategyHits"] == random_efficacy["randomHits"]
+    assert random_efficacy["hitDifference"] == 0
+    efficacy_history = payload["strategyEfficacyHistory"]
+    assert len(efficacy_history) == 2
+    assert efficacy_history[0]["referenceDrawNumber"] == 1
+    assert efficacy_history[0]["targetDrawNumber"] == 2
+    assert efficacy_history[0]["actualNumbers"] == [1, 10, 20, 30, 40, 49]
+    assert set(efficacy_history[0]["strategyHits"]) == {
+        strategy["id"] for strategy in latest_suite["strategies"]
+    }
     assert payload["possibleDraw"]["lastDrawNumbers"] == [5, 12, 19, 27, 36, 45]
     assert len(payload["possibleDraw"]["lastSeenRows"]) == 49
     assert len(payload["possibleDraw"]["relationshipEdges"]) == 1176
@@ -137,10 +154,13 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
         "hit_rate",
         "hit_percentage",
     ]
-    assert sum(
-        row["hits"]
-        for row in payload["tables"]["freshness_gap_distribution"]["rows"]
-    ) == 18
+    assert (
+        sum(
+            row["hits"]
+            for row in payload["tables"]["freshness_gap_distribution"]["rows"]
+        )
+        == 18
+    )
     assert payload["tables"]["number_trends"]["columns"] == [
         "bin",
         "start_draw",
@@ -171,6 +191,7 @@ def test_disabled_report_plugins_are_not_calculated_or_returned(
     assert payload["history"] == []
     assert payload["combinedPredictions"] == []
     assert payload["predictionSuites"] == []
+    assert payload["strategyEfficacyHistory"] == []
     assert payload["possibleDraw"]["relationshipEdges"] == []
 
 
@@ -217,8 +238,7 @@ def test_analysis_emits_only_enabled_strategy_plugins(tmp_path: Path) -> None:
 
     assert payload["options"]["enabledStrategies"] == ["freshness", "entropy"]
     assert [
-        strategy["id"]
-        for strategy in payload["predictionSuites"][-1]["strategies"]
+        strategy["id"] for strategy in payload["predictionSuites"][-1]["strategies"]
     ] == ["freshness", "entropy"]
 
 

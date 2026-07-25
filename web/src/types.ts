@@ -15,12 +15,17 @@ export type StrategyId =
   | "freshness"
   | "emd"
   | "randomness"
+  | "fresh_random"
+  | "chi_square"
   | "entropy"
   | "markov100"
   | "mkfr"
   | "bayesian"
+  | "predictive_grid"
+  | "mixed"
   | "svc"
-  | "tbl";
+  | "tbl"
+  | "cis";
 export type ViewId =
   | "overview"
   | "numbers"
@@ -125,6 +130,7 @@ export interface CombinedPredictionDialogData {
   dataset: DatasetSummary;
   predictions: CombinedPredictionHistory[];
   predictionSuites: PredictionSuite[];
+  strategyEfficacyHistory: StrategyEfficacyRecord[];
   history: HistoryDraw[];
   possibleDraw: PossibleDrawAnalysis;
 }
@@ -157,12 +163,31 @@ export interface StrategyNumberPrediction {
   details: string[];
 }
 
+export interface StrategyEfficacy {
+  evaluatedDraws: number;
+  strategyHits: number;
+  randomHits: number;
+  expectedRandomHits: number;
+  averageHitsPerDraw: number;
+  randomAverageHitsPerDraw: number;
+  hitDifference: number;
+}
+
+export interface StrategyEfficacyRecord {
+  referenceDrawNumber: number;
+  targetDrawNumber: number;
+  actualNumbers: number[];
+  randomHits: number;
+  strategyHits: Partial<Record<StrategyId, number>>;
+}
+
 export interface StrategyPrediction {
   id: StrategyId;
   name: string;
   description: string;
   topNumbers: number[];
   numbers: StrategyNumberPrediction[];
+  efficacy: StrategyEfficacy | null;
 }
 
 export interface PredictionSuite {

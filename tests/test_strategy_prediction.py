@@ -2,19 +2,31 @@
 
 import pytest
 
-from rand_ai import Draw, Draws, PredictionSuite, StrategyPrediction
+from rand_ai import (
+    Draw,
+    Draws,
+    PredictionSuite,
+    StrategyEfficacy,
+    StrategyEfficacyRecord,
+    StrategyPrediction,
+)
 from rand_ai.strategy_prediction import (
     _BASE_PROBABILITY,
+    _CIS_EXPERTS,
+    _EXPECTED_RANDOM_HITS_PER_DRAW,
     _MKFR_MAX_ORDER,
     _MKFR_MIN_CONTEXT_SUPPORT,
     _MKFR_PRIOR_STRENGTH,
     _StrategyState,
+    _median,
     _proximity_bucket,
+    _rank_strength,
+    _variance,
     build_prediction_suites,
 )
 
 
-def test_builds_ten_named_rankings_and_reports_progress() -> None:
+def test_builds_fifteen_named_rankings_and_reports_progress() -> None:
     draws = Draws()
     draws.add(Draw(1, 2, 8, 17, 31, 49))
     draws.add(Draw(3, 6, 12, 22, 36, 47))
@@ -36,20 +48,36 @@ def test_builds_ten_named_rankings_and_reports_progress() -> None:
         "Fresh",
         "EMD",
         "Rand",
+        "FRnd",
+        "Chi²",
         "Entr",
         "Mark",
         "MKFR",
         "Baye",
+        "Grid",
+        "Mix",
         "SVC",
         "TBL",
+        "CIS",
     ]
     assert all(
         isinstance(strategy, StrategyPrediction)
         and len(strategy.numbers) == 49
         and tuple(item.rank for item in strategy.numbers) == tuple(range(1, 50))
-        and strategy.top_numbers
-        == tuple(item.number for item in strategy.numbers[:6])
+        and strategy.top_numbers == tuple(item.number for item in strategy.numbers[:6])
         for strategy in suites[-1].strategies
+    )
+    assert all(
+        isinstance(strategy.efficacy, StrategyEfficacy)
+        and strategy.efficacy.evaluated_draws == 2
+        for strategy in suites[-1].strategies
+    )
+    random_efficacy = suites[-1].strategies[3].efficacy
+    assert random_efficacy is not None
+    assert random_efficacy.strategy_hits == random_efficacy.random_hits
+    assert random_efficacy.hit_difference == 0
+    assert random_efficacy.expected_random_hits == pytest.approx(
+        2 * _EXPECTED_RANDOM_HITS_PER_DRAW
     )
     assert progress == [(1, 3), (2, 3), (3, 3)]
 
@@ -85,6 +113,110 @@ def test_builds_only_selected_strategy_plugins(
     ]
 
 
+def test_builds_only_the_four_new_plugins_with_internal_dependencies() -> None:
+    draws = Draws()
+    draws.add(Draw(1, 2, 8, 17, 31, 49))
+    draws.add(Draw(3, 6, 12, 22, 36, 47))
+    draws.prepare_predictions()
+
+    suites = build_prediction_suites(
+        draws.draws,
+        enabled_strategy_ids=(
+            "fresh_random",
+            "predictive_grid",
+            "mixed",
+            "cis",
+        ),
+    )
+
+    assert [strategy.strategy_id for strategy in suites[-1].strategies] == [
+        "fresh_random",
+        "predictive_grid",
+        "mixed",
+        "cis",
+    ]
+    assert all(
+        len(strategy.numbers) == 49 and len(strategy.top_numbers) == 6
+        for strategy in suites[-1].strategies
+    )
+
+
+def test_new_strategy_math_and_cis_learned_mode() -> None:
+    ranking = list(range(1, 50))
+    scores, details = _StrategyState._combine_rankings(((ranking, 1.0),))
+    assert scores[1] == pytest.approx(1.12)
+    assert details[1] == (
+        "Top-quarter agreement 1/1",
+        "Top-6 agreement 1/1",
+    )
+
+    state = _StrategyState(("cis",), total_draw_count=100)
+    assert state._cis_previous_draw_features() == (0.0, 0.0, 0.0)
+    state.cis_draw_count = 36
+    rankings = {strategy_id: ranking for strategy_id, _label, _weight in _CIS_EXPERTS}
+    cis_scores, cis_details = state._cis_scores(rankings)
+
+    assert set(cis_scores) == set(range(1, 50))
+    assert cis_details[1][0].startswith("Learned probability")
+    assert _rank_strength([1], 2) == 0
+    assert _variance([]) == 0
+    assert _median([]) == 0
+    assert _median([3]) == 3
+
+
+def test_chi_square_ranks_signed_frequency_residuals() -> None:
+    state = _StrategyState(("chi_square",))
+    state.draw_count = 49
+    for number, observed in enumerate((0, 2, 6, 10, 12), start=1):
+        state.appearances[number] = observed
+
+    scores, details = state._chi_square_scores()
+
+    assert scores[1] == 0
+    assert scores[3] == pytest.approx(0.5)
+    assert scores[5] == 1
+    assert [details[number][0] for number in range(1, 6)] == [
+        "Strong under",
+        "Mild under",
+        "Near expected",
+        "Mild over",
+        "Strong over",
+    ]
+    assert details[5][1] == "Observed 12 vs expected 6.00"
+    assert details[5][3] == "Chi-square contribution 6.000"
+
+
+def test_four_new_plugins_do_not_learn_from_future_draws() -> None:
+    draws = Draws()
+    for numbers in (
+        (1, 2, 8, 17, 31, 49),
+        (3, 6, 12, 22, 36, 47),
+        (1, 9, 18, 27, 38, 45),
+        (4, 10, 19, 28, 37, 46),
+    ):
+        draws.add(Draw(*numbers))
+    draws.prepare_predictions()
+    strategy_ids = (
+        "fresh_random",
+        "predictive_grid",
+        "mixed",
+        "cis",
+    )
+
+    prefix = build_prediction_suites(
+        draws.draws[:3],
+        enabled_strategy_ids=strategy_ids,
+    )
+    extended = build_prediction_suites(
+        draws.draws,
+        enabled_strategy_ids=strategy_ids,
+    )
+
+    assert [strategy.top_numbers for strategy in prefix[-1].strategies] == [
+        strategy.top_numbers for strategy in extended[2].strategies
+    ]
+
+
 def test_allows_every_strategy_plugin_to_be_disabled() -> None:
     suites = build_prediction_suites(
         (Draw(),),
@@ -92,6 +224,78 @@ def test_allows_every_strategy_plugin_to_be_disabled() -> None:
     )
 
     assert suites[0].strategies == ()
+
+
+def test_reports_zero_efficacy_until_a_next_draw_is_available() -> None:
+    draws = Draws()
+    draws.add(Draw(1, 2, 8, 17, 31, 49))
+    draws.prepare_predictions()
+
+    suite = build_prediction_suites(
+        draws.draws,
+        enabled_strategy_ids=("freshness",),
+    )[0]
+    efficacy = suite.strategies[0].efficacy
+
+    assert efficacy == StrategyEfficacy(
+        evaluated_draws=0,
+        strategy_hits=0,
+        random_hits=0,
+        expected_random_hits=0.0,
+        average_hits_per_draw=0.0,
+        random_average_hits_per_draw=0.0,
+        hit_difference=0,
+    )
+
+
+def test_efficacy_uses_only_results_available_at_each_historical_point() -> None:
+    draws = Draws()
+    draws.add(Draw(1, 2, 8, 17, 31, 49))
+    draws.add(Draw(3, 6, 12, 22, 36, 47))
+    draws.add(Draw(1, 9, 18, 27, 38, 45))
+    draws.prepare_predictions()
+
+    suites = build_prediction_suites(
+        draws.draws,
+        enabled_strategy_ids=("freshness",),
+    )
+
+    assert [
+        suite.strategies[0].efficacy.evaluated_draws
+        for suite in suites
+        if suite.strategies[0].efficacy is not None
+    ] == [1, 2, 2]
+
+
+def test_display_history_limit_does_not_limit_efficacy_evaluation() -> None:
+    draws = Draws()
+    draws.add(Draw(1, 2, 8, 17, 31, 49))
+    draws.add(Draw(3, 6, 12, 22, 36, 47))
+    draws.add(Draw(1, 9, 18, 27, 38, 45))
+    draws.add(Draw(4, 11, 20, 29, 37, 48))
+    draws.prepare_predictions()
+
+    efficacy_records: list[StrategyEfficacyRecord] = []
+    suites = build_prediction_suites(
+        draws.draws,
+        history_start=3,
+        enabled_strategy_ids=("freshness",),
+        efficacy_record=efficacy_records.append,
+    )
+
+    assert len(suites) == 1
+    efficacy = suites[0].strategies[0].efficacy
+    assert efficacy is not None
+    assert efficacy.evaluated_draws == 3
+    assert [record.target_draw_number for record in efficacy_records] == [2, 3, 4]
+    assert all(
+        record.strategy_hits[0][0] == "freshness"
+        and record.actual_numbers
+        == tuple(ball.value for ball in draws.draws[index + 1].balls)
+        and 0 <= record.strategy_hits[0][1] <= 6
+        and 0 <= record.random_hits <= 6
+        for index, record in enumerate(efficacy_records)
+    )
 
 
 def test_rejects_unknown_strategy_plugin() -> None:
@@ -126,12 +330,12 @@ def test_mkfr_backs_off_from_an_unsupported_longer_context() -> None:
         _MKFR_MIN_CONTEXT_SUPPORT - 1,
         0,
     ]
-    baseline = (
-        20 + _MKFR_PRIOR_STRENGTH * _BASE_PROBABILITY
-    ) / (100 + _MKFR_PRIOR_STRENGTH)
-    expected_order_one = (
-        2 + _MKFR_PRIOR_STRENGTH * baseline
-    ) / (10 + _MKFR_PRIOR_STRENGTH)
+    baseline = (20 + _MKFR_PRIOR_STRENGTH * _BASE_PROBABILITY) / (
+        100 + _MKFR_PRIOR_STRENGTH
+    )
+    expected_order_one = (2 + _MKFR_PRIOR_STRENGTH * baseline) / (
+        10 + _MKFR_PRIOR_STRENGTH
+    )
 
     probability, support, selected_order = state._mkfr_probability(1)
 
@@ -140,9 +344,9 @@ def test_mkfr_backs_off_from_an_unsupported_longer_context() -> None:
     assert selected_order == 1
 
     state.mkfr_transitions[1][1][0b10] = [6, 2]
-    expected_order_two = (
-        2 + _MKFR_PRIOR_STRENGTH * expected_order_one
-    ) / (8 + _MKFR_PRIOR_STRENGTH)
+    expected_order_two = (2 + _MKFR_PRIOR_STRENGTH * expected_order_one) / (
+        8 + _MKFR_PRIOR_STRENGTH
+    )
 
     probability, support, selected_order = state._mkfr_probability(1)
 
@@ -169,12 +373,9 @@ def test_mkfr_supports_joint_contexts_through_order_twenty() -> None:
     assert selected_order == _MKFR_MAX_ORDER
     assert scores[1] > scores[2]
     assert details[1][3] == (
-        f"Order {_MKFR_MAX_ORDER}/{_MKFR_MAX_ORDER}: "
-        f"{'1' * _MKFR_MAX_ORDER}"
+        f"Order {_MKFR_MAX_ORDER}/{_MKFR_MAX_ORDER}: {'1' * _MKFR_MAX_ORDER}"
     )
-    assert details[1][4] == (
-        f"Context support {_MKFR_MIN_CONTEXT_SUPPORT}"
-    )
+    assert details[1][4] == (f"Context support {_MKFR_MIN_CONTEXT_SUPPORT}")
 
 
 def test_mkfr_ranks_transition_lift_above_each_numbers_baseline() -> None:
@@ -219,9 +420,7 @@ def test_mkfr_prediction_does_not_learn_from_a_future_draw() -> None:
     with_future = Draws()
     for draw in prefix:
         without_future.add(draw)
-        with_future.add(
-            Draw(*(ball.value for ball in draw.balls))
-        )
+        with_future.add(Draw(*(ball.value for ball in draw.balls)))
     with_future.add(Draw(4, 11, 20, 29, 37, 48))
     without_future.prepare_predictions()
     with_future.prepare_predictions()

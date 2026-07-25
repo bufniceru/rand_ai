@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from collections import deque
 from collections.abc import Callable, Collection, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import combinations
 
 from rand_ai.draw import Draw
@@ -14,6 +14,7 @@ from rand_ai.prediction import CombinedPrediction
 _NUMBER_COUNT = 49
 _NUMBERS_PER_DRAW = 6
 _BASE_PROBABILITY = _NUMBERS_PER_DRAW / _NUMBER_COUNT
+_EXPECTED_RANDOM_HITS_PER_DRAW = _NUMBERS_PER_DRAW * _NUMBERS_PER_DRAW / _NUMBER_COUNT
 _MAX_GAP_BUCKET = 35
 _MARKOV_PRIOR_STRENGTH = 8.0
 _MARKOV_DECAY = 0.5 ** (1 / 500)
@@ -21,10 +22,27 @@ _MKFR_MAX_ORDER = 20
 _MKFR_PRIOR_STRENGTH = 8.0
 _MKFR_MIN_CONTEXT_SUPPORT = 8
 _RANDOM_SEED = 20260626
+_FRESH_RANDOM_SEED_OFFSET = 7919
+_FRESH_RANDOM_INFLUENCE = 0.35
+_CIS_MINIMUM_TRAINING_DRAWS = 36
 _PROXIMITY_BUCKETS = ("paired", "tight", "near", "balanced", "wide", "isolated")
 _EARTH_MOVER_BUCKETS = ("Overlap", "Near", "Close", "Middle", "Far", "Distant")
 _PRIMES = {
-    2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47,
+    2,
+    3,
+    5,
+    7,
+    11,
+    13,
+    17,
+    19,
+    23,
+    29,
+    31,
+    37,
+    41,
+    43,
+    47,
 }
 
 PredictionProgress = Callable[[int, int], None]
@@ -33,13 +51,47 @@ STRATEGY_IDS = (
     "freshness",
     "emd",
     "randomness",
+    "fresh_random",
+    "chi_square",
     "entropy",
     "markov100",
     "mkfr",
     "bayesian",
+    "predictive_grid",
+    "mixed",
     "svc",
     "tbl",
+    "cis",
 )
+_CIS_EXPERTS = (
+    ("freshness", "Freshness", 0.15),
+    ("proximity", "Proximity", 0.12),
+    ("emd", "EMD", 0.10),
+    ("bayesian", "Bayesian", 0.15),
+    ("markov100", "100 Markov", 0.10),
+    ("mixed", "Mixed", 0.12),
+    ("randomness", "Randomness", 0.04),
+    ("fresh_random", "Fresh Random", 0.05),
+    ("svc", "SVC", 0.08),
+    ("tbl", "TBL", 0.09),
+)
+_STRATEGY_DEPENDENCIES = {
+    "fresh_random": {"freshness", "randomness"},
+    "mixed": {"freshness", "proximity", "emd", "bayesian"},
+    "predictive_grid": {"markov100"},
+    "cis": {
+        "freshness",
+        "proximity",
+        "emd",
+        "bayesian",
+        "markov100",
+        "mixed",
+        "randomness",
+        "fresh_random",
+        "svc",
+        "tbl",
+    },
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +106,19 @@ class StrategyNumberPrediction:
 
 
 @dataclass(frozen=True, slots=True)
+class StrategyEfficacy:
+    """Compare walk-forward Top-6 hits with equal-size random selections."""
+
+    evaluated_draws: int
+    strategy_hits: int
+    random_hits: int
+    expected_random_hits: float
+    average_hits_per_draw: float
+    random_average_hits_per_draw: float
+    hit_difference: int
+
+
+@dataclass(frozen=True, slots=True)
 class StrategyPrediction:
     """Store one named 49-number strategy ranking."""
 
@@ -62,6 +127,18 @@ class StrategyPrediction:
     description: str
     numbers: tuple[StrategyNumberPrediction, ...]
     top_numbers: tuple[int, ...]
+    efficacy: StrategyEfficacy | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class StrategyEfficacyRecord:
+    """Store one completed draw's hits for selectable-range comparisons."""
+
+    reference_draw_number: int
+    target_draw_number: int
+    actual_numbers: tuple[int, ...]
+    random_hits: int
+    strategy_hits: tuple[tuple[str, int], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +149,9 @@ class PredictionSuite:
     target_draw_number: int
     actual_numbers: tuple[int, ...]
     strategies: tuple[StrategyPrediction, ...]
+
+
+EfficacyRecordCallback = Callable[[StrategyEfficacyRecord], None]
 
 
 def _clamp(value: float, minimum: float, maximum: float) -> float:
@@ -88,10 +168,7 @@ def _scale_scores(scores: dict[int, float]) -> dict[int, float]:
     spread = maximum - minimum
     if spread <= 0:
         return {number: 0.0 for number in scores}
-    return {
-        number: (score - minimum) / spread
-        for number, score in scores.items()
-    }
+    return {number: (score - minimum) / spread for number, score in scores.items()}
 
 
 def _strategy(
@@ -102,10 +179,7 @@ def _strategy(
     gaps: dict[int, int],
     details: dict[int, tuple[str, ...]] | None = None,
 ) -> StrategyPrediction:
-    ranked = sorted(
-        scores,
-        key=lambda number: (-scores[number], -gaps[number], number),
-    )
+    ranked = _ranking_from_scores(scores, gaps)
     predictions = tuple(
         StrategyNumberPrediction(
             number=number,
@@ -125,9 +199,9 @@ def _strategy(
     )
 
 
-def _random_ranking(draw_index: int) -> list[int]:
+def _random_ranking(draw_index: int, seed: int = _RANDOM_SEED) -> list[int]:
     """Return the deterministic LCG/Fisher-Yates baseline used by PyLotto."""
-    state = (_RANDOM_SEED ^ (((draw_index + 1) * 2654435761) & 0xFFFFFFFF))
+    state = seed ^ (((draw_index + 1) * 2654435761) & 0xFFFFFFFF)
     state &= 0xFFFFFFFF
     numbers = list(range(1, _NUMBER_COUNT + 1))
     for index in range(len(numbers) - 1, 0, -1):
@@ -135,6 +209,117 @@ def _random_ranking(draw_index: int) -> list[int]:
         swap_index = state % (index + 1)
         numbers[index], numbers[swap_index] = numbers[swap_index], numbers[index]
     return numbers
+
+
+def _ranking_from_scores(
+    scores: dict[int, float],
+    gaps: dict[int, int],
+) -> list[int]:
+    return sorted(
+        scores,
+        key=lambda number: (-scores[number], -gaps[number], number),
+    )
+
+
+def _rank_strength(ranking: Sequence[int], number: int) -> float:
+    try:
+        rank = ranking.index(number) + 1
+    except ValueError:
+        rank = _NUMBER_COUNT
+    return (_NUMBER_COUNT - rank) / (_NUMBER_COUNT - 1)
+
+
+def _average(values: Sequence[float]) -> float:
+    return sum(values) / len(values) if values else 0.0
+
+
+def _variance(values: Sequence[float]) -> float:
+    if not values:
+        return 0.0
+    mean = _average(values)
+    return _average([(value - mean) ** 2 for value in values])
+
+
+def _median(values: Sequence[float]) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return (ordered[middle - 1] + ordered[middle]) / 2
+
+
+class _EfficacyTracker:
+    """Accumulate walk-forward comparisons without retaining every ranking."""
+
+    def __init__(self) -> None:
+        self.evaluated_draws = 0
+        self.random_hits = 0
+        self.strategy_hits: dict[str, int] = {}
+
+    def compare(
+        self,
+        suite: PredictionSuite,
+    ) -> tuple[PredictionSuite, StrategyEfficacyRecord | None]:
+        """Attach metrics available through this suite's target draw."""
+        record: StrategyEfficacyRecord | None = None
+        if suite.actual_numbers:
+            self.evaluated_draws += 1
+            actual = set(suite.actual_numbers)
+            random_top = _random_ranking(suite.reference_draw_number)[
+                :_NUMBERS_PER_DRAW
+            ]
+            current_random_hits = len(actual.intersection(random_top))
+            self.random_hits += current_random_hits
+            current_strategy_hits = tuple(
+                (
+                    strategy.strategy_id,
+                    len(actual.intersection(strategy.top_numbers)),
+                )
+                for strategy in suite.strategies
+            )
+            for strategy_id, hits in current_strategy_hits:
+                self.strategy_hits[strategy_id] = (
+                    self.strategy_hits.get(strategy_id, 0) + hits
+                )
+            record = StrategyEfficacyRecord(
+                reference_draw_number=suite.reference_draw_number,
+                target_draw_number=suite.target_draw_number,
+                actual_numbers=suite.actual_numbers,
+                random_hits=current_random_hits,
+                strategy_hits=current_strategy_hits,
+            )
+
+        expected_random_hits = self.evaluated_draws * _EXPECTED_RANDOM_HITS_PER_DRAW
+        updated_strategies = tuple(
+            replace(
+                strategy,
+                efficacy=StrategyEfficacy(
+                    evaluated_draws=self.evaluated_draws,
+                    strategy_hits=self.strategy_hits.get(strategy.strategy_id, 0),
+                    random_hits=self.random_hits,
+                    expected_random_hits=expected_random_hits,
+                    average_hits_per_draw=(
+                        self.strategy_hits.get(strategy.strategy_id, 0)
+                        / self.evaluated_draws
+                        if self.evaluated_draws
+                        else 0.0
+                    ),
+                    random_average_hits_per_draw=(
+                        self.random_hits / self.evaluated_draws
+                        if self.evaluated_draws
+                        else 0.0
+                    ),
+                    hit_difference=(
+                        self.strategy_hits.get(strategy.strategy_id, 0)
+                        - self.random_hits
+                    ),
+                ),
+            )
+            for strategy in suite.strategies
+        )
+        return replace(suite, strategies=updated_strategies), record
 
 
 def _proximity_bucket(distance: int) -> int:
@@ -154,15 +339,12 @@ def _proximity_bucket(distance: int) -> int:
 def _gap_entropy_percent(numbers: Sequence[int]) -> float:
     ordered = sorted(numbers)
     circular_gaps = [
-        ordered[index + 1] - ordered[index]
-        for index in range(len(ordered) - 1)
+        ordered[index + 1] - ordered[index] for index in range(len(ordered) - 1)
     ]
     circular_gaps.append((_NUMBER_COUNT + ordered[0]) - ordered[-1])
     total = sum(circular_gaps)
     entropy = -sum(
-        (gap / total) * math.log2(gap / total)
-        for gap in circular_gaps
-        if gap > 0
+        (gap / total) * math.log2(gap / total) for gap in circular_gaps if gap > 0
     )
     return entropy / math.log2(_NUMBERS_PER_DRAW) * 100
 
@@ -173,20 +355,29 @@ class _StrategyState:
     def __init__(
         self,
         enabled_strategy_ids: Collection[str] = STRATEGY_IDS,
+        total_draw_count: int = 1,
     ) -> None:
-        self.enabled_strategy_ids = frozenset(enabled_strategy_ids)
+        self.requested_strategy_ids = frozenset(enabled_strategy_ids)
+        active_strategy_ids = set(self.requested_strategy_ids)
+        for strategy_id in tuple(active_strategy_ids):
+            active_strategy_ids.update(_STRATEGY_DEPENDENCIES.get(strategy_id, ()))
+        self.enabled_strategy_ids = frozenset(active_strategy_ids)
+        self.total_draw_count = max(total_draw_count, 1)
         self.draw_count = 0
         self.appearances = [0] * (_NUMBER_COUNT + 1)
         self.last_seen: list[int | None] = [None] * (_NUMBER_COUNT + 1)
-        self.occurrences: list[list[int]] = [
-            [] for _ in range(_NUMBER_COUNT + 1)
-        ]
+        self.occurrences: list[list[int]] = [[] for _ in range(_NUMBER_COUNT + 1)]
         self.recent_draws: deque[set[int]] = deque(maxlen=100)
         self.pair_counts: dict[tuple[int, int], int] = {}
         self.previous_draw: set[int] = set()
+        self.previous_previous_draw: set[int] = set()
+        self.current_month = 0
+        self.transition_counts = [
+            [0] * (_NUMBER_COUNT + 1) for _ in range(_NUMBER_COUNT + 1)
+        ]
+        self.transition_totals = [0] * (_NUMBER_COUNT + 1)
         self.proximity_counts = [
-            [0] * len(_PROXIMITY_BUCKETS)
-            for _ in range(_NUMBER_COUNT + 1)
+            [0] * len(_PROXIMITY_BUCKETS) for _ in range(_NUMBER_COUNT + 1)
         ]
         self.proximity_totals = [0] * len(_PROXIMITY_BUCKETS)
         self.entropy_totals = [0.0] * (_NUMBER_COUNT + 1)
@@ -196,26 +387,32 @@ class _StrategyState:
         self.bayesian_opportunities = [0] * (_MAX_GAP_BUCKET + 1)
         self.bayesian_hits = [0] * (_MAX_GAP_BUCKET + 1)
         self.mkfr_histories: list[deque[int]] = (
-            [
-                deque(maxlen=_MKFR_MAX_ORDER)
-                for _ in range(_NUMBER_COUNT + 1)
-            ]
+            [deque(maxlen=_MKFR_MAX_ORDER) for _ in range(_NUMBER_COUNT + 1)]
             if "mkfr" in self.enabled_strategy_ids
             else []
         )
         self.mkfr_transitions: list[list[dict[int, list[int]]]] = (
-            [
-                [
-                    {}
-                    for _ in range(_MKFR_MAX_ORDER)
-                ]
-                for _ in range(_NUMBER_COUNT + 1)
-            ]
+            [[{} for _ in range(_MKFR_MAX_ORDER)] for _ in range(_NUMBER_COUNT + 1)]
             if "mkfr" in self.enabled_strategy_ids
             else []
         )
         self.svc_weights = [0.0] * 11
         self.tbl_weights = [0.0] * 14
+        self.cis_weights = [0.0] * (22 + len(_CIS_EXPERTS) * 4)
+        self.cis_draw_count = 0
+        self.cis_total_hits = {
+            strategy_id: 0 for strategy_id, _label, _weight in _CIS_EXPERTS
+        }
+        self.cis_evaluated_draws = {
+            strategy_id: 0 for strategy_id, _label, _weight in _CIS_EXPERTS
+        }
+        self.cis_recent_hits = {
+            strategy_id: deque(maxlen=100)
+            for strategy_id, _label, _weight in _CIS_EXPERTS
+        }
+        self.cis_prior_rankings: dict[str, list[int]] = {}
+        self.cis_pending_rankings: dict[str, list[int]] = {}
+        self.cis_pending_features: dict[int, tuple[float, ...]] = {}
         self.prior_rankings = {
             "freshness": list(range(1, _NUMBER_COUNT + 1)),
             "proximity": list(range(1, _NUMBER_COUNT + 1)),
@@ -232,9 +429,7 @@ class _StrategyState:
         for number in range(1, _NUMBER_COUNT + 1):
             seen_at = self.last_seen[number]
             gaps[number] = (
-                self.draw_count
-                if seen_at is None
-                else self.draw_count - 1 - seen_at
+                self.draw_count if seen_at is None else self.draw_count - 1 - seen_at
             )
         return gaps
 
@@ -261,8 +456,7 @@ class _StrategyState:
             float(gap >= 12),
             _clamp((expected - self.appearances[number]) / expected, -1, 1),
             _clamp(
-                (recent8_expected - self._recent_count(number, 8))
-                / recent8_expected,
+                (recent8_expected - self._recent_count(number, 8)) / recent8_expected,
                 -1,
                 1,
             ),
@@ -286,10 +480,7 @@ class _StrategyState:
         occurrences = self.occurrences[number]
         if len(occurrences) < 2:
             return 0.0
-        gaps = [
-            right - left
-            for left, right in zip(occurrences, occurrences[1:])
-        ]
+        gaps = [right - left for left, right in zip(occurrences, occurrences[1:])]
         return sum(gaps) / len(gaps)
 
     def _previous_compatibility(self, number: int) -> float:
@@ -306,14 +497,8 @@ class _StrategyState:
         draw_count = max(self.draw_count, 1)
         gap = self.current_gaps()[number]
         mean_gap = self._mean_gap(number)
-        overdue = (
-            0.0
-            if mean_gap <= 0
-            else _clamp((gap - mean_gap) / mean_gap, -1, 1)
-        )
-        recent5 = self._recent_count(number, 5) / max(
-            min(len(self.recent_draws), 5), 1
-        )
+        overdue = 0.0 if mean_gap <= 0 else _clamp((gap - mean_gap) / mean_gap, -1, 1)
+        recent5 = self._recent_count(number, 5) / max(min(len(self.recent_draws), 5), 1)
         recent20 = self._recent_count(number, 20) / max(
             min(len(self.recent_draws), 20), 1
         )
@@ -338,12 +523,196 @@ class _StrategyState:
             / 2,
         ]
 
+    def _cis_expert_accuracy(
+        self,
+        strategy_id: str,
+        window_size: int,
+    ) -> float:
+        recent = list(self.cis_recent_hits[strategy_id])[-window_size:]
+        return _average(recent) / _NUMBERS_PER_DRAW if recent else 0.0
+
+    def _cis_expert_weight(
+        self,
+        strategy_id: str,
+        base_weight: float,
+    ) -> float:
+        evaluated = self.cis_evaluated_draws[strategy_id]
+        long_term = (
+            _BASE_PROBABILITY
+            if evaluated == 0
+            else self.cis_total_hits[strategy_id] / (evaluated * _NUMBERS_PER_DRAW)
+        )
+        return base_weight * (
+            0.45
+            + self._cis_expert_accuracy(strategy_id, 20) * 1.4
+            + self._cis_expert_accuracy(strategy_id, 50) * 0.8
+            + long_term * 0.9
+        )
+
+    def _cis_previous_draw_features(self) -> tuple[float, float, float]:
+        if not self.previous_draw:
+            return 0.0, 0.0, 0.0
+        values = sorted(self.previous_draw)
+        gaps = [right - left for left, right in zip(values, values[1:])]
+        entropy = min(_variance(gaps) / 100, 1)
+        low_count = sum(value <= 24 for value in values)
+        odd_count = sum(value % 2 == 1 for value in values)
+        balance = 1 - (abs(low_count - 3) + abs(odd_count - 3)) / _NUMBERS_PER_DRAW
+        volatility = (
+            0.0
+            if not self.previous_previous_draw
+            else abs(sum(self.previous_draw) - sum(self.previous_previous_draw)) / 294
+        )
+        return entropy, balance, volatility
+
+    def _cis_features(
+        self,
+        number: int,
+        rankings: dict[str, list[int]],
+        rank_maps: dict[str, dict[int, int]],
+        prior_rank_maps: dict[str, dict[int, int]],
+        dynamic_weights: dict[str, float],
+        recent_accuracies: dict[str, float],
+        long_term_accuracies: dict[str, float],
+    ) -> tuple[float, ...]:
+        ranks = [
+            rank_maps[strategy_id][number]
+            for strategy_id, _label, _weight in _CIS_EXPERTS
+            if strategy_id in rankings
+        ]
+        strengths = [(_NUMBER_COUNT - rank) / (_NUMBER_COUNT - 1) for rank in ranks]
+        consensus_count = sum(rank <= math.ceil(_NUMBER_COUNT * 0.25) for rank in ranks)
+        top_six_count = sum(rank <= _NUMBERS_PER_DRAW for rank in ranks)
+        opposition_count = sum(
+            rank > math.floor(_NUMBER_COUNT * 0.75) for rank in ranks
+        )
+        expert_count = max(len(_CIS_EXPERTS), 1)
+        disagreement = _variance(strengths)
+        normalized_rank_variance = _variance([float(rank) for rank in ranks]) / (
+            _NUMBER_COUNT**2
+        )
+        entropy_inputs = [
+            top_six_count / expert_count,
+            consensus_count / expert_count,
+            opposition_count / expert_count,
+        ]
+        recommendation_entropy = -sum(
+            value * math.log2(value) for value in entropy_inputs if value > 0
+        ) / math.log2(3)
+        weighted_strength_total = 0.0
+        dynamic_weight_total = 0.0
+        for strategy_id, _label, _base_weight in _CIS_EXPERTS:
+            rank = rank_maps.get(strategy_id, {}).get(number)
+            strength = (
+                (_NUMBER_COUNT - rank) / (_NUMBER_COUNT - 1)
+                if rank is not None
+                else 0.0
+            )
+            dynamic_weight = dynamic_weights[strategy_id]
+            weighted_strength_total += strength * dynamic_weight
+            dynamic_weight_total += dynamic_weight
+        weighted_agreement = weighted_strength_total / max(
+            dynamic_weight_total,
+            1e-12,
+        )
+        previous_entropy, previous_balance, volatility = (
+            self._cis_previous_draw_features()
+        )
+        month = self.current_month
+        season = math.floor((month % 12) / 3) / 3 if month else 0.0
+        features = [
+            1.0,
+            _average(strengths),
+            _median(strengths),
+            max([*strengths, 0.0]),
+            min([*strengths, 0.0]),
+            disagreement,
+            math.sqrt(disagreement),
+            consensus_count / expert_count,
+            top_six_count / expert_count,
+            opposition_count / expert_count,
+            consensus_count / expert_count,
+            min(disagreement * 4, 1),
+            min(normalized_rank_variance, 1),
+            recommendation_entropy if math.isfinite(recommendation_entropy) else 0.0,
+            weighted_agreement,
+            weighted_agreement * (1 - min(disagreement * 2, 1)),
+            self.draw_count / self.total_draw_count,
+            (month - 1) / 11 if month else 0.0,
+            season,
+            previous_entropy,
+            previous_balance,
+            volatility,
+        ]
+        for strategy_id, _label, _base_weight in _CIS_EXPERTS:
+            current_rank = rank_maps.get(strategy_id, {}).get(number)
+            previous_rank = prior_rank_maps.get(strategy_id, {}).get(number)
+            momentum = (
+                0.0
+                if previous_rank is None or current_rank is None
+                else _clamp(
+                    (previous_rank - current_rank) / _NUMBER_COUNT,
+                    -1,
+                    1,
+                )
+            )
+            features.extend(
+                (
+                    (
+                        0.0
+                        if current_rank is None
+                        else (_NUMBER_COUNT - current_rank) / (_NUMBER_COUNT - 1)
+                    ),
+                    recent_accuracies[strategy_id],
+                    long_term_accuracies[strategy_id],
+                    momentum,
+                )
+            )
+        return tuple(features)
+
+    @staticmethod
+    def _cis_nonlinear_score(features: Sequence[float]) -> float:
+        return (
+            math.tanh((features[14] - 0.3) * 3) * 0.22
+            + math.tanh((features[7] - features[9]) * 2.5) * 0.18
+            - math.tanh(features[12] * 2) * 0.08
+        )
+
+    def _cis_probability(self, features: Sequence[float]) -> float:
+        return _sigmoid(
+            self._dot(self.cis_weights, features) + self._cis_nonlinear_score(features)
+        )
+
+    def _train_cis(self, drawn: set[int]) -> None:
+        learning_rate = 0.08 / math.sqrt(self.cis_draw_count + 1)
+        positive_weight = (_NUMBER_COUNT - _NUMBERS_PER_DRAW) / _NUMBERS_PER_DRAW
+        for number, features in self.cis_pending_features.items():
+            target = float(number in drawn)
+            predicted = self._cis_probability(features)
+            error = (target - predicted) * (positive_weight if target else 1)
+            for index, feature in enumerate(features):
+                self.cis_weights[index] = (
+                    self.cis_weights[index] * (1 - learning_rate * 0.0006)
+                    + learning_rate * error * feature
+                )
+
+        for strategy_id, ranking in self.cis_pending_rankings.items():
+            hits = len(drawn.intersection(ranking[:_NUMBERS_PER_DRAW]))
+            self.cis_total_hits[strategy_id] += hits
+            self.cis_evaluated_draws[strategy_id] += 1
+            self.cis_recent_hits[strategy_id].append(hits)
+            self.cis_prior_rankings[strategy_id] = list(ranking)
+        self.cis_draw_count += 1
+
     @staticmethod
     def _dot(weights: Sequence[float], features: Sequence[float]) -> float:
         return sum(weight * feature for weight, feature in zip(weights, features))
 
     def train(self, drawn: set[int]) -> None:
         """Learn the current draw using only the state available before it."""
+        if "cis" in self.enabled_strategy_ids:
+            self._train_cis(drawn)
+
         if "mkfr" in self.enabled_strategy_ids:
             for number in range(1, _NUMBER_COUNT + 1):
                 target = int(number in drawn)
@@ -409,14 +778,12 @@ class _StrategyState:
                         + tbl_rate * error * feature
                     )
 
-    def remember(self, drawn: set[int]) -> None:
+    def remember(self, drawn: set[int], draw_date: str | None = None) -> None:
         entropy_enabled = "entropy" in self.enabled_strategy_ids
         proximity_enabled = bool(
             self.enabled_strategy_ids.intersection({"proximity", "tbl"})
         )
-        entropy_percent = (
-            _gap_entropy_percent(tuple(drawn)) if entropy_enabled else 0.0
-        )
+        entropy_percent = _gap_entropy_percent(tuple(drawn)) if entropy_enabled else 0.0
         ordered = sorted(drawn)
         for index, number in enumerate(ordered):
             if proximity_enabled:
@@ -436,14 +803,25 @@ class _StrategyState:
                 if entropy_percent >= 92:
                     self.high_entropy_hits[number] += 1
 
-        if "tbl" in self.enabled_strategy_ids:
+        grid_or_tbl_enabled = bool(
+            self.enabled_strategy_ids.intersection({"predictive_grid", "tbl"})
+        )
+        if grid_or_tbl_enabled:
             for left, right in combinations(ordered, 2):
                 key = (left, right)
                 self.pair_counts[key] = self.pair_counts.get(key, 0) + 1
 
-        if "tbl" in self.enabled_strategy_ids:
-            self.previous_draw = drawn
-        if self.enabled_strategy_ids.intersection({"svc", "tbl"}):
+        if "predictive_grid" in self.enabled_strategy_ids and self.previous_draw:
+            for previous in self.previous_draw:
+                for current in drawn:
+                    self.transition_counts[previous][current] += 1
+                self.transition_totals[previous] += len(drawn)
+
+        if self.enabled_strategy_ids.intersection({"cis", "predictive_grid", "tbl"}):
+            self.previous_previous_draw = self.previous_draw
+            self.previous_draw = set(drawn)
+        self.current_month = int(draw_date[5:7]) if draw_date else 0
+        if self.enabled_strategy_ids.intersection({"predictive_grid", "svc", "tbl"}):
             self.recent_draws.append(drawn)
         if "emd" in self.enabled_strategy_ids:
             self.draw_vectors.append(tuple(sorted(drawn)))
@@ -460,9 +838,7 @@ class _StrategyState:
         length = min(len(left), len(right))
         if length == 0:
             return 0.0
-        return sum(
-            abs(left[index] - right[index]) for index in range(length)
-        ) / length
+        return sum(abs(left[index] - right[index]) for index in range(length)) / length
 
     @staticmethod
     def _earth_mover_bucket(distance: float) -> str:
@@ -481,12 +857,8 @@ class _StrategyState:
     def _earth_mover_scores(
         self,
     ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
-        weighted_hits = {
-            number: 0.0 for number in range(1, _NUMBER_COUNT + 1)
-        }
-        weighted_distances = {
-            number: 0.0 for number in range(1, _NUMBER_COUNT + 1)
-        }
+        weighted_hits = {number: 0.0 for number in range(1, _NUMBER_COUNT + 1)}
+        weighted_distances = {number: 0.0 for number in range(1, _NUMBER_COUNT + 1)}
         support = {number: 0 for number in range(1, _NUMBER_COUNT + 1)}
         if not self.draw_vectors:
             return weighted_hits, {}
@@ -506,9 +878,7 @@ class _StrategyState:
 
         maximum = max(weighted_hits.values(), default=0.0)
         scores = {
-            number: (
-                weighted_hits[number] / maximum if maximum > 0 else 0.0
-            )
+            number: (weighted_hits[number] / maximum if maximum > 0 else 0.0)
             for number in weighted_hits
         }
         details: dict[int, tuple[str, ...]] = {}
@@ -537,26 +907,27 @@ class _StrategyState:
         details: dict[int, tuple[str, ...]] = {}
         for number in range(1, _NUMBER_COUNT + 1):
             counts = self.proximity_counts[number]
-            scores[number] = (
-                sum(count * share for count, share in zip(counts, shares))
-                / max(self.draw_count, 1)
+            scores[number] = sum(
+                count * share for count, share in zip(counts, shares)
+            ) / max(self.draw_count, 1)
+            top_bucket = max(
+                range(len(counts)), key=lambda index: (counts[index], -index)
             )
-            top_bucket = max(range(len(counts)), key=lambda index: (counts[index], -index))
             details[number] = (
                 _PROXIMITY_BUCKETS[top_bucket].title(),
                 f"{self.appearances[number]} appearances",
             )
         return _scale_scores(scores), details
 
-    def _entropy_scores(self, gaps: dict[int, int]) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+    def _entropy_scores(
+        self, gaps: dict[int, int]
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
         raw: dict[int, float] = {}
         details: dict[int, tuple[str, ...]] = {}
         for number in range(1, _NUMBER_COUNT + 1):
             appearances = self.appearances[number]
             average = (
-                50.0
-                if appearances == 0
-                else self.entropy_totals[number] / appearances
+                50.0 if appearances == 0 else self.entropy_totals[number] / appearances
             )
             high_share = (
                 0.0
@@ -573,6 +944,36 @@ class _StrategyState:
                 f"High-entropy share {high_share:.1%}",
             )
         return _scale_scores(raw), details
+
+    def _chi_square_scores(
+        self,
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        expected = self.draw_count * _NUMBERS_PER_DRAW / _NUMBER_COUNT
+        residuals: dict[int, float] = {}
+        details: dict[int, tuple[str, ...]] = {}
+        for number in range(1, _NUMBER_COUNT + 1):
+            observed = self.appearances[number]
+            difference = observed - expected
+            residual = difference / math.sqrt(expected) if expected > 0 else 0.0
+            contribution = difference**2 / expected if expected > 0 else 0.0
+            if residual <= -2:
+                band = "Strong under"
+            elif residual <= -1:
+                band = "Mild under"
+            elif residual >= 2:
+                band = "Strong over"
+            elif residual >= 1:
+                band = "Mild over"
+            else:
+                band = "Near expected"
+            residuals[number] = residual
+            details[number] = (
+                band,
+                f"Observed {observed} vs expected {expected:.2f}",
+                f"Signed Pearson residual {residual:+.3f}",
+                f"Chi-square contribution {contribution:.3f}",
+            )
+        return _scale_scores(residuals), details
 
     def _gap_model_scores(
         self,
@@ -604,10 +1005,9 @@ class _StrategyState:
         return scaled, details
 
     def _mkfr_baseline_probability(self, number: int) -> float:
-        return (
-            self.appearances[number]
-            + _MKFR_PRIOR_STRENGTH * _BASE_PROBABILITY
-        ) / (self.draw_count + _MKFR_PRIOR_STRENGTH)
+        return (self.appearances[number] + _MKFR_PRIOR_STRENGTH * _BASE_PROBABILITY) / (
+            self.draw_count + _MKFR_PRIOR_STRENGTH
+        )
 
     def _mkfr_probability(self, number: int) -> tuple[float, int, int]:
         history = self.mkfr_histories[number]
@@ -625,9 +1025,9 @@ class _StrategyState:
             opportunities = failures + hits
             if opportunities < _MKFR_MIN_CONTEXT_SUPPORT:
                 continue
-            probability = (
-                hits + _MKFR_PRIOR_STRENGTH * probability
-            ) / (opportunities + _MKFR_PRIOR_STRENGTH)
+            probability = (hits + _MKFR_PRIOR_STRENGTH * probability) / (
+                opportunities + _MKFR_PRIOR_STRENGTH
+            )
             selected_support = opportunities
             selected_order = order
         return probability, selected_support, selected_order
@@ -642,11 +1042,7 @@ class _StrategyState:
             baseline = self._mkfr_baseline_probability(number)
             lift = probability - baseline
             context = "".join(str(outcome) for outcome in self.mkfr_histories[number])
-            selected_context = (
-                context[-selected_order:]
-                if selected_order > 0
-                else "—"
-            )
+            selected_context = context[-selected_order:] if selected_order > 0 else "—"
             raw[number] = lift
             details[number] = (
                 f"Context probability {probability:.2%}",
@@ -657,6 +1053,209 @@ class _StrategyState:
             )
         return _scale_scores(raw), details
 
+    @staticmethod
+    def _combine_rankings(
+        sources: Sequence[tuple[Sequence[int], float]],
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        weight_total = sum(weight for _ranking, weight in sources) or 1
+        source_count = max(len(sources), 1)
+        scores: dict[int, float] = {}
+        details: dict[int, tuple[str, ...]] = {}
+        for number in range(1, _NUMBER_COUNT + 1):
+            ranks = [ranking.index(number) + 1 for ranking, _weight in sources]
+            weighted_strength = sum(
+                _rank_strength(ranking, number) * weight for ranking, weight in sources
+            )
+            agreement_count = sum(
+                rank <= math.ceil(_NUMBER_COUNT * 0.25) for rank in ranks
+            )
+            top_six_count = sum(rank <= _NUMBERS_PER_DRAW for rank in ranks)
+            agreement_bonus = agreement_count / source_count * 0.07
+            top_six_bonus = top_six_count / source_count * 0.05
+            scores[number] = (
+                weighted_strength / weight_total + agreement_bonus + top_six_bonus
+            )
+            details[number] = (
+                f"Top-quarter agreement {agreement_count}/{source_count}",
+                f"Top-6 agreement {top_six_count}/{source_count}",
+            )
+        return scores, details
+
+    def _predictive_grid_scores(
+        self,
+        gaps: dict[int, int],
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        gap_probabilities = [
+            (hit + _MARKOV_PRIOR_STRENGTH * _BASE_PROBABILITY)
+            / (opportunity + _MARKOV_PRIOR_STRENGTH)
+            for hit, opportunity in zip(
+                self.markov_hits,
+                self.markov_opportunities,
+            )
+        ]
+        markov_raw: dict[int, float] = {}
+        transition_raw: dict[int, float] = {}
+        frequency_raw: dict[int, float] = {}
+        recent_raw: dict[int, float] = {}
+        gap_raw: dict[int, float] = {}
+        pair_raw: dict[int, float] = {}
+        for number in range(1, _NUMBER_COUNT + 1):
+            bucket = min(gaps[number], _MAX_GAP_BUCKET)
+            markov_raw[number] = gap_probabilities[bucket]
+            transition_values = [
+                self.transition_counts[previous][number]
+                / self.transition_totals[previous]
+                if self.transition_totals[previous]
+                else 0.0
+                for previous in self.previous_draw
+            ]
+            transition_raw[number] = _average(transition_values)
+            frequency_raw[number] = self.appearances[number] / max(self.draw_count, 1)
+            recent_raw[number] = float(self._recent_count(number, 20))
+            gap_raw[number] = float(gaps[number])
+            affinities = [
+                float(
+                    self.pair_counts.get(
+                        tuple(sorted((number, previous))),
+                        0,
+                    )
+                )
+                for previous in self.previous_draw
+                if previous != number
+            ]
+            pair_raw[number] = _average(affinities)
+
+        components = {
+            "markov": _scale_scores(markov_raw),
+            "transition": _scale_scores(transition_raw),
+            "frequency": _scale_scores(frequency_raw),
+            "recent": _scale_scores(recent_raw),
+            "gap": _scale_scores(gap_raw),
+            "pair": _scale_scores(pair_raw),
+        }
+        scores = {
+            number: (
+                0.35 * components["markov"][number]
+                + 0.20 * components["transition"][number]
+                + 0.15 * components["frequency"][number]
+                + 0.15 * components["recent"][number]
+                + 0.10 * components["gap"][number]
+                + 0.05 * components["pair"][number]
+            )
+            for number in range(1, _NUMBER_COUNT + 1)
+        }
+        details = {
+            number: (
+                f"Gap-state Markov {components['markov'][number]:.1%}",
+                f"Last-draw transition {components['transition'][number]:.1%}",
+                f"Lifetime frequency {components['frequency'][number]:.1%}",
+                f"Recent-20 activity {components['recent'][number]:.1%}",
+                f"Current gap {components['gap'][number]:.1%}",
+                f"Pair affinity {components['pair'][number]:.1%}",
+            )
+            for number in range(1, _NUMBER_COUNT + 1)
+        }
+        return scores, details
+
+    def _cis_scores(
+        self,
+        rankings: dict[str, list[int]],
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        rank_maps = {
+            strategy_id: {number: rank for rank, number in enumerate(ranking, start=1)}
+            for strategy_id, ranking in rankings.items()
+        }
+        prior_rank_maps = {
+            strategy_id: {number: rank for rank, number in enumerate(ranking, start=1)}
+            for strategy_id, ranking in self.cis_prior_rankings.items()
+        }
+        dynamic_weights = {
+            strategy_id: self._cis_expert_weight(
+                strategy_id,
+                base_weight,
+            )
+            for strategy_id, _label, base_weight in _CIS_EXPERTS
+        }
+        recent_accuracies = {
+            strategy_id: self._cis_expert_accuracy(strategy_id, 20)
+            for strategy_id, _label, _weight in _CIS_EXPERTS
+        }
+        long_term_accuracies = {
+            strategy_id: (
+                0.0
+                if self.cis_evaluated_draws[strategy_id] == 0
+                else self.cis_total_hits[strategy_id]
+                / (self.cis_evaluated_draws[strategy_id] * _NUMBERS_PER_DRAW)
+            )
+            for strategy_id, _label, _weight in _CIS_EXPERTS
+        }
+        self.cis_pending_rankings = {
+            strategy_id: list(rankings[strategy_id])
+            for strategy_id, _label, _weight in _CIS_EXPERTS
+            if strategy_id in rankings
+        }
+        self.cis_pending_features = {
+            number: self._cis_features(
+                number,
+                rankings,
+                rank_maps,
+                prior_rank_maps,
+                dynamic_weights,
+                recent_accuracies,
+                long_term_accuracies,
+            )
+            for number in range(1, _NUMBER_COUNT + 1)
+        }
+        warm_up = self.cis_draw_count < _CIS_MINIMUM_TRAINING_DRAWS
+        scores: dict[int, float] = {}
+        details: dict[int, tuple[str, ...]] = {}
+        for number, features in self.cis_pending_features.items():
+            contributions = [
+                (
+                    strategy_id,
+                    (_NUMBER_COUNT - rank_maps[strategy_id][number])
+                    / (_NUMBER_COUNT - 1)
+                    * dynamic_weights[strategy_id],
+                )
+                for strategy_id, _label, _base_weight in _CIS_EXPERTS
+                if strategy_id in rankings
+            ]
+            probability = self._cis_probability(features)
+            if warm_up:
+                contribution_total = sum(
+                    contribution for _strategy_id, contribution in contributions
+                )
+                dynamic_weight_total = sum(
+                    dynamic_weights[strategy_id]
+                    for strategy_id, _label, _base_weight in _CIS_EXPERTS
+                    if strategy_id in rankings
+                )
+                scores[number] = contribution_total / max(
+                    dynamic_weight_total,
+                    1e-12,
+                )
+            else:
+                scores[number] = probability
+            supporters = sorted(
+                contributions,
+                key=lambda item: (-item[1], item[0]),
+            )[:3]
+            supporter_text = ", ".join(
+                strategy_id for strategy_id, _contribution in supporters
+            )
+            details[number] = (
+                (
+                    f"Warm-up ensemble {self.cis_draw_count}/"
+                    f"{_CIS_MINIMUM_TRAINING_DRAWS} draws"
+                    if warm_up
+                    else f"Learned probability {probability:.2%}"
+                ),
+                f"Strongest experts: {supporter_text}",
+                f"Consensus {features[7]:.0%}",
+                f"Opposition {features[9]:.0%}",
+            )
+        return _scale_scores(scores), details
+
     def build_strategies(
         self,
         combined: CombinedPrediction,
@@ -664,11 +1263,12 @@ class _StrategyState:
     ) -> tuple[StrategyPrediction, ...]:
         gaps = self.current_gaps()
         enabled = self.enabled_strategy_ids
+        requested = self.requested_strategy_ids
         built: dict[str, StrategyPrediction] = {}
-        tbl_enabled = "tbl" in enabled
+        rankings: dict[str, list[int]] = {}
 
         freshness_scores: dict[int, float] = {}
-        if "freshness" in enabled or tbl_enabled:
+        if "freshness" in enabled:
             by_number = {item.number: item for item in combined.numbers}
             freshness_scores = _scale_scores(
                 {
@@ -676,7 +1276,11 @@ class _StrategyState:
                     for number in range(1, _NUMBER_COUNT + 1)
                 }
             )
-            if "freshness" in enabled:
+            rankings["freshness"] = _ranking_from_scores(
+                freshness_scores,
+                gaps,
+            )
+            if "freshness" in requested:
                 freshness_details: dict[int, tuple[str, ...]] = {
                     number: (
                         f"Gap {gaps[number]}",
@@ -694,9 +1298,13 @@ class _StrategyState:
                 )
 
         proximity_scores: dict[int, float] = {}
-        if "proximity" in enabled or tbl_enabled:
+        if "proximity" in enabled:
             proximity_scores, proximity_details = self._proximity_scores()
-            if "proximity" in enabled:
+            rankings["proximity"] = _ranking_from_scores(
+                proximity_scores,
+                gaps,
+            )
+            if "proximity" in requested:
                 built["proximity"] = _strategy(
                     "proximity",
                     "Prox",
@@ -708,23 +1316,29 @@ class _StrategyState:
 
         if "emd" in enabled:
             earth_mover_scores, earth_mover_details = self._earth_mover_scores()
-            built["emd"] = _strategy(
-                "emd",
-                "EMD",
-                "Earth-mover analogue ranking from historical draw vectors.",
+            rankings["emd"] = _ranking_from_scores(
                 earth_mover_scores,
                 gaps,
-                earth_mover_details,
             )
+            if "emd" in requested:
+                built["emd"] = _strategy(
+                    "emd",
+                    "EMD",
+                    "Earth-mover analogue ranking from historical draw vectors.",
+                    earth_mover_scores,
+                    gaps,
+                    earth_mover_details,
+                )
 
         random_ranking: list[int] = []
-        if "randomness" in enabled or tbl_enabled:
+        if "randomness" in enabled:
             random_ranking = _random_ranking(draw_index + 1)
             randomness_scores = {
                 number: (_NUMBER_COUNT - rank) / (_NUMBER_COUNT - 1)
                 for rank, number in enumerate(random_ranking, start=1)
             }
-            if "randomness" in enabled:
+            rankings["randomness"] = random_ranking
+            if "randomness" in requested:
                 randomness_details: dict[int, tuple[str, ...]] = {
                     number: ("Deterministic PyLotto baseline",)
                     for number in randomness_scores
@@ -740,51 +1354,85 @@ class _StrategyState:
 
         if "entropy" in enabled:
             entropy_scores, entropy_details = self._entropy_scores(gaps)
-            built["entropy"] = _strategy(
-                "entropy",
-                "Entr",
-                "Structural gap-entropy history with overdue adjustment.",
+            rankings["entropy"] = _ranking_from_scores(
                 entropy_scores,
                 gaps,
-                entropy_details,
             )
+            if "entropy" in requested:
+                built["entropy"] = _strategy(
+                    "entropy",
+                    "Entr",
+                    "Structural gap-entropy history with overdue adjustment.",
+                    entropy_scores,
+                    gaps,
+                    entropy_details,
+                )
+
+        if "chi_square" in enabled:
+            chi_square_scores, chi_square_details = self._chi_square_scores()
+            rankings["chi_square"] = _ranking_from_scores(
+                chi_square_scores,
+                gaps,
+            )
+            if "chi_square" in requested:
+                built["chi_square"] = _strategy(
+                    "chi_square",
+                    "Chi²",
+                    "Signed Pearson residual from the uniform 6/49 frequency expectation.",
+                    chi_square_scores,
+                    gaps,
+                    chi_square_details,
+                )
 
         if "markov100" in enabled:
-            markov_scores, markov_details = self._gap_model_scores(
-                gaps, weighted=True
-            )
-            built["markov100"] = _strategy(
-                "markov100",
-                "Mark",
-                "Recency-weighted gap-state Markov model on a 0–100 scale.",
+            markov_scores, markov_details = self._gap_model_scores(gaps, weighted=True)
+            rankings["markov100"] = _ranking_from_scores(
                 markov_scores,
                 gaps,
-                markov_details,
             )
+            if "markov100" in requested:
+                built["markov100"] = _strategy(
+                    "markov100",
+                    "Mark",
+                    "Recency-weighted gap-state Markov model on a 0–100 scale.",
+                    markov_scores,
+                    gaps,
+                    markov_details,
+                )
 
         if "mkfr" in enabled:
             mkfr_scores, mkfr_details = self._mkfr_scores()
-            built["mkfr"] = _strategy(
-                "mkfr",
-                "MKFR",
-                "Per-number variable-order D/!D context model ranked by transition lift.",
+            rankings["mkfr"] = _ranking_from_scores(
                 mkfr_scores,
                 gaps,
-                mkfr_details,
             )
+            if "mkfr" in requested:
+                built["mkfr"] = _strategy(
+                    "mkfr",
+                    "MKFR",
+                    "Per-number variable-order D/!D context model ranked by transition lift.",
+                    mkfr_scores,
+                    gaps,
+                    mkfr_details,
+                )
 
         if "bayesian" in enabled:
             bayesian_scores, bayesian_details = self._gap_model_scores(
                 gaps, weighted=False
             )
-            built["bayesian"] = _strategy(
-                "bayesian",
-                "Baye",
-                "Beta-smoothed Bayesian gap-state posterior ranking.",
+            rankings["bayesian"] = _ranking_from_scores(
                 bayesian_scores,
                 gaps,
-                bayesian_details,
             )
+            if "bayesian" in requested:
+                built["bayesian"] = _strategy(
+                    "bayesian",
+                    "Baye",
+                    "Beta-smoothed Bayesian gap-state posterior ranking.",
+                    bayesian_scores,
+                    gaps,
+                    bayesian_details,
+                )
 
         if "svc" in enabled:
             svc_margins = {
@@ -800,25 +1448,24 @@ class _StrategyState:
                 )
                 for number in svc_scores
             }
-            built["svc"] = _strategy(
-                "svc",
-                "SVC",
-                "Online linear support-vector classifier inspired by PyLotto.",
+            rankings["svc"] = _ranking_from_scores(
                 svc_scores,
                 gaps,
-                svc_details,
             )
+            if "svc" in requested:
+                built["svc"] = _strategy(
+                    "svc",
+                    "SVC",
+                    "Online linear support-vector classifier inspired by PyLotto.",
+                    svc_scores,
+                    gaps,
+                    svc_details,
+                )
 
-        if tbl_enabled:
+        if "tbl" in enabled:
             self.prior_rankings = {
-                "freshness": sorted(
-                    freshness_scores,
-                    key=lambda number: (-freshness_scores[number], number),
-                ),
-                "proximity": sorted(
-                    proximity_scores,
-                    key=lambda number: (-proximity_scores[number], number),
-                ),
+                "freshness": rankings["freshness"],
+                "proximity": rankings["proximity"],
                 "randomness": random_ranking,
             }
             tbl_raw: dict[int, float] = {}
@@ -839,19 +1486,128 @@ class _StrategyState:
                     f"Lifetime frequency {self.appearances[number] / max(self.draw_count, 1):.2%}",
                     f"Recent 20: {self._recent_count(number, 20)}",
                 )
-            built["tbl"] = _strategy(
-                "tbl",
-                "TBL",
-                "Temporal Behavior Learning with recency, frequency, and strategy features.",
-                _scale_scores(tbl_raw),
+            tbl_scores = _scale_scores(tbl_raw)
+            rankings["tbl"] = _ranking_from_scores(
+                tbl_scores,
                 gaps,
-                tbl_details,
             )
+            if "tbl" in requested:
+                built["tbl"] = _strategy(
+                    "tbl",
+                    "TBL",
+                    "Temporal Behavior Learning with recency, frequency, and strategy features.",
+                    tbl_scores,
+                    gaps,
+                    tbl_details,
+                )
+
+        if "fresh_random" in enabled:
+            fresh_random_ranking = _random_ranking(
+                draw_index + 1,
+                _RANDOM_SEED + _FRESH_RANDOM_SEED_OFFSET,
+            )
+            random_rank = {
+                number: rank
+                for rank, number in enumerate(
+                    fresh_random_ranking,
+                    start=1,
+                )
+            }
+            freshness_rank = {
+                number: rank
+                for rank, number in enumerate(
+                    rankings["freshness"],
+                    start=1,
+                )
+            }
+            fresh_random_scores = {
+                number: (
+                    (_NUMBER_COUNT - random_rank[number])
+                    / (_NUMBER_COUNT - 1)
+                    * (1 - _FRESH_RANDOM_INFLUENCE)
+                    + (_NUMBER_COUNT - freshness_rank[number])
+                    / (_NUMBER_COUNT - 1)
+                    * _FRESH_RANDOM_INFLUENCE
+                )
+                for number in range(1, _NUMBER_COUNT + 1)
+            }
+            rankings["fresh_random"] = sorted(
+                fresh_random_scores,
+                key=lambda number: (
+                    -fresh_random_scores[number],
+                    freshness_rank[number],
+                    number,
+                ),
+            )
+            if "fresh_random" in requested:
+                fresh_random_details = {
+                    number: (
+                        f"Random rank {random_rank[number]}",
+                        f"Freshness rank {freshness_rank[number]}",
+                        "Blend 65% random / 35% freshness",
+                    )
+                    for number in range(1, _NUMBER_COUNT + 1)
+                }
+                built["fresh_random"] = _strategy(
+                    "fresh_random",
+                    "FRnd",
+                    "Seeded random ranking softly guided by freshness.",
+                    fresh_random_scores,
+                    gaps,
+                    fresh_random_details,
+                )
+
+        if "mixed" in enabled:
+            mixed_scores, mixed_details = self._combine_rankings(
+                (
+                    (rankings["freshness"], 0.30),
+                    (rankings["proximity"], 0.24),
+                    (rankings["emd"], 0.14),
+                    (rankings["bayesian"], 0.32),
+                )
+            )
+            rankings["mixed"] = _ranking_from_scores(mixed_scores, gaps)
+            if "mixed" in requested:
+                built["mixed"] = _strategy(
+                    "mixed",
+                    "Mix",
+                    "Weighted PyLotto consensus of Freshness, Proximity, EMD, and Bayesian.",
+                    mixed_scores,
+                    gaps,
+                    mixed_details,
+                )
+
+        if "predictive_grid" in enabled:
+            grid_scores, grid_details = self._predictive_grid_scores(gaps)
+            rankings["predictive_grid"] = _ranking_from_scores(
+                grid_scores,
+                gaps,
+            )
+            if "predictive_grid" in requested:
+                built["predictive_grid"] = _strategy(
+                    "predictive_grid",
+                    "Grid",
+                    "Six-component predictive score grid from PyLotto.",
+                    grid_scores,
+                    gaps,
+                    grid_details,
+                )
+
+        if "cis" in enabled:
+            cis_scores, cis_details = self._cis_scores(rankings)
+            rankings["cis"] = _ranking_from_scores(cis_scores, gaps)
+            if "cis" in requested:
+                built["cis"] = _strategy(
+                    "cis",
+                    "CIS",
+                    "Collective Intelligence Strategy learning from ten expert rankings.",
+                    cis_scores,
+                    gaps,
+                    cis_details,
+                )
 
         return tuple(
-            built[strategy_id]
-            for strategy_id in STRATEGY_IDS
-            if strategy_id in built
+            built[strategy_id] for strategy_id in STRATEGY_IDS if strategy_id in built
         )
 
 
@@ -861,8 +1617,9 @@ def build_prediction_suites(
     history_start: int = 0,
     enabled_strategy_ids: Collection[str] = STRATEGY_IDS,
     progress: PredictionProgress | None = None,
+    efficacy_record: EfficacyRecordCallback | None = None,
 ) -> tuple[PredictionSuite, ...]:
-    """Calculate enabled strategy plugins and retain the requested history."""
+    """Evaluate all draws and retain only the requested display history."""
     requested = set(enabled_strategy_ids)
     unknown = requested.difference(STRATEGY_IDS)
     if unknown:
@@ -872,18 +1629,36 @@ def build_prediction_suites(
     selected = tuple(
         strategy_id for strategy_id in STRATEGY_IDS if strategy_id in requested
     )
-    state = _StrategyState(selected)
+    state = _StrategyState(selected, total_draw_count=len(draws))
+    efficacy = _EfficacyTracker()
     suites: list[PredictionSuite] = []
     total = len(draws)
     for draw_index, draw in enumerate(draws):
         drawn = {ball.value for ball in draw.balls}
         if selected:
             state.train(drawn)
-            state.remember(drawn)
-        if draw_index >= history_start:
+            state.remember(drawn, draw.date)
             combined = draw.prediction
-            if selected and combined is None:
+            if combined is None:
                 raise ValueError("Combined predictions must be prepared first")
+            actual = (
+                tuple(ball.value for ball in draws[draw_index + 1].balls)
+                if draw_index + 1 < total
+                else ()
+            )
+            compared, record = efficacy.compare(
+                PredictionSuite(
+                    reference_draw_number=draw_index + 1,
+                    target_draw_number=draw_index + 2,
+                    actual_numbers=actual,
+                    strategies=state.build_strategies(combined, draw_index),
+                )
+            )
+            if record is not None and efficacy_record is not None:
+                efficacy_record(record)
+            if draw_index >= history_start:
+                suites.append(compared)
+        elif draw_index >= history_start:
             actual = (
                 tuple(ball.value for ball in draws[draw_index + 1].balls)
                 if draw_index + 1 < total
@@ -894,11 +1669,7 @@ def build_prediction_suites(
                     reference_draw_number=draw_index + 1,
                     target_draw_number=draw_index + 2,
                     actual_numbers=actual,
-                    strategies=(
-                        ()
-                        if combined is None
-                        else state.build_strategies(combined, draw_index)
-                    ),
+                    strategies=(),
                 )
             )
         if progress is not None:

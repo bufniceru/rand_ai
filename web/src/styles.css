@@ -984,6 +984,172 @@ tbody tr:nth-child(even) {
   to { transform: rotate(360deg); }
 }
 
+/* Shared navigation between the three prediction-workspace windows */
+.prediction-workspace-navigation {
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  width: min(1180px, 100%);
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin: 0 auto 12px;
+  padding: 9px 12px 9px 16px;
+  border: 1px solid rgba(137, 174, 208, 0.55);
+  border-radius: 14px;
+  color: #fff;
+  background: linear-gradient(105deg, #102b4b, #184f7f);
+  box-shadow: 0 10px 24px rgba(13, 42, 70, 0.2);
+}
+
+.prediction-workspace-navigation-label {
+  min-width: 168px;
+  display: grid;
+  gap: 2px;
+}
+
+.prediction-workspace-navigation-label span {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.prediction-workspace-navigation-label small {
+  color: #bcd1e5;
+  font-size: 9px;
+}
+
+.prediction-workspace-navigation-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(145px, 1fr));
+  gap: 7px;
+  margin-left: auto;
+}
+
+.prediction-workspace-navigation-buttons button {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 11px;
+  border: 1px solid rgba(184, 211, 235, 0.42);
+  border-radius: 9px;
+  color: #eaf4fc;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.prediction-workspace-navigation-buttons button:hover {
+  border-color: #d3e8fa;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.prediction-workspace-navigation-buttons button.active {
+  border-color: #fff;
+  color: #12385d;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(5, 25, 44, 0.22);
+  cursor: default;
+}
+
+.prediction-workspace-navigation-buttons kbd {
+  padding: 2px 5px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  opacity: 0.7;
+  font-family: inherit;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.prediction-workspace-navigation > p {
+  max-width: 200px;
+  margin: 0;
+  color: #ffd5d5;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.prediction-workspace-navigation.has-context-controls {
+  gap: 9px;
+  padding-left: 10px;
+}
+
+.prediction-workspace-navigation.has-context-controls
+  .prediction-workspace-navigation-label {
+  display: none;
+}
+
+.prediction-workspace-navigation.has-context-controls
+  .prediction-workspace-navigation-buttons {
+  grid-template-columns: repeat(3, minmax(94px, 1fr));
+  flex: 1 1 300px;
+  margin-left: 0;
+}
+
+.prediction-workspace-navigation.has-context-controls
+  .prediction-workspace-navigation-buttons button {
+  min-height: 38px;
+  gap: 5px;
+  padding: 0 9px;
+  font-size: 11px;
+}
+
+.prediction-workspace-navigation.has-context-controls
+  .prediction-workspace-navigation-buttons kbd {
+  display: none;
+}
+
+.prediction-workspace-navigation-controls {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-left: 9px;
+  border-left: 1px solid rgba(194, 218, 239, 0.35);
+}
+
+.prediction-workspace-navigation-controls .reference-buttons {
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.prediction-workspace-navigation-controls .reference-buttons button {
+  min-height: 32px;
+  padding: 0 7px;
+  border-color: rgba(196, 218, 237, 0.55);
+  color: #eaf4fc;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 9px;
+}
+
+.prediction-workspace-navigation-controls .reference-buttons button:hover:not(:disabled) {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.prediction-workspace-navigation-controls .reference-buttons button:disabled {
+  opacity: 0.38;
+}
+
+.prediction-workspace-navigation-controls .prediction-reference-summary {
+  min-width: 138px;
+  justify-content: flex-end;
+  gap: 5px;
+  color: #c3d8ea;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.prediction-workspace-navigation-controls .prediction-reference-summary strong {
+  color: #fff;
+  font-size: 19px;
+}
+
 /* Dedicated Last Seen dialog */
 .last-seen-dialog-shell {
   width: 100%;
@@ -1065,9 +1231,274 @@ tbody tr:nth-child(even) {
   grid-template-columns: minmax(660px, 1fr) minmax(250px, 300px);
   grid-template-areas:
     "legend legend"
-    "numbers coverage";
+    "numbers coverage"
+    "efficacy efficacy";
   align-items: start;
   gap: 10px;
+}
+
+.prediction-efficacy-overview {
+  grid-area: efficacy;
+  min-width: 0;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.prediction-efficacy-overview > header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 11px;
+}
+
+.prediction-efficacy-overview > header div {
+  display: grid;
+  gap: 3px;
+}
+
+.prediction-efficacy-overview > header strong {
+  color: #173d64;
+  font-size: 16px;
+}
+
+.prediction-efficacy-overview > header span,
+.prediction-efficacy-overview > header small {
+  color: #687d92;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.efficacy-range-controls {
+  display: grid;
+  grid-template-columns:
+    minmax(180px, 0.75fr)
+    minmax(310px, 1.25fr)
+    minmax(175px, 0.7fr)
+    minmax(125px, 0.5fr);
+  align-items: stretch;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.efficacy-count-control,
+.efficacy-range-controls fieldset,
+.efficacy-range-controls output,
+.efficacy-retest-control {
+  min-width: 0;
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid #cfdde9;
+  border-radius: 9px;
+  background: #f5f9fd;
+}
+
+.efficacy-count-control {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 9px;
+}
+
+.efficacy-count-control > span,
+.efficacy-range-controls legend {
+  color: #536b83;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.efficacy-count-control input {
+  grid-row: span 2;
+  width: 82px;
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 1px solid #9db4ca;
+  border-radius: 7px;
+  color: #12395f;
+  background: #ffffff;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.efficacy-count-control small {
+  color: #71859a;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.efficacy-range-controls fieldset {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.efficacy-range-controls legend {
+  float: left;
+  margin-right: 5px;
+}
+
+.efficacy-range-controls fieldset label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #304f6c;
+  font-size: 10px;
+  font-weight: 850;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.efficacy-range-controls fieldset input {
+  accent-color: #245f96;
+}
+
+.efficacy-range-controls output {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+}
+
+.efficacy-range-controls output strong {
+  color: #173f67;
+  font-size: 14px;
+}
+
+.efficacy-range-controls output span {
+  overflow: hidden;
+  color: #657a90;
+  font-size: 9px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.efficacy-retest-control {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+}
+
+.efficacy-retest-control button {
+  min-height: 34px;
+  padding: 6px 16px;
+  border: 1px solid #174b7d;
+  border-radius: 7px;
+  color: #ffffff;
+  background: linear-gradient(145deg, #2f75ad, #174b7d);
+  box-shadow: 0 4px 10px rgba(23, 75, 125, 0.18);
+  font-size: 12px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.efficacy-retest-control button:hover:not(:disabled) {
+  background: linear-gradient(145deg, #3884bf, #1b588f);
+}
+
+.efficacy-retest-control button:focus-visible {
+  outline: 2px solid #7fb1dc;
+  outline-offset: 2px;
+}
+
+.efficacy-retest-control button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.efficacy-retest-control small {
+  overflow: hidden;
+  color: #657a90;
+  font-size: 9px;
+  font-weight: 800;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.efficacy-table-wrap {
+  overflow-x: auto;
+}
+
+.prediction-efficacy-overview table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid #d6e2ed;
+  border-radius: 9px;
+  color: #314b65;
+  font-size: 11px;
+}
+
+.prediction-efficacy-overview th,
+.prediction-efficacy-overview td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e0e8f0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.prediction-efficacy-overview th:first-child,
+.prediction-efficacy-overview td:first-child,
+.prediction-efficacy-overview th:last-child,
+.prediction-efficacy-overview td:last-child {
+  text-align: left;
+}
+
+.prediction-efficacy-overview thead th {
+  color: #526a82;
+  background: #eef4fa;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.prediction-efficacy-overview thead th:first-child {
+  color: #ffffff;
+  background: #12395f;
+}
+
+.prediction-efficacy-overview tbody th {
+  color: #ffffff;
+  background: #173f67;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.01em;
+}
+
+.prediction-efficacy-overview tbody tr:nth-child(even) th {
+  background: #24547f;
+}
+
+.efficacy-rank {
+  display: inline-block;
+  width: 23px;
+  color: #cfe5f8;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.prediction-efficacy-overview tbody tr:last-child th,
+.prediction-efficacy-overview tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.prediction-efficacy-overview tr.is-ahead td:nth-last-child(-n + 3) {
+  color: #247344;
+  font-weight: 900;
+}
+
+.prediction-efficacy-overview tr.is-behind td:nth-last-child(-n + 3) {
+  color: #a04444;
+  font-weight: 900;
+}
+
+.prediction-efficacy-overview tr.is-tied td:nth-last-child(-n + 3),
+.prediction-efficacy-overview tr.is-pending td:nth-last-child(-n + 3) {
+  color: #62768a;
+  font-weight: 850;
 }
 
 .prediction-coverage-report {
@@ -1081,6 +1512,13 @@ tbody tr:nth-child(even) {
 }
 
 .prediction-coverage-report header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.prediction-coverage-report header > div {
   display: grid;
   gap: 4px;
 }
@@ -1096,6 +1534,35 @@ tbody tr:nth-child(even) {
   font-weight: 750;
 }
 
+.prediction-coverage-report header button {
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 2px solid #bd2a2a;
+  border-radius: 999px;
+  color: #a11616;
+  background: #fff7f7;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.prediction-coverage-report header button:hover:not(:disabled) {
+  color: #ffffff;
+  background: #bd2a2a;
+}
+
+.prediction-coverage-report header button:focus-visible {
+  outline: 3px solid rgba(189, 42, 42, 0.28);
+  outline-offset: 2px;
+}
+
+.prediction-coverage-report header button:disabled {
+  border-color: #cbd5df;
+  color: #8190a0;
+  background: #f2f5f8;
+  cursor: default;
+}
+
 .prediction-coverage-report ul {
   margin: 0;
   padding: 0;
@@ -1107,13 +1574,47 @@ tbody tr:nth-child(even) {
 
 .prediction-coverage-report li {
   min-height: 52px;
-  display: grid;
-  align-content: center;
-  gap: 3px;
-  padding: 8px 11px;
   border: 1px solid #d8e4ef;
   border-radius: 9px;
   background: #f5f9fd;
+}
+
+.prediction-coverage-report li.selected {
+  border-color: #bd2a2a;
+  background: #fff1f1;
+  box-shadow: 0 0 0 2px rgba(189, 42, 42, 0.12);
+}
+
+.prediction-coverage-report li label {
+  min-height: 50px;
+  display: grid;
+  grid-template-columns: 21px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 11px;
+  cursor: pointer;
+}
+
+.prediction-coverage-report li input {
+  appearance: none;
+  width: 19px;
+  height: 19px;
+  margin: 0;
+  border: 2px solid #8799aa;
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.prediction-coverage-report li input:checked {
+  border-color: #bd2a2a;
+  background: #bd2a2a;
+  box-shadow: inset 0 0 0 4px #ffffff;
+}
+
+.prediction-coverage-report li input:focus-visible {
+  outline: 3px solid rgba(189, 42, 42, 0.28);
+  outline-offset: 2px;
 }
 
 .prediction-coverage-report li span {
@@ -1205,6 +1706,14 @@ tbody tr:nth-child(even) {
   box-shadow: 0 0 0 7px #111827, 0 6px 16px rgba(17, 24, 39, 0.28);
 }
 
+.all-predictions-cell.is-in-selected-coverage-zone {
+  z-index: 3;
+  border-color: #ffffff;
+  box-shadow:
+    0 0 0 7px #d71920,
+    0 7px 18px rgba(164, 13, 18, 0.34);
+}
+
 .all-predictions-cell > strong {
   width: 40px;
   height: 40px;
@@ -1268,6 +1777,9 @@ tbody tr:nth-child(even) {
 
 .prediction-strategy-tabs button {
   width: 100%;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
   padding: 10px 8px;
   border: 1px solid #c8d7e7;
   border-radius: 9px;
@@ -1275,6 +1787,12 @@ tbody tr:nth-child(even) {
   background: #eef5fb;
   font-size: 12px;
   font-weight: 800;
+}
+
+.prediction-strategy-tabs button small {
+  color: #6b7e92;
+  font-size: 8px;
+  font-weight: 850;
 }
 
 .prediction-workspace-layout {
@@ -1334,6 +1852,112 @@ tbody tr:nth-child(even) {
   color: #245c3a;
   font-size: 12px;
   white-space: nowrap;
+}
+
+.strategy-efficacy-card {
+  padding: 14px 16px;
+  border: 1px solid #cedce9;
+  border-left: 5px solid #748ba1;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.strategy-efficacy-card.is-ahead {
+  border-left-color: #2e8b57;
+  background: linear-gradient(100deg, #f1fbf5, #ffffff 52%);
+}
+
+.strategy-efficacy-card.is-behind {
+  border-left-color: #b35b5b;
+  background: linear-gradient(100deg, #fff6f5, #ffffff 52%);
+}
+
+.strategy-efficacy-card.is-tied {
+  border-left-color: #657e98;
+}
+
+.strategy-efficacy-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.strategy-efficacy-card > header div {
+  display: grid;
+  gap: 2px;
+}
+
+.strategy-efficacy-card > header span {
+  color: #6a7e92;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.strategy-efficacy-card > header strong {
+  color: #173d64;
+  font-size: 17px;
+}
+
+.strategy-efficacy-card > header b {
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #425b72;
+  background: #e9f0f6;
+  font-size: 12px;
+}
+
+.strategy-efficacy-card.is-ahead > header b {
+  color: #1f6d40;
+  background: #dff4e7;
+}
+
+.strategy-efficacy-card.is-behind > header b {
+  color: #923e3e;
+  background: #f9e5e3;
+}
+
+.strategy-efficacy-card dl {
+  margin: 12px 0 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.strategy-efficacy-card dl > div {
+  padding: 9px 11px;
+  border: 1px solid #dbe5ee;
+  border-radius: 9px;
+  background: rgba(248, 251, 254, 0.88);
+}
+
+.strategy-efficacy-card dt {
+  color: #64798e;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.strategy-efficacy-card dd {
+  margin: 4px 0 0;
+  color: #173d64;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.strategy-efficacy-card dd small {
+  margin-left: 4px;
+  color: #6b8094;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.strategy-efficacy-card > p {
+  margin: 10px 0 0;
+  color: #5e7388;
+  font-size: 10px;
+  line-height: 1.45;
 }
 
 .combined-score-grid {
@@ -1423,6 +2047,14 @@ tbody tr:nth-child(even) {
   padding: 0;
   overflow: auto;
   background: #f5f8fb;
+}
+
+.possible-draw-dialog-shell > .prediction-workspace-navigation {
+  width: 100%;
+  min-width: 1120px;
+  margin-bottom: 0;
+  border-width: 0 0 1px;
+  border-radius: 0;
 }
 
 .possible-draw-window {
@@ -2207,6 +2839,10 @@ tbody tr:nth-child(even) {
     #eef3f7;
 }
 
+.draw-editor-shell > .prediction-workspace-navigation {
+  width: min(920px, 100%);
+}
+
 .draw-editor-window {
   width: min(920px, 100%);
   min-height: calc(100vh - 40px);
@@ -2679,6 +3315,20 @@ tbody tr:nth-child(even) {
   .prediction-strategy-tabs button {
     padding: 8px 4px;
     font-size: 10px;
+  }
+
+  .strategy-efficacy-card dl {
+    grid-template-columns: repeat(2, minmax(110px, 1fr));
+  }
+
+  .prediction-efficacy-overview > header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .efficacy-range-controls {
+    grid-template-columns: 1fr;
   }
 
   .combined-score-grid {

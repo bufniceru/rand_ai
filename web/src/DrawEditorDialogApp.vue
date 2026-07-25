@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import PredictionWorkspaceNavigation from "./components/PredictionWorkspaceNavigation.vue";
 import type { DrawEditorData, DrawEditorEntry } from "./types";
 
 type EditorMode = "view" | "add" | "edit";
@@ -124,6 +125,7 @@ onMounted(async () => {
 
 <template>
   <main class="draw-editor-shell">
+    <PredictionWorkspaceNavigation active="draw-history" />
     <section class="draw-editor-window">
       <header class="draw-editor-header">
         <div>

@@ -30,17 +30,34 @@ const reportPlugins = [
   { id: "possible-draw", label: "Possible Draw" },
 ];
 let enabledReportIds = new Set(reportPlugins.map((plugin) => plugin.id));
+const legacyStrategyPluginIds = [
+  "proximity",
+  "freshness",
+  "emd",
+  "randomness",
+  "entropy",
+  "markov100",
+  "mkfr",
+  "bayesian",
+  "svc",
+  "tbl",
+];
 const strategyPlugins = [
   { id: "proximity", label: "Prox" },
   { id: "freshness", label: "Fresh" },
   { id: "emd", label: "EMD" },
   { id: "randomness", label: "Rand" },
+  { id: "fresh_random", label: "FRnd" },
+  { id: "chi_square", label: "Chi²" },
   { id: "entropy", label: "Entr" },
   { id: "markov100", label: "Mark" },
   { id: "mkfr", label: "MKFR" },
   { id: "bayesian", label: "Baye" },
+  { id: "predictive_grid", label: "Grid" },
+  { id: "mixed", label: "Mix" },
   { id: "svc", label: "SVC" },
   { id: "tbl", label: "TBL" },
+  { id: "cis", label: "CIS" },
 ];
 let enabledStrategyIds = new Set(strategyPlugins.map((plugin) => plugin.id));
 
@@ -142,12 +159,16 @@ function loadStrategyPreferences() {
       return new Set(strategyPlugins.map((plugin) => plugin.id));
     }
     const knownIds = new Set(strategyPlugins.map((plugin) => plugin.id));
-    return new Set(
+    const selected = new Set(
       parsed.enabledStrategies.filter(
         (strategyId) =>
           typeof strategyId === "string" && knownIds.has(strategyId),
       ),
     );
+    if (legacyStrategyPluginIds.every((strategyId) => selected.has(strategyId))) {
+      for (const plugin of strategyPlugins) selected.add(plugin.id);
+    }
+    return selected;
   } catch (error) {
     if (error?.code !== "ENOENT") {
       console.warn("Could not load strategy plugin preferences:", error);
@@ -904,6 +925,7 @@ ipcMain.handle("dataset:analyze", async (event, request) => {
           dataset: payload.dataset,
           predictions: payload.combinedPredictions,
           predictionSuites: payload.predictionSuites,
+          strategyEfficacyHistory: payload.strategyEfficacyHistory,
           history: payload.history,
           possibleDraw: payload.possibleDraw,
         }

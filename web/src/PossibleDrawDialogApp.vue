@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import PredictionWorkspaceNavigation from "./components/PredictionWorkspaceNavigation.vue";
 import type {
   CombinedPredictionDialogData,
   PossibleDrawNumberRequest,
@@ -57,8 +58,9 @@ const activePlan = computed(() => plans.value.find((plan) => plan.id === activeP
 
 const orderedStrategies = computed(() => {
   const order: StrategyId[] = [
-    "freshness", "proximity", "emd", "entropy", "markov100",
-    "mkfr", "bayesian", "svc", "tbl", "randomness",
+    "freshness", "proximity", "emd", "chi_square", "entropy", "markov100",
+    "mkfr", "bayesian", "predictive_grid", "mixed", "svc", "tbl",
+    "cis", "fresh_random", "randomness",
   ];
   return order
     .map((id) => strategyById.value.get(id))
@@ -311,8 +313,10 @@ function cardColor(id: string): string {
   return {
     freshness: "#f58a59", proximity: "#efb23e", emd: "#d9a531",
     entropy: "#c95d42", markov100: "#f3b94e", mkfr: "#1f8f75",
-    bayesian: "#d477b8",
-    svc: "#9567e8", tbl: "#1695a8", randomness: "#3264ad",
+    chi_square: "#6256c7", bayesian: "#d477b8",
+    predictive_grid: "#008ca8", mixed: "#dd6b20",
+    svc: "#9567e8", tbl: "#1695a8", cis: "#b12f67",
+    fresh_random: "#7b56c2", randomness: "#3264ad",
   }[id] ?? "#6e8195";
 }
 
@@ -382,6 +386,7 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="possible-draw-dialog-shell">
+    <PredictionWorkspaceNavigation active="possible-draw" />
     <section v-if="latestSuite && dialogData" class="possible-draw-window">
       <header class="possible-draw-toolbar">
         <label class="possible-plan-select">

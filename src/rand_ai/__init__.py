@@ -13,6 +13,8 @@ from rand_ai.lotto_results import (
 from rand_ai.prediction import CombinedPrediction, NumberPrediction
 from rand_ai.strategy_prediction import (
     PredictionSuite,
+    StrategyEfficacy,
+    StrategyEfficacyRecord,
     StrategyNumberPrediction,
     StrategyPrediction,
 )
@@ -26,6 +28,8 @@ __all__ = (
     "CombinedPrediction",
     "NumberPrediction",
     "PredictionSuite",
+    "StrategyEfficacy",
+    "StrategyEfficacyRecord",
     "StrategyNumberPrediction",
     "StrategyPrediction",
     "create_lotto_results_pickle",

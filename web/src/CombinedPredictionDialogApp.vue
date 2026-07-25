@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import type { CombinedPredictionDialogData } from "./types";
+import PredictionWorkspaceNavigation from "./components/PredictionWorkspaceNavigation.vue";
 import CombinedPredictionGridView from "./views/CombinedPredictionGridView.vue";
 
 const dialogData = ref<CombinedPredictionDialogData | null>(null);
@@ -33,9 +34,11 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="combined-prediction-dialog-shell">
+    <PredictionWorkspaceNavigation v-if="!dialogData" active="predictions" />
     <CombinedPredictionGridView
       v-if="dialogData"
       :prediction-suites="dialogData.predictionSuites"
+      :efficacy-history="dialogData.strategyEfficacyHistory"
     />
     <section v-else class="dialog-empty-state">
       <strong>Predictions unavailable</strong>

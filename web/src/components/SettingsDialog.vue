@@ -23,12 +23,17 @@ const strategyDescriptions: Record<StrategyId, string> = {
   freshness: "Gap recency and historical hit-rate model.",
   emd: "Earth-mover similarity to historical draw vectors.",
   randomness: "Deterministic random comparison baseline.",
+  fresh_random: "Seeded random ranking guided 35% by freshness.",
+  chi_square: "Signed frequency deviation from uniform random expectation.",
   entropy: "Gap-entropy history with overdue adjustment.",
   markov100: "Recency-weighted gap-state Markov model.",
   mkfr: "Variable-order D/!D context transition lift.",
   bayesian: "Bayesian gap-state posterior ranking.",
+  predictive_grid: "Six-component Markov, transition, and history score grid.",
+  mixed: "Weighted consensus of four complementary strategies.",
   svc: "Online support-vector classification model.",
   tbl: "Temporal behavior learning ensemble.",
+  cis: "Online learner combining ten strategy experts.",
 };
 
 const selectedCount = computed(() => selectedStrategyIds.value.size);

@@ -22,6 +22,7 @@ from rand_ai.statistics import CorrelationMethod, DrawsStatistics
 from rand_ai.strategy_prediction import (
     PredictionSuite,
     STRATEGY_IDS,
+    StrategyEfficacyRecord,
     StrategyPrediction,
     build_prediction_suites,
 )
@@ -188,11 +189,27 @@ def _prediction_progress(
 
 
 def _strategy_payload(strategy: StrategyPrediction) -> dict[str, Any]:
+    efficacy = strategy.efficacy
     return {
         "id": strategy.strategy_id,
         "name": strategy.name,
         "description": strategy.description,
         "topNumbers": list(strategy.top_numbers),
+        "efficacy": (
+            None
+            if efficacy is None
+            else {
+                "evaluatedDraws": efficacy.evaluated_draws,
+                "strategyHits": efficacy.strategy_hits,
+                "randomHits": efficacy.random_hits,
+                "expectedRandomHits": efficacy.expected_random_hits,
+                "averageHitsPerDraw": efficacy.average_hits_per_draw,
+                "randomAverageHitsPerDraw": (
+                    efficacy.random_average_hits_per_draw
+                ),
+                "hitDifference": efficacy.hit_difference,
+            }
+        ),
         "numbers": [
             {
                 "number": item.number,
@@ -214,6 +231,18 @@ def _suite_payload(suite: PredictionSuite) -> dict[str, Any]:
         "strategies": [
             _strategy_payload(strategy) for strategy in suite.strategies
         ],
+    }
+
+
+def _efficacy_record_payload(
+    record: StrategyEfficacyRecord,
+) -> dict[str, Any]:
+    return {
+        "referenceDrawNumber": record.reference_draw_number,
+        "targetDrawNumber": record.target_draw_number,
+        "actualNumbers": list(record.actual_numbers),
+        "randomHits": record.random_hits,
+        "strategyHits": dict(record.strategy_hits),
     }
 
 
@@ -319,6 +348,7 @@ def build_analysis_payload(
                 )
             )
     prediction_suites: Sequence[PredictionSuite] = ()
+    efficacy_records: list[StrategyEfficacyRecord] = []
     if prediction_suites_required:
         _report_progress(progress, 31, "Preparing named PyLotto strategy models")
         prediction_suites = build_prediction_suites(
@@ -331,6 +361,7 @@ def build_analysis_payload(
                 60,
                 f"Calculating {len(strategy_ids)} enabled prediction strategy plugins",
             ),
+            efficacy_record=efficacy_records.append,
         )
     _report_progress(progress, 61, "Validating draw history and analysis options")
     statistics = DrawsStatistics(draws, trend_bins=trend_bins)
@@ -417,6 +448,10 @@ def build_analysis_payload(
         "combinedPredictions": prediction_history,
         "predictionSuites": [
             _suite_payload(suite) for suite in prediction_suites
+        ],
+        "strategyEfficacyHistory": [
+            _efficacy_record_payload(record)
+            for record in efficacy_records
         ],
         "possibleDraw": (
             _possible_draw_payload(draws)
