@@ -2,7 +2,7 @@
 
 import logging
 import pickle
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from random import SystemRandom
 from typing import BinaryIO
@@ -63,7 +63,12 @@ class Draws:
             pickle.dump(self, pickle_file)
 
     @classmethod
-    def load_trusted_pickle(cls, source: BinaryIO) -> "Draws":
+    def load_trusted_pickle(
+        cls,
+        source: BinaryIO,
+        *,
+        prepare_predictions: bool = True,
+    ) -> "Draws":
         """Load a Draws object from a trusted pickle binary stream.
 
         Pickle can execute arbitrary code during loading. Never pass data from
@@ -72,7 +77,18 @@ class Draws:
         loaded_object = pickle.load(source)
         if not isinstance(loaded_object, cls):
             raise TypeError("Pickle must contain a Draws instance")
+        if prepare_predictions:
+            loaded_object.prepare_predictions()
         return loaded_object
+
+    def prepare_predictions(
+        self,
+        progress: Callable[[int, int], None] | None = None,
+    ) -> None:
+        """Calculate exact-value combined predictions for every stored draw."""
+        from rand_ai.prediction import attach_combined_predictions
+
+        attach_combined_predictions(self._draws, progress)
 
     def log_draws(self) -> None:
         """Log every stored draw at INFO level in insertion order."""

@@ -1,12 +1,29 @@
 """Define a validated six-ball draw and its circular distances."""
 
+from __future__ import annotations
+
+from datetime import date as calendar_date
+from typing import TYPE_CHECKING
+
 from rand_ai.ball import Ball
+
+if TYPE_CHECKING:
+    from rand_ai.prediction import CombinedPrediction
 
 
 class Draw:
     """Store six unique, sorted Balls with values from 1 through 49."""
 
-    __slots__ = ("_num1", "_num2", "_num3", "_num4", "_num5", "_num6")
+    __slots__ = (
+        "_num1",
+        "_num2",
+        "_num3",
+        "_num4",
+        "_num5",
+        "_num6",
+        "_date",
+        "_prediction",
+    )
 
     def __init__(
         self,
@@ -16,9 +33,13 @@ class Draw:
         num4: int = 4,
         num5: int = 5,
         num6: int = 6,
+        *,
+        date: str | None = None,
     ) -> None:
         """Initialize the draw after validating and sorting its numbers."""
         numbers = self._sort_numbers(num1, num2, num3, num4, num5, num6)
+        self._date = self._validate_date(date)
+        self._prediction: CombinedPrediction | None = None
         left_distances = (
             (numbers[0] - 1) + (49 - numbers[5]),
             *(right - left - 1 for left, right in zip(numbers, numbers[1:])),
@@ -37,6 +58,18 @@ class Draw:
                 numbers, left_distances, right_distances, strict=True
             )
         )
+
+    @staticmethod
+    def _validate_date(value: str | None) -> str | None:
+        """Return an ISO calendar date or preserve a missing legacy date."""
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise TypeError("Date must be an ISO date string")
+        try:
+            return calendar_date.fromisoformat(value).isoformat()
+        except ValueError as error:
+            raise ValueError("Date must use YYYY-MM-DD") from error
 
     @staticmethod
     def _require_integer(value: int) -> int:
@@ -127,6 +160,11 @@ class Draw:
             self.num6,
         )
 
+    @property
+    def date(self) -> str | None:
+        """Return the draw date, or None for a legacy undated pickle."""
+        return getattr(self, "_date", None)
+
     def _set_gaps(self, gaps: tuple[int, ...]) -> None:
         """Populate each ball's historical gap when this draw is inserted."""
         if len(gaps) != 6:
@@ -142,3 +180,12 @@ class Draw:
             ball._with_gap(gap)
             for ball, gap in zip(self.balls, gaps, strict=True)
         )
+
+    @property
+    def prediction(self) -> CombinedPrediction | None:
+        """Return the precomputed raw freshness/proximity prediction."""
+        return self._prediction
+
+    def _set_prediction(self, prediction: CombinedPrediction) -> None:
+        """Attach display-ready prediction information during dataset import."""
+        self._prediction = prediction

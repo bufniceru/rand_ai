@@ -31,6 +31,27 @@ class TestDrawInitialization:
 
         assert _values(draw) == (1, 2, 10, 20, 30, 49)
 
+    def test_constructor_stores_valid_iso_date(self) -> None:
+        draw = Draw(1, 2, 10, 20, 30, 49, date="2026-07-23")
+
+        assert draw.date == "2026-07-23"
+
+    @pytest.mark.parametrize(
+        ("value", "error", "message"),
+        (
+            (20260723, TypeError, "ISO date string"),
+            ("23-07-2026", ValueError, "YYYY-MM-DD"),
+        ),
+    )
+    def test_constructor_rejects_invalid_date(
+        self,
+        value: object,
+        error: type[Exception],
+        message: str,
+    ) -> None:
+        with pytest.raises(error, match=message):
+            Draw(date=cast(str, value))
+
     def test_constructor_sorts_numbers_in_ascending_order(self) -> None:
         """Verify that unordered constructor values are sorted."""
         draw = Draw(49, 1, 30, 10, 40, 20)
@@ -109,6 +130,22 @@ class TestDrawProperties:
 
         with pytest.raises(AttributeError):
             setattr(draw, "balls", ())
+
+    def test_date_is_read_only_and_legacy_safe(self) -> None:
+        draw = Draw(date="2026-07-23")
+        legacy_draw = object.__new__(Draw)
+
+        assert legacy_draw.date is None
+        with pytest.raises(AttributeError):
+            draw.date = "2026-07-24"
+
+    def test_prediction_starts_empty_and_is_read_only(self) -> None:
+        """Prediction data is attached only by the trusted import calculation."""
+        draw = Draw()
+
+        assert draw.prediction is None
+        with pytest.raises(AttributeError):
+            draw.prediction = None
 
     def test_rejects_wrong_number_of_internal_gaps(self) -> None:
         """Verify gap population requires one gap for every Ball."""

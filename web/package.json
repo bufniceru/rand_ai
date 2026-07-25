@@ -1,0 +1,59 @@
+{
+  "name": "rand-ai-desktop",
+  "version": "0.1.0",
+  "description": "Rand AI Vue and Electron statistics dashboard",
+  "author": "Rand AI",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vue-tsc --noEmit && vite build",
+    "build:electron": "vue-tsc --noEmit && vite build --mode electron",
+    "electron": "npm run build:electron && electron .",
+    "bridge:build": "cd .. && .venv\\Scripts\\pyinstaller.exe --noconfirm --clean --onefile --collect-submodules dateutil --name rand-ai-bridge src/rand_ai/gui_bridge.py",
+    "electron:build": "npm run bridge:build && npm run build:electron && electron-builder --win portable",
+    "electron:build:hook": "node scripts/watch-electron-build.cjs"
+  },
+  "dependencies": {
+    "plotly.js-dist-min": "^3.1.2",
+    "vue": "^3.5.24"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.0",
+    "electron": "^43.1.1",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.0",
+    "vue-tsc": "^3.1.2"
+  },
+  "build": {
+    "appId": "com.randai.desktop",
+    "productName": "Rand AI",
+    "directories": {
+      "output": "electron-package"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist/rand-ai-bridge.exe",
+        "to": "bridge/rand-ai-bridge.exe"
+      }
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
+  }
+}

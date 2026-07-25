@@ -8,9 +8,17 @@ build/
 dist/
 wheels/
 *.egg-info
+*.spec
 
 # Virtual environments
 .venv
+
+# Desktop application build artifacts
+web/node_modules/
+web/dist/
+web/electron-package/
+.codex_tmp/uv-cache/
+.codex_tmp/**/node_modules/
 
 # IDE settings
 .idea/
