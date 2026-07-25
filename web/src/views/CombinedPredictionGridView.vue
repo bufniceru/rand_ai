@@ -12,6 +12,7 @@ const props = defineProps<{
 
 const referenceOffset = ref(0);
 const selectedStrategyId = ref("all");
+const mutedStrategyIds = ref<Set<string>>(new Set());
 
 const maximumOffset = computed(() => Math.max(0, props.predictionSuites.length - 1));
 const selectedIndex = computed(() =>
@@ -22,12 +23,18 @@ const selectedStrategy = computed(
   () =>
     selectedStrategyId.value === "all"
       ? null
-      :
-    selectedPrediction.value?.strategies.find(
-      (strategy) => strategy.id === selectedStrategyId.value,
-    ) ??
-    selectedPrediction.value?.strategies[0] ??
-    null,
+      : selectedPrediction.value?.strategies.find(
+          (strategy) => strategy.id === selectedStrategyId.value,
+        ) ??
+        selectedPrediction.value?.strategies[0] ??
+        null,
+);
+const allStrategiesVisible = computed(
+  () =>
+    (selectedPrediction.value?.strategies.length ?? 0) > 0 &&
+    selectedPrediction.value?.strategies.every(
+      (strategy) => !mutedStrategyIds.value.has(strategy.id),
+    ),
 );
 const actualNumbers = computed(
   () => new Set(selectedPrediction.value?.actualNumbers ?? []),
@@ -42,7 +49,7 @@ const allReportCells = computed(() =>
         .map((strategy) => ({
           id: strategy.id,
           name: strategy.name,
-          color: strategyColor(strategy.id),
+          color: strategyDisplayColor(strategy.id),
         })),
     };
   }),
@@ -68,13 +75,19 @@ watch(
 );
 
 watch(selectedPrediction, (prediction) => {
+  const available = new Set<string>(
+    prediction?.strategies.map((strategy) => strategy.id) ?? [],
+  );
   if (
     prediction &&
     selectedStrategyId.value !== "all" &&
-    !prediction.strategies.some((strategy) => strategy.id === selectedStrategyId.value)
+    !available.has(selectedStrategyId.value)
   ) {
-    selectedStrategyId.value = prediction.strategies[0]?.id ?? "";
+    selectedStrategyId.value = prediction.strategies[0]?.id ?? "all";
   }
+  mutedStrategyIds.value = new Set(
+    [...mutedStrategyIds.value].filter((strategyId) => available.has(strategyId)),
+  );
 });
 
 function scoreLabel(entry: StrategyNumberPrediction): string {
@@ -89,10 +102,32 @@ function strategyColor(strategyId: string): string {
     randomness: "#3264ad",
     entropy: "#c95d42",
     markov100: "#e8c238",
+    mkfr: "#1f8f75",
     bayesian: "#d477b8",
     svc: "#9567e8",
     tbl: "#1695a8",
   }[strategyId] ?? "#6e8195";
+}
+
+function strategyDisplayColor(strategyId: string): string {
+  return mutedStrategyIds.value.has(strategyId)
+    ? "#ffffff"
+    : strategyColor(strategyId);
+}
+
+function toggleStrategyColor(strategyId: string): void {
+  const next = new Set(mutedStrategyIds.value);
+  if (next.has(strategyId)) next.delete(strategyId);
+  else next.add(strategyId);
+  mutedStrategyIds.value = next;
+}
+
+function toggleAllStrategyColors(): void {
+  mutedStrategyIds.value = allStrategiesVisible.value
+    ? new Set(
+        selectedPrediction.value?.strategies.map((strategy) => strategy.id) ?? [],
+      )
+    : new Set();
 }
 
 function cellTitle(
@@ -230,14 +265,27 @@ function sectorStyle(cell: (typeof allReportCells.value)[number]): Record<string
               </li>
             </ul>
           </section>
-          <div class="prediction-color-legend" aria-label="Prediction report colors">
-            <span
+          <div class="prediction-color-legend" role="group" aria-label="Prediction report colors">
+            <label>
+              <input
+                type="checkbox"
+                :checked="allStrategiesVisible"
+                @change="toggleAllStrategyColors"
+              />
+              <span>All colors</span>
+            </label>
+            <label
               v-for="strategy in selectedPrediction.strategies"
               :key="strategy.id"
             >
-              <i :style="{ background: strategyColor(strategy.id) }"></i>
-              {{ strategy.name }}
-            </span>
+              <input
+                type="checkbox"
+                :checked="!mutedStrategyIds.has(strategy.id)"
+                :style="{ '--legend-color': strategyColor(strategy.id) }"
+                @change="toggleStrategyColor(strategy.id)"
+              />
+              <span>{{ strategy.name }}</span>
+            </label>
           </div>
           <div
           class="all-predictions-grid"

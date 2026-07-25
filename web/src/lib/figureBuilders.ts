@@ -272,6 +272,47 @@ function matchingPairs(analysis: AnalysisPayload): FigureSpec {
   };
 }
 
+function freshnessGapDistribution(analysis: AnalysisPayload): FigureSpec {
+  const rows = table(analysis, "freshness_gap_distribution").rows;
+  const layout = baseLayout(
+    "Number hits by exact freshness gap",
+    "Gap (intervening draws since the previous hit)",
+    "Number hits",
+  );
+  return {
+    data: [{
+      type: "bar",
+      x: rows.map((row) => numberValue(row, "gap")),
+      y: rows.map((row) => numberValue(row, "hits")),
+      customdata: rows.map((row) => [
+        numberValue(row, "opportunities"),
+        numberValue(row, "hit_rate"),
+        numberValue(row, "hit_percentage"),
+      ]),
+      marker: {
+        color: rows.map((row) => numberValue(row, "hit_rate")),
+        colorscale: [
+          [0, "#dbe7fb"],
+          [0.5, "#5a86d6"],
+          [1, "#204f9e"],
+        ],
+        colorbar: { title: { text: "Hit rate %" } },
+      },
+      hovertemplate:
+        "Gap %{x}<br>Hits %{y:,}<br>Opportunities %{customdata[0]:,}<br>Hit rate %{customdata[1]:.3f}%<br>Share of all hits %{customdata[2]:.3f}%<extra></extra>",
+    }],
+    layout: {
+      ...layout,
+      bargap: 0.08,
+      xaxis: {
+        title: { text: "Gap (intervening draws since the previous hit)" },
+        dtick: rows.length > 60 ? 5 : 1,
+        gridcolor: "rgba(78,92,118,.12)",
+      },
+    },
+  };
+}
+
 export function buildFigures(analysis: AnalysisPayload): Record<string, FigureSpec> {
   const enabled = new Set(analysis.options.enabledReports);
   const figures: Record<string, FigureSpec> = {};
@@ -356,6 +397,9 @@ export function buildFigures(analysis: AnalysisPayload): Record<string, FigureSp
 
   if (enabled.has("randomness")) {
     figures.matching_pairs = matchingPairs(analysis);
+  }
+  if (enabled.has("gaps")) {
+    figures.freshness_gap_distribution = freshnessGapDistribution(analysis);
   }
   return figures;
 }

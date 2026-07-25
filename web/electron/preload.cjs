@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld("randAiDesktop", {
   openDataset: () => ipcRenderer.invoke("dataset:open"),
   getReportPlugins: () => ipcRenderer.invoke("report-plugins:get"),
   getStrategyPlugins: () => ipcRenderer.invoke("strategy-plugins:get"),
+  setStrategyPlugins: (strategyIds) =>
+    ipcRenderer.invoke("strategy-plugins:set", strategyIds),
   analyzeDataset: (request) => ipcRenderer.invoke("dataset:analyze", request),
   onAnalysisProgress: (callback) => {
     const listener = (_event, progress) => callback(progress);

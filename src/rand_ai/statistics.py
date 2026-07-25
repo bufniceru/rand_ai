@@ -235,6 +235,56 @@ class DrawsStatistics:
         values = np.hstack((self._numbers, draw_sums))
         return self._describe(values, (*NUMBER_NAMES, "draw_sum"))
 
+    def freshness_gap_distribution(self) -> pd.DataFrame:
+        """Return whole-history hits and opportunities for every exact gap."""
+        hit_counts = np.zeros(self._draw_count, dtype=np.int64)
+        opportunity_delta = np.zeros(self._draw_count + 1, dtype=np.int64)
+
+        for number in range(1, 50):
+            occurrences = np.flatnonzero(np.any(self._numbers == number, axis=1))
+            if occurrences.size:
+                hit_gaps = np.concatenate(
+                    (
+                        occurrences[:1],
+                        np.diff(occurrences) - 1,
+                    )
+                ).astype(np.int64)
+                np.add.at(hit_counts, hit_gaps, 1)
+                interval_maxima = hit_gaps
+                trailing_gap = self._draw_count - int(occurrences[-1]) - 2
+                if trailing_gap >= 0:
+                    interval_maxima = np.append(interval_maxima, trailing_gap)
+            else:
+                interval_maxima = np.array(
+                    [self._draw_count - 1],
+                    dtype=np.int64,
+                )
+
+            opportunity_delta[0] += interval_maxima.size
+            np.add.at(opportunity_delta, interval_maxima + 1, -1)
+
+        opportunity_counts = np.cumsum(opportunity_delta[:-1])
+        encountered = np.flatnonzero(opportunity_counts)
+        maximum_gap = int(encountered[-1])
+        gaps = np.arange(maximum_gap + 1, dtype=np.int64)
+        hits = hit_counts[: maximum_gap + 1]
+        opportunities = opportunity_counts[: maximum_gap + 1]
+        hit_rate = np.divide(
+            hits,
+            opportunities,
+            out=np.zeros(maximum_gap + 1, dtype=np.float64),
+            where=opportunities != 0,
+        )
+        return pd.DataFrame(
+            {
+                "gap": gaps,
+                "hits": hits,
+                "opportunities": opportunities,
+                "hit_rate": hit_rate * 100,
+                "hit_percentage": hits / (self._draw_count * 6) * 100,
+            }
+        )
+
     def draw_structure_distributions(self) -> pd.DataFrame:
         """Return sum, parity, range, and consecutive-pair distributions."""
         draw_sums = self._numbers.sum(axis=1, dtype=np.int64)
@@ -476,6 +526,7 @@ class DrawsStatistics:
             "number_frequencies": self.number_frequencies(),
             "position_frequencies": self.position_frequencies(),
             "number_descriptive": self.number_descriptive(),
+            "freshness_gap_distribution": self.freshness_gap_distribution(),
             "draw_structure_distributions": self.draw_structure_distributions(),
             "pair_cooccurrence": self.pair_cooccurrence(),
             "space_frequencies": self.space_frequencies(),

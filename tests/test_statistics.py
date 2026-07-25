@@ -167,6 +167,31 @@ class TestDrawsStatisticsTables:
         assert descriptive.loc["draw_sum", "min"] == 21
         assert descriptive.loc["draw_sum", "max"] == 150
 
+    def test_freshness_gap_distribution_covers_every_exact_gap(self) -> None:
+        """Verify hits, candidate opportunities, and rates by pre-draw gap."""
+        distribution = DrawsStatistics(
+            _sample_draws()
+        ).freshness_gap_distribution()
+
+        assert distribution["gap"].tolist() == [0, 1, 2]
+        assert distribution["hits"].tolist() == [7, 6, 5]
+        assert distribution["opportunities"].tolist() == [61, 48, 38]
+        assert distribution["hits"].sum() == 18
+        assert distribution["opportunities"].sum() == 3 * 49
+        assert distribution.loc[0, "hit_rate"] == pytest.approx(700 / 61)
+        assert distribution.loc[2, "hit_percentage"] == pytest.approx(250 / 9)
+
+    def test_freshness_gaps_support_numbers_never_drawn_again(self) -> None:
+        """Verify trailing and never-hit candidate gaps remain opportunities."""
+        draws = Draws()
+        draws.add(Draw())
+        draws.add(Draw())
+        distribution = DrawsStatistics(draws).freshness_gap_distribution()
+
+        assert distribution["gap"].tolist() == [0, 1]
+        assert distribution["hits"].tolist() == [12, 0]
+        assert distribution["opportunities"].tolist() == [55, 43]
+
     def test_draw_structure_distributions(self) -> None:
         """Verify sums, parity, ranges, and consecutive-pair counts."""
         distributions = DrawsStatistics(_sample_draws()).draw_structure_distributions()
@@ -345,6 +370,7 @@ class TestDrawsRandomnessAndExports:
             "number_frequencies",
             "position_frequencies",
             "number_descriptive",
+            "freshness_gap_distribution",
             "draw_structure_distributions",
             "pair_cooccurrence",
             "space_frequencies",

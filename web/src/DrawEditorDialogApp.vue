@@ -3,10 +3,12 @@ import { computed, onMounted, ref } from "vue";
 import type { DrawEditorData, DrawEditorEntry } from "./types";
 
 type EditorMode = "view" | "add" | "edit";
+type DrawVisualization = "grid" | "circle";
 
 const data = ref<DrawEditorData | null>(null);
 const currentIndex = ref(0);
 const mode = ref<EditorMode>("view");
+const visualization = ref<DrawVisualization>("grid");
 const editDate = ref("");
 const editNumbers = ref<number[]>([]);
 const originalDate = ref("");
@@ -26,6 +28,15 @@ const displayedSet = computed(() => new Set(displayedNumbers.value));
 const canSave = computed(
   () => /^\d{4}-\d{2}-\d{2}$/.test(editDate.value) && editNumbers.value.length === 6,
 );
+const circleNumbers = Array.from({ length: 49 }, (_value, index) => {
+  const number = index + 1;
+  const angle = (index / 49) * Math.PI * 2 - Math.PI / 2;
+  return {
+    number,
+    left: `${50 + Math.cos(angle) * 44}%`,
+    top: `${50 + Math.sin(angle) * 44}%`,
+  };
+});
 
 function navigate(index: number): void {
   if (!draws.value.length) return;
@@ -158,8 +169,34 @@ onMounted(async () => {
         </div>
       </nav>
 
+      <nav class="draw-editor-view-tabs" role="tablist" aria-label="Draw visualization">
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="visualization === 'grid'"
+          :class="{ active: visualization === 'grid' }"
+          @click="visualization = 'grid'"
+        >
+          7×7 Grid
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="visualization === 'circle'"
+          :class="{ active: visualization === 'circle' }"
+          @click="visualization = 'circle'"
+        >
+          PyLotto Circle
+        </button>
+      </nav>
+
       <section v-if="!loading && data" class="draw-editor-content">
-        <div class="draw-editor-grid" role="grid" aria-label="Draw numbers">
+        <div
+          v-if="visualization === 'grid'"
+          class="draw-editor-grid"
+          role="grid"
+          aria-label="Draw numbers in a 7 by 7 grid"
+        >
           <button
             v-for="number in 49"
             :key="number"
@@ -170,6 +207,33 @@ onMounted(async () => {
             @click="toggleNumber(number)"
           >
             {{ number }}
+          </button>
+        </div>
+        <div
+          v-else
+          class="draw-editor-circle"
+          role="group"
+          aria-label="Draw numbers arranged around a PyLotto circle"
+        >
+          <div class="draw-editor-circle-rings" aria-hidden="true" />
+          <div class="draw-editor-circle-center" aria-hidden="true">
+            <span>Draw</span>
+            <strong>{{ currentIndex + 1 }}</strong>
+            <small>{{ displayedNumbers.length }} / 6 selected</small>
+          </div>
+          <button
+            v-for="entry in circleNumbers"
+            :key="entry.number"
+            type="button"
+            :class="{
+              selected: displayedSet.has(entry.number),
+              editable: mode !== 'view',
+            }"
+            :style="{ left: entry.left, top: entry.top }"
+            :aria-pressed="displayedSet.has(entry.number)"
+            @click="toggleNumber(entry.number)"
+          >
+            {{ entry.number }}
           </button>
         </div>
         <div class="draw-editor-summary">

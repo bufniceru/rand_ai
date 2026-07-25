@@ -23,6 +23,7 @@ const reportPlugins = [
   { id: "spaces", label: "Spaces" },
   { id: "relationships", label: "Relationships" },
   { id: "randomness", label: "Randomness" },
+  { id: "gaps", label: "Gaps" },
   { id: "last-seen", label: "Last Seen Highlight" },
   { id: "last-seen-gap", label: "Last Seen Gap Highlight" },
   { id: "predictions", label: "Predictions" },
@@ -36,6 +37,7 @@ const strategyPlugins = [
   { id: "randomness", label: "Rand" },
   { id: "entropy", label: "Entr" },
   { id: "markov100", label: "Mark" },
+  { id: "mkfr", label: "MKFR" },
   { id: "bayesian", label: "Baye" },
   { id: "svc", label: "SVC" },
   { id: "tbl", label: "TBL" },
@@ -48,6 +50,7 @@ const dashboardViews = [
   ["spaces", "Spaces"],
   ["relationships", "Relationships"],
   ["randomness", "Randomness"],
+  ["gaps", "Gaps"],
   ["export", "Export"],
 ];
 
@@ -384,15 +387,7 @@ function updateReportPlugin(reportId, enabled) {
 function updateStrategyPlugins(nextEnabledStrategyIds) {
   enabledStrategyIds = new Set(nextEnabledStrategyIds);
   saveStrategyPreferences();
-  buildApplicationMenu();
-  sendMenuAction("strategyPluginsChanged", strategyPluginState());
-}
-
-function updateStrategyPlugin(strategyId, enabled) {
-  const nextEnabledStrategyIds = new Set(enabledStrategyIds);
-  if (enabled) nextEnabledStrategyIds.add(strategyId);
-  else nextEnabledStrategyIds.delete(strategyId);
-  updateStrategyPlugins(nextEnabledStrategyIds);
+  return strategyPluginState();
 }
 
 function lastSeenDialogData() {
@@ -720,6 +715,12 @@ function buildApplicationMenu() {
           click: () => sendMenuAction("export"),
         },
         { type: "separator" },
+        {
+          label: "Settings...",
+          accelerator: "CmdOrCtrl+,",
+          click: () => sendMenuAction("openSettings"),
+        },
+        { type: "separator" },
         { role: "quit" },
       ],
     },
@@ -776,12 +777,18 @@ function buildApplicationMenu() {
     {
       label: "Reports",
       submenu: [
-        ...reportPlugins.map((plugin) => ({
-          label: plugin.label,
-          type: "checkbox",
-          checked: enabledReportIds.has(plugin.id),
-          click: (menuItem) => updateReportPlugin(plugin.id, menuItem.checked),
-        })),
+        ...reportPlugins.flatMap((plugin) => {
+          const item = {
+            label: plugin.label,
+            type: "checkbox",
+            checked: enabledReportIds.has(plugin.id),
+            click: (menuItem) =>
+              updateReportPlugin(plugin.id, menuItem.checked),
+          };
+          return plugin.id === "gaps"
+            ? [{ type: "separator" }, item, { type: "separator" }]
+            : [item];
+        }),
         { type: "separator" },
         {
           label: "Enable All Reports",
@@ -793,32 +800,6 @@ function buildApplicationMenu() {
           label: "Disable All Reports",
           enabled: enabledReportIds.size !== 0,
           click: () => updateReportPlugins([]),
-        },
-      ],
-    },
-    {
-      label: "Strategies",
-      submenu: [
-        ...strategyPlugins.map((plugin) => ({
-          label: plugin.label,
-          type: "checkbox",
-          checked: enabledStrategyIds.has(plugin.id),
-          click: (menuItem) =>
-            updateStrategyPlugin(plugin.id, menuItem.checked),
-        })),
-        { type: "separator" },
-        {
-          label: "Enable All Strategies",
-          enabled: enabledStrategyIds.size !== strategyPlugins.length,
-          click: () =>
-            updateStrategyPlugins(
-              strategyPlugins.map((plugin) => plugin.id),
-            ),
-        },
-        {
-          label: "Disable All Strategies",
-          enabled: enabledStrategyIds.size !== 0,
-          click: () => updateStrategyPlugins([]),
         },
       ],
     },
@@ -871,6 +852,18 @@ ipcMain.handle("dataset:open", async () => chooseDataset());
 ipcMain.handle("report-plugins:get", () => reportPluginState());
 
 ipcMain.handle("strategy-plugins:get", () => strategyPluginState());
+
+ipcMain.handle("strategy-plugins:set", (_event, requestedStrategyIds) => {
+  if (!Array.isArray(requestedStrategyIds)) {
+    throw new TypeError("Strategy selection must be an array.");
+  }
+  const requested = new Set(requestedStrategyIds);
+  return updateStrategyPlugins(
+    strategyPlugins
+      .map((plugin) => plugin.id)
+      .filter((strategyId) => requested.has(strategyId)),
+  );
+});
 
 ipcMain.handle("dataset:analyze", async (event, request) => {
   const sendProgress = (progress) => {

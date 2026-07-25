@@ -17,6 +17,9 @@ _BASE_PROBABILITY = _NUMBERS_PER_DRAW / _NUMBER_COUNT
 _MAX_GAP_BUCKET = 35
 _MARKOV_PRIOR_STRENGTH = 8.0
 _MARKOV_DECAY = 0.5 ** (1 / 500)
+_MKFR_MAX_ORDER = 20
+_MKFR_PRIOR_STRENGTH = 8.0
+_MKFR_MIN_CONTEXT_SUPPORT = 8
 _RANDOM_SEED = 20260626
 _PROXIMITY_BUCKETS = ("paired", "tight", "near", "balanced", "wide", "isolated")
 _EARTH_MOVER_BUCKETS = ("Overlap", "Near", "Close", "Middle", "Far", "Distant")
@@ -32,6 +35,7 @@ STRATEGY_IDS = (
     "randomness",
     "entropy",
     "markov100",
+    "mkfr",
     "bayesian",
     "svc",
     "tbl",
@@ -191,6 +195,25 @@ class _StrategyState:
         self.markov_hits = [0.0] * (_MAX_GAP_BUCKET + 1)
         self.bayesian_opportunities = [0] * (_MAX_GAP_BUCKET + 1)
         self.bayesian_hits = [0] * (_MAX_GAP_BUCKET + 1)
+        self.mkfr_histories: list[deque[int]] = (
+            [
+                deque(maxlen=_MKFR_MAX_ORDER)
+                for _ in range(_NUMBER_COUNT + 1)
+            ]
+            if "mkfr" in self.enabled_strategy_ids
+            else []
+        )
+        self.mkfr_transitions: list[list[dict[int, list[int]]]] = (
+            [
+                [
+                    {}
+                    for _ in range(_MKFR_MAX_ORDER)
+                ]
+                for _ in range(_NUMBER_COUNT + 1)
+            ]
+            if "mkfr" in self.enabled_strategy_ids
+            else []
+        )
         self.svc_weights = [0.0] * 11
         self.tbl_weights = [0.0] * 14
         self.prior_rankings = {
@@ -321,6 +344,22 @@ class _StrategyState:
 
     def train(self, drawn: set[int]) -> None:
         """Learn the current draw using only the state available before it."""
+        if "mkfr" in self.enabled_strategy_ids:
+            for number in range(1, _NUMBER_COUNT + 1):
+                target = int(number in drawn)
+                history = self.mkfr_histories[number]
+                context = 0
+                for order in range(
+                    1,
+                    min(len(history), _MKFR_MAX_ORDER) + 1,
+                ):
+                    context |= history[-order] << (order - 1)
+                    counts = self.mkfr_transitions[number][order - 1].setdefault(
+                        context,
+                        [0, 0],
+                    )
+                    counts[target] += 1
+
         gap_models_enabled = bool(
             self.enabled_strategy_ids.intersection({"markov100", "bayesian"})
         )
@@ -408,6 +447,9 @@ class _StrategyState:
             self.recent_draws.append(drawn)
         if "emd" in self.enabled_strategy_ids:
             self.draw_vectors.append(tuple(sorted(drawn)))
+        if "mkfr" in self.enabled_strategy_ids:
+            for number in range(1, _NUMBER_COUNT + 1):
+                self.mkfr_histories[number].append(int(number in drawn))
         self.draw_count += 1
 
     @staticmethod
@@ -561,6 +603,60 @@ class _StrategyState:
         }
         return scaled, details
 
+    def _mkfr_baseline_probability(self, number: int) -> float:
+        return (
+            self.appearances[number]
+            + _MKFR_PRIOR_STRENGTH * _BASE_PROBABILITY
+        ) / (self.draw_count + _MKFR_PRIOR_STRENGTH)
+
+    def _mkfr_probability(self, number: int) -> tuple[float, int, int]:
+        history = self.mkfr_histories[number]
+        active_orders = min(len(history), _MKFR_MAX_ORDER)
+        probability = self._mkfr_baseline_probability(number)
+        selected_support = 0
+        selected_order = 0
+        context = 0
+        for order in range(1, active_orders + 1):
+            context |= history[-order] << (order - 1)
+            failures, hits = self.mkfr_transitions[number][order - 1].get(
+                context,
+                (0, 0),
+            )
+            opportunities = failures + hits
+            if opportunities < _MKFR_MIN_CONTEXT_SUPPORT:
+                continue
+            probability = (
+                hits + _MKFR_PRIOR_STRENGTH * probability
+            ) / (opportunities + _MKFR_PRIOR_STRENGTH)
+            selected_support = opportunities
+            selected_order = order
+        return probability, selected_support, selected_order
+
+    def _mkfr_scores(
+        self,
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        raw: dict[int, float] = {}
+        details: dict[int, tuple[str, ...]] = {}
+        for number in range(1, _NUMBER_COUNT + 1):
+            probability, support, selected_order = self._mkfr_probability(number)
+            baseline = self._mkfr_baseline_probability(number)
+            lift = probability - baseline
+            context = "".join(str(outcome) for outcome in self.mkfr_histories[number])
+            selected_context = (
+                context[-selected_order:]
+                if selected_order > 0
+                else "—"
+            )
+            raw[number] = lift
+            details[number] = (
+                f"Context probability {probability:.2%}",
+                f"Baseline probability {baseline:.2%}",
+                f"Transition lift {lift * 100:+.2f} pp",
+                f"Order {selected_order}/{_MKFR_MAX_ORDER}: {selected_context}",
+                f"Context support {support}",
+            )
+        return _scale_scores(raw), details
+
     def build_strategies(
         self,
         combined: CombinedPrediction,
@@ -664,6 +760,17 @@ class _StrategyState:
                 markov_scores,
                 gaps,
                 markov_details,
+            )
+
+        if "mkfr" in enabled:
+            mkfr_scores, mkfr_details = self._mkfr_scores()
+            built["mkfr"] = _strategy(
+                "mkfr",
+                "MKFR",
+                "Per-number variable-order D/!D context model ranked by transition lift.",
+                mkfr_scores,
+                gaps,
+                mkfr_details,
             )
 
         if "bayesian" in enabled:

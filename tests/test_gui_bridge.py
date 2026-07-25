@@ -116,6 +116,7 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
         "Rand",
         "Entr",
         "Mark",
+        "MKFR",
         "Baye",
         "SVC",
         "TBL",
@@ -129,6 +130,17 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
     assert len(payload["possibleDraw"]["lastSeenRows"]) == 49
     assert len(payload["possibleDraw"]["relationshipEdges"]) == 1176
     assert "sampled_spaces" in payload["tables"]
+    assert payload["tables"]["freshness_gap_distribution"]["columns"] == [
+        "gap",
+        "hits",
+        "opportunities",
+        "hit_rate",
+        "hit_percentage",
+    ]
+    assert sum(
+        row["hits"]
+        for row in payload["tables"]["freshness_gap_distribution"]["rows"]
+    ) == 18
     assert payload["tables"]["number_trends"]["columns"] == [
         "bin",
         "start_draw",
@@ -160,6 +172,19 @@ def test_disabled_report_plugins_are_not_calculated_or_returned(
     assert payload["combinedPredictions"] == []
     assert payload["predictionSuites"] == []
     assert payload["possibleDraw"]["relationshipEdges"] == []
+
+
+def test_numbers_report_builds_shared_frequency_table_without_overview(
+    tmp_path: Path,
+) -> None:
+    """Verify the Numbers plugin can calculate its shared table independently."""
+    payload = build_analysis_payload(
+        _draws(),
+        _pickle_path(tmp_path),
+        enabled_reports=("numbers",),
+    )
+
+    assert "number_frequencies" in payload["tables"]
 
 
 def test_possible_draw_prepares_its_prediction_dependency(

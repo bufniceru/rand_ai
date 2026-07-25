@@ -5,6 +5,7 @@ export type ReportId =
   | "spaces"
   | "relationships"
   | "randomness"
+  | "gaps"
   | "last-seen"
   | "last-seen-gap"
   | "predictions"
@@ -16,6 +17,7 @@ export type StrategyId =
   | "randomness"
   | "entropy"
   | "markov100"
+  | "mkfr"
   | "bayesian"
   | "svc"
   | "tbl";
@@ -25,6 +27,7 @@ export type ViewId =
   | "spaces"
   | "relationships"
   | "randomness"
+  | "gaps"
   | "export";
 
 export interface AnalysisOptions {
@@ -206,6 +209,7 @@ export interface FigureSpec {
 export type MenuAction =
   | { action: "datasetSelected"; dataset: DatasetSelection }
   | { action: "openView"; view: ViewId }
+  | { action: "openSettings" }
   | ({ action: "reportPluginsChanged" } & ReportPluginState)
   | ({ action: "strategyPluginsChanged" } & StrategyPluginState)
   | { action: "export" };
@@ -219,6 +223,7 @@ export interface DesktopApi {
   openDataset(): Promise<DatasetSelection | null>;
   getReportPlugins(): Promise<ReportPluginState>;
   getStrategyPlugins(): Promise<StrategyPluginState>;
+  setStrategyPlugins(strategyIds: StrategyId[]): Promise<StrategyPluginState>;
   analyzeDataset(request: {
     path: string;
     options: AnalysisOptions;

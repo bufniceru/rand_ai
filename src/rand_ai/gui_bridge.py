@@ -33,6 +33,7 @@ REPORT_IDS = (
     "spaces",
     "relationships",
     "randomness",
+    "gaps",
     "last-seen",
     "last-seen-gap",
     "predictions",
@@ -159,6 +160,10 @@ def _analysis_tables(
         ]
     if "randomness" in reports:
         tables["randomness_diagnostics"] = statistics.randomness_diagnostics()
+    if "gaps" in reports:
+        tables["freshness_gap_distribution"] = (
+            statistics.freshness_gap_distribution()
+        )
     _report_progress(progress, 82, "Statistical tables are complete")
     return tables
 

@@ -693,6 +693,7 @@ tbody tr:nth-child(even) {
 }
 
 .trust-dialog,
+.settings-dialog,
 .loading-card,
 .number-popup {
   border: 1px solid rgba(255, 255, 255, 0.7);
@@ -708,6 +709,153 @@ tbody tr:nth-child(even) {
 .trust-dialog {
   width: min(620px, calc(100vw - 40px));
   padding: 30px;
+}
+
+.settings-dialog {
+  width: min(780px, calc(100vw - 40px));
+  max-height: calc(100vh - 56px);
+  overflow: auto;
+  padding: 30px;
+  outline: none;
+}
+
+.settings-dialog-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+.settings-dialog-heading h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 27px;
+}
+
+.settings-dialog-heading p:not(.eyebrow) {
+  max-width: 500px;
+  margin: 8px 0 0;
+  color: #617086;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.settings-dialog-heading > strong {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border-radius: 999px;
+  color: #245c3a;
+  background: #e8f6ed;
+  font-size: 11px;
+}
+
+.settings-selection-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.strategy-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.strategy-setting-option {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  padding: 13px 14px;
+  border: 1px solid #d5e0e9;
+  border-radius: 11px;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.strategy-setting-option.enabled {
+  border-color: #8db4da;
+  background: #edf6ff;
+  box-shadow: inset 0 0 0 1px rgba(46, 99, 197, 0.08);
+}
+
+.strategy-setting-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.strategy-setting-check {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #aebdcb;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.strategy-setting-option.enabled .strategy-setting-check {
+  border-color: var(--blue);
+  background: var(--blue);
+}
+
+.strategy-setting-option input:focus-visible + .strategy-setting-check {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.strategy-setting-option.enabled .strategy-setting-check::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  border-bottom: 2px solid #fff;
+  border-left: 2px solid #fff;
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+.strategy-setting-option > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.strategy-setting-option strong {
+  color: #173d64;
+  font-size: 13px;
+}
+
+.strategy-setting-option small {
+  color: #66798d;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.settings-dialog-note {
+  margin: 18px 0;
+  padding: 11px 13px;
+  border-radius: 9px;
+  color: #536b82;
+  background: #f1f5f8;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .settings-dialog-heading {
+    display: grid;
+  }
+
+  .settings-dialog-heading > strong {
+    justify-self: start;
+  }
+
+  .strategy-settings-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .trust-dialog h2 {
@@ -992,7 +1140,7 @@ tbody tr:nth-child(even) {
   background: rgba(255, 255, 255, 0.94);
 }
 
-.prediction-color-legend span {
+.prediction-color-legend label {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1000,14 +1148,30 @@ tbody tr:nth-child(even) {
   font-size: 15px;
   font-weight: 850;
   white-space: nowrap;
+  cursor: pointer;
 }
 
-.prediction-color-legend i {
+.prediction-color-legend input {
+  appearance: none;
   width: 19px;
   height: 19px;
-  display: inline-block;
+  margin: 0;
+  border: 1px solid #bdcbd8;
   border-radius: 50%;
   flex: 0 0 19px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.prediction-color-legend input:checked {
+  border-color: var(--legend-color, #3264ad);
+  background: var(--legend-color, #3264ad);
+  box-shadow: inset 0 0 0 3px #ffffff;
+}
+
+.prediction-color-legend input:focus-visible {
+  outline: 2px solid #3264ad;
+  outline-offset: 2px;
 }
 
 .all-predictions-grid {
@@ -2169,6 +2333,34 @@ tbody tr:nth-child(even) {
   width: 128px;
 }
 
+.draw-editor-view-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 18px 0;
+  background: #fff;
+}
+
+.draw-editor-view-tabs button {
+  min-width: 132px;
+  padding: 9px 16px;
+  border: 1px solid #cbd9e6;
+  border-bottom-color: #aac2d8;
+  border-radius: 9px 9px 0 0;
+  color: #5b7188;
+  background: #edf3f8;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.draw-editor-view-tabs button.active {
+  border-color: #7da9cf;
+  border-bottom-color: #fff;
+  color: #174b82;
+  background: #fff;
+  box-shadow: 0 -3px 10px rgba(35, 77, 116, 0.08);
+}
+
 .draw-date-field strong,
 .draw-selection-count strong {
   color: #174b82;
@@ -2177,15 +2369,16 @@ tbody tr:nth-child(even) {
 
 .draw-editor-content {
   display: grid;
-  grid-template-columns: 430px minmax(250px, 1fr);
+  grid-template-columns: minmax(430px, 500px) minmax(220px, 1fr);
   align-items: center;
-  gap: 44px;
-  padding: 42px 52px;
+  gap: 32px;
+  padding: 28px 36px 36px;
 }
 
 .draw-editor-grid {
   display: grid;
   grid-template-columns: repeat(7, 52px);
+  justify-content: center;
   gap: 10px;
 }
 
@@ -2223,6 +2416,118 @@ tbody tr:nth-child(even) {
   color: #fff;
   background: linear-gradient(145deg, #3d84ca, #14569b);
   box-shadow: 0 0 0 3px #1f3e5c;
+}
+
+.draw-editor-circle {
+  width: min(500px, 100%);
+  position: relative;
+  justify-self: center;
+  aspect-ratio: 1;
+  border: 1px solid #b7cfe4;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #fff 0 24%, transparent 24.5%),
+    radial-gradient(circle, transparent 0 48%, rgba(78, 131, 178, 0.09) 48.5% 49%, transparent 49.5%),
+    radial-gradient(circle, #f8fbfe 0 68%, #e9f3fb 68.5% 100%);
+  box-shadow:
+    inset 0 0 0 10px rgba(255, 255, 255, 0.72),
+    0 15px 34px rgba(25, 66, 102, 0.12);
+}
+
+.draw-editor-circle-rings {
+  position: absolute;
+  inset: 14%;
+  border: 1px solid rgba(70, 124, 172, 0.22);
+  border-radius: 50%;
+}
+
+.draw-editor-circle-rings::before,
+.draw-editor-circle-rings::after {
+  content: "";
+  position: absolute;
+  border: 1px solid rgba(70, 124, 172, 0.17);
+  border-radius: 50%;
+}
+
+.draw-editor-circle-rings::before {
+  inset: 17%;
+}
+
+.draw-editor-circle-rings::after {
+  inset: 34%;
+}
+
+.draw-editor-circle-center {
+  width: 128px;
+  height: 128px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-content: center;
+  gap: 3px;
+  transform: translate(-50%, -50%);
+  border: 1px solid #9ebbd4;
+  border-radius: 50%;
+  color: #315a80;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 24px rgba(29, 69, 105, 0.12);
+  text-align: center;
+}
+
+.draw-editor-circle-center span,
+.draw-editor-circle-center small {
+  color: #6c8195;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.draw-editor-circle-center strong {
+  color: #174b82;
+  font-size: 28px;
+}
+
+.draw-editor-circle > button {
+  width: 27px;
+  height: 27px;
+  position: absolute;
+  z-index: 2;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 1px solid #a9c8e2;
+  border-radius: 50%;
+  color: #28516f;
+  background: #edf7ff;
+  box-shadow: 0 2px 5px rgba(28, 65, 98, 0.12);
+  font-size: 10px;
+  font-weight: 900;
+  cursor: default;
+}
+
+.draw-editor-circle > button.editable {
+  cursor: pointer;
+}
+
+.draw-editor-circle > button.editable:hover {
+  z-index: 4;
+  border-color: #4f91c9;
+  background: #d6ecff;
+  transform: translate(-50%, -50%) scale(1.15);
+}
+
+.draw-editor-circle > button.selected {
+  z-index: 3;
+  border: 3px solid #fff;
+  color: #fff;
+  background: linear-gradient(145deg, #42a965, #18723b);
+  box-shadow: 0 0 0 2px #1d6338, 0 4px 9px rgba(29, 99, 56, 0.28);
+}
+
+.draw-editor-circle > button.editable.selected {
+  background: linear-gradient(145deg, #3d84ca, #14569b);
+  box-shadow: 0 0 0 2px #1f3e5c, 0 4px 9px rgba(26, 74, 119, 0.28);
 }
 
 .draw-editor-summary > span {
@@ -2320,6 +2625,30 @@ tbody tr:nth-child(even) {
 
   .status-bar span:last-child {
     display: none;
+  }
+}
+
+@media (max-width: 850px) {
+  .draw-editor-shell {
+    padding: 10px;
+  }
+
+  .draw-editor-window {
+    min-height: calc(100vh - 20px);
+  }
+
+  .draw-editor-header,
+  .draw-editor-navigation {
+    flex-wrap: wrap;
+  }
+
+  .draw-editor-content {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .draw-editor-summary {
+    width: min(420px, 100%);
   }
 }
 

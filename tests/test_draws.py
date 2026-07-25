@@ -11,9 +11,6 @@ import pytest
 
 from rand_ai import Ball, Draw, Draws
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_RANDOM_DRAWS_PICKLE_PATH = _PROJECT_ROOT / "data" / "draws.pkl"
-
 
 class TestDrawsInitialization:
     """Test creation and storage constraints for Draws."""
@@ -185,19 +182,22 @@ class TestDrawsPersistenceAndLogging:
             Draws.load_trusted_pickle(payload)
 
     def test_generates_pickles_and_logs_10000_draws(
-        self, caplog: pytest.LogCaptureFixture
+        self,
+        caplog: pytest.LogCaptureFixture,
+        tmp_path: Path,
     ) -> None:
         """Generate, persist, reload, and log ten thousand draws."""
         draws = Draws()
         draws.generate_random(10_000)
-        draws.save_pickle(_RANDOM_DRAWS_PICKLE_PATH)
+        pickle_path = tmp_path / "draws.pkl"
+        draws.save_pickle(pickle_path)
 
-        with _RANDOM_DRAWS_PICKLE_PATH.open("rb") as pickle_file:
+        with pickle_path.open("rb") as pickle_file:
             restored_draws = pickle.load(pickle_file)
 
         assert isinstance(restored_draws, Draws)
         assert len(restored_draws) == 10_000
-        assert _RANDOM_DRAWS_PICKLE_PATH.is_file()
+        assert pickle_path.is_file()
 
         with caplog.at_level(logging.INFO, logger="rand_ai.draws"):
             restored_draws.log_draws()

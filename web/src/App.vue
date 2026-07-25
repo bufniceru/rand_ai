@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import SettingsDialog from "./components/SettingsDialog.vue";
 import TrustDialog from "./components/TrustDialog.vue";
 import { buildFigures } from "./lib/figureBuilders";
 import ExportView from "./views/ExportView.vue";
+import GapsView from "./views/GapsView.vue";
 import NumbersView from "./views/NumbersView.vue";
 import OverviewView from "./views/OverviewView.vue";
 import RandomnessView from "./views/RandomnessView.vue";
@@ -17,6 +19,7 @@ import type {
   ReportId,
   ReportPluginState,
   StrategyId,
+  StrategyPlugin,
   StrategyPluginState,
   ViewId,
 } from "./types";
@@ -27,12 +30,16 @@ const views: { id: ViewId; label: string; shortLabel: string }[] = [
   { id: "spaces", label: "Spaces", shortLabel: "Spaces" },
   { id: "relationships", label: "Relationships", shortLabel: "Relationships" },
   { id: "randomness", label: "Randomness", shortLabel: "Randomness" },
+  { id: "gaps", label: "Gaps", shortLabel: "Gaps" },
   { id: "export", label: "Export", shortLabel: "Export" },
 ];
 
 const activeView = ref<ViewId>("overview");
 const enabledReportIds = ref<ReportId[]>([]);
 const enabledStrategyIds = ref<StrategyId[]>([]);
+const strategyPlugins = ref<StrategyPlugin[]>([]);
+const settingsOpen = ref(false);
+const savingSettings = ref(false);
 const pendingDataset = ref<DatasetSelection | null>(null);
 const activeDataset = ref<DatasetSelection | null>(null);
 const analysis = ref<AnalysisPayload | null>(null);
@@ -88,8 +95,48 @@ function acceptReportPluginState(state: ReportPluginState): void {
 }
 
 function acceptStrategyPluginState(state: StrategyPluginState): void {
+  strategyPlugins.value = state.plugins.map((plugin) => ({ ...plugin }));
   enabledStrategyIds.value = [...state.enabledStrategies];
   options.enabledStrategies = [...state.enabledStrategies];
+}
+
+async function openSettings(): Promise<void> {
+  if (!window.randAiDesktop) return;
+  errorMessage.value = "";
+  try {
+    acceptStrategyPluginState(
+      await window.randAiDesktop.getStrategyPlugins(),
+    );
+    settingsOpen.value = true;
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function saveStrategySettings(
+  strategyIds: StrategyId[],
+): Promise<void> {
+  if (!window.randAiDesktop) return;
+  savingSettings.value = true;
+  errorMessage.value = "";
+  const changed =
+    strategyIds.length !== enabledStrategyIds.value.length ||
+    strategyIds.some(
+      (strategyId, index) => strategyId !== enabledStrategyIds.value[index],
+    );
+  try {
+    const state = await window.randAiDesktop.setStrategyPlugins(strategyIds);
+    acceptStrategyPluginState(state);
+    settingsOpen.value = false;
+    if (changed && activeDataset.value) {
+      if (loading.value) reportRefreshPending = true;
+      else await analyzeDataset(activeDataset.value, normalizeOptions());
+    }
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    savingSettings.value = false;
+  }
 }
 
 function normalizeOptions(): AnalysisOptions {
@@ -297,6 +344,10 @@ function handleMenuAction(message: MenuAction): void {
     activeView.value = message.view;
     return;
   }
+  if (message.action === "openSettings") {
+    void openSettings();
+    return;
+  }
   if (message.action === "reportPluginsChanged") {
     acceptReportPluginState(message);
     if (activeDataset.value) {
@@ -313,7 +364,7 @@ function handleMenuAction(message: MenuAction): void {
     }
     return;
   }
-  void exportAnalysis();
+  if (message.action === "export") void exportAnalysis();
 }
 
 onMounted(async () => {
@@ -498,6 +549,11 @@ onBeforeUnmount(() => {
           :analysis="analysis"
           :figures="figures"
         />
+        <GapsView
+          v-else-if="activeView === 'gaps' && analysis.options.enabledReports.includes('gaps')"
+          :analysis="analysis"
+          :figures="figures"
+        />
         <ExportView
           v-else
           :analysis="analysis"
@@ -562,6 +618,15 @@ onBeforeUnmount(() => {
       :dataset="pendingDataset"
       @cancel="pendingDataset = null"
       @confirm="confirmTrust"
+    />
+
+    <SettingsDialog
+      v-if="settingsOpen"
+      :plugins="strategyPlugins"
+      :enabled-strategy-ids="enabledStrategyIds"
+      :saving="savingSettings"
+      @cancel="settingsOpen = false"
+      @save="saveStrategySettings"
     />
 
     <footer class="status-bar">

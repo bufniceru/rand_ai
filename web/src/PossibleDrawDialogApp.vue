@@ -55,8 +55,8 @@ const activePlan = computed(() => plans.value.find((plan) => plan.id === activeP
 
 const orderedStrategies = computed(() => {
   const order: StrategyId[] = [
-    "freshness", "proximity", "emd", "entropy", "bayesian",
-    "markov100", "svc", "tbl", "randomness",
+    "freshness", "proximity", "emd", "entropy", "markov100",
+    "mkfr", "bayesian", "svc", "tbl", "randomness",
   ];
   return order
     .map((id) => strategyById.value.get(id))
@@ -278,7 +278,8 @@ function rankWidth(prediction: StrategyNumberPrediction | null | undefined): str
 function cardColor(id: string): string {
   return {
     freshness: "#f58a59", proximity: "#efb23e", emd: "#d9a531",
-    entropy: "#c95d42", bayesian: "#f3b94e", markov100: "#f3b94e",
+    entropy: "#c95d42", markov100: "#f3b94e", mkfr: "#1f8f75",
+    bayesian: "#d477b8",
     svc: "#9567e8", tbl: "#1695a8", randomness: "#3264ad",
   }[id] ?? "#6e8195";
 }
@@ -291,6 +292,8 @@ function compactDetail(detail: string): string {
     .replace("Average distance", "EMD")
     .replace("Support draws", "Hits")
     .replace("Hit probability", "Hit")
+    .replace("Next probability", "Prob")
+    .replace("Transition support", "Support")
     .replace("Lifetime frequency", "Life");
 }
 
