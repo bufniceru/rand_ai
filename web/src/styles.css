@@ -2610,43 +2610,34 @@ tbody tr:nth-child(even) {
 
 .prediction-meters-panel {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
 }
 
 .prediction-meter-card {
   min-width: 0;
-  height: 130px;
-  padding: 13px;
+  min-height: 28px;
+  padding: 4px 8px;
   overflow: hidden;
   border: 1px solid #d8dee6;
-  border-radius: 10px;
+  border-radius: 7px;
   background: #fff;
-  box-shadow: 0 9px 22px rgba(35, 57, 78, 0.08);
-}
-
-.prediction-meter-card--compact {
-  height: 92px;
+  box-shadow: 0 4px 10px rgba(35, 57, 78, 0.06);
+  display: grid;
+  grid-template-columns: minmax(145px, 220px) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
 }
 
 .prediction-meter-card h2 {
   overflow: hidden;
-  margin: 0 0 10px;
+  margin: 0;
   color: #54647b;
   font-size: 11px;
   font-weight: 950;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
-}
-
-.meter-scale {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 5px;
-  color: #6c7c91;
-  font-size: 9px;
-  font-weight: 850;
 }
 
 .meter-track,
@@ -2659,37 +2650,15 @@ tbody tr:nth-child(even) {
   background: #e9eef3;
 }
 
+.meter-track {
+  height: 9px;
+}
+
 .meter-track span {
   height: 100%;
   display: block;
   border-radius: inherit;
   background: var(--meter-color);
-}
-
-.meter-details {
-  min-width: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-top: 11px;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.meter-details strong {
-  flex: 0 0 auto;
-  color: #0e2747;
-  font-size: 15px;
-}
-
-.meter-details span {
-  min-width: 0;
-  overflow: hidden;
-  color: #586a82;
-  font-size: 9px;
-  font-weight: 850;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
 }
 
 .related-number-card {

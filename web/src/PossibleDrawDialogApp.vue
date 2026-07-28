@@ -72,7 +72,7 @@ const highlightedLastSeen = computed(() => lastSeenRows.value[lastSeenIndex.valu
 const activePlan = computed(() => plans.value.find((plan) => plan.id === activePlanId.value));
 
 const orderedStrategies = computed(() => {
-  const order: StrategyId[] = [
+  const fallbackOrder: StrategyId[] = [
     "freshness", "proximity", "emd", "chi_square", "entropy", "markov100",
     "mkfr", "mksp", "bayesian", "predictive_grid", "co_occurrence",
     "doublet_triplet_markov", "mixed", "svc", "tbl",
@@ -80,9 +80,33 @@ const orderedStrategies = computed(() => {
     "residual_coverage",
     "chained",
   ];
-  return order
-    .map((id) => strategyById.value.get(id))
-    .filter((strategy): strategy is StrategyPrediction => strategy !== undefined);
+  const fallbackRank = new Map(fallbackOrder.map((id, index) => [id, index]));
+  return [...strategies.value].sort((left, right) => {
+    const leftEfficacy = left.efficacy;
+    const rightEfficacy = right.efficacy;
+    const leftHasHistory = (leftEfficacy?.evaluatedDraws ?? 0) > 0;
+    const rightHasHistory = (rightEfficacy?.evaluatedDraws ?? 0) > 0;
+
+    if (leftHasHistory !== rightHasHistory) return rightHasHistory ? 1 : -1;
+
+    const averageHitDifference =
+      (rightEfficacy?.averageHitsPerDraw ?? 0) -
+      (leftEfficacy?.averageHitsPerDraw ?? 0);
+    if (averageHitDifference !== 0) return averageHitDifference;
+
+    const randomDifference =
+      (rightEfficacy?.hitDifference ?? 0) - (leftEfficacy?.hitDifference ?? 0);
+    if (randomDifference !== 0) return randomDifference;
+
+    const totalHitDifference =
+      (rightEfficacy?.strategyHits ?? 0) - (leftEfficacy?.strategyHits ?? 0);
+    if (totalHitDifference !== 0) return totalHitDifference;
+
+    return (
+      (fallbackRank.get(left.id) ?? fallbackOrder.length) -
+      (fallbackRank.get(right.id) ?? fallbackOrder.length)
+    );
+  });
 });
 
 const recalculatedPredictions = computed(() => {
@@ -445,6 +469,17 @@ function rankWidth(prediction: StrategyNumberPrediction | null | undefined): str
   return `${prediction ? Math.max(2, ((50 - prediction.rank) / 49) * 100) : 0}%`;
 }
 
+function strategyMeterTitle(strategy: StrategyPrediction): string {
+  const prediction = focusedPredictions.value.get(strategy.id);
+  const effectiveness = strategy.efficacy && strategy.efficacy.evaluatedDraws > 0
+    ? `${strategy.efficacy.averageHitsPerDraw.toFixed(3)} historical hits per draw`
+    : "historical effectiveness unavailable";
+  if (!prediction) {
+    return `${strategyFullName(strategy)} · ${effectiveness}`;
+  }
+  return `${strategyFullName(strategy)} · rank ${prediction.rank} · ${effectiveness}`;
+}
+
 function strategyFullName(strategy: StrategyPrediction): string {
   return {
     freshness: "Freshness",
@@ -483,19 +518,6 @@ function cardColor(id: string): string {
     residual_coverage: "#0f766e",
     chained: "#9a3412",
   }[id] ?? "#6e8195";
-}
-
-function compactDetail(detail: string): string {
-  return detail
-    .replace("Average entropy", "Avg")
-    .replace("High-entropy share", "High")
-    .replace("Posterior probability", "Prob")
-    .replace("Average distance", "EMD")
-    .replace("Support draws", "Hits")
-    .replace("Hit probability", "Hit")
-    .replace("Next probability", "Prob")
-    .replace("Transition support", "Support")
-    .replace("Lifetime frequency", "Life");
 }
 
 function acceptData(data: CombinedPredictionDialogData): void {
@@ -729,35 +751,19 @@ onBeforeUnmount(() => {
               v-for="strategy in orderedStrategies"
               :key="strategy.id"
               class="prediction-meter-card"
-              :class="{
-                'prediction-meter-card--compact':
-                  !focusedPredictions.get(strategy.id) &&
-                  !(focusedNumber !== null && (selectedSet.has(focusedNumber) || droppedSet.has(focusedNumber))),
-              }"
               :style="{ '--meter-color': cardColor(strategy.id) }"
+              :title="strategyMeterTitle(strategy)"
             >
               <h2>{{ strategyFullName(strategy) }}</h2>
-              <div class="meter-scale"><span>1</span><span>13</span><span>25</span><span>37</span><span>49</span></div>
-              <div class="meter-track">
-                <span :style="{ width: rankWidth(focusedPredictions.get(strategy.id)) }"></span>
-              </div>
-              <div v-if="focusedPredictions.get(strategy.id)" class="meter-details">
-                <strong>Recalculated rank {{ focusedPredictions.get(strategy.id)!.rank }}</strong>
-                <span v-if="focusedPredictions.get(strategy.id)!.originalRank !== focusedPredictions.get(strategy.id)!.rank">
-                  Was rank {{ focusedPredictions.get(strategy.id)!.originalRank }}
-                </span>
-                <span
-                  v-for="detail in focusedPredictions.get(strategy.id)!.details.slice(0, 3)"
-                  :key="detail"
-                  :title="detail"
-                >{{ compactDetail(detail) }}</span>
-                <span>Score {{ (focusedPredictions.get(strategy.id)!.score * 100).toFixed(1) }}</span>
-              </div>
               <div
-                v-else-if="focusedNumber !== null && (selectedSet.has(focusedNumber) || droppedSet.has(focusedNumber))"
-                class="meter-details"
+                class="meter-track"
+                role="meter"
+                aria-valuemin="1"
+                aria-valuemax="49"
+                :aria-valuenow="focusedPredictions.get(strategy.id)?.rank"
+                :aria-label="strategyMeterTitle(strategy)"
               >
-                <strong>Eliminated from remaining ranks</strong>
+                <span :style="{ width: rankWidth(focusedPredictions.get(strategy.id)) }"></span>
               </div>
             </article>
           </div>
