@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import PredictionWorkspaceNavigation from "./components/PredictionWorkspaceNavigation.vue";
 import type {
   CombinedPredictionDialogData,
   PossibleDrawNumberRequest,
@@ -25,8 +24,26 @@ interface RelatedSuggestion {
   score: number;
 }
 
+interface RecalculatedPrediction extends StrategyNumberPrediction {
+  originalRank: number;
+}
+
+interface WorkflowCandidate {
+  number: number;
+  consensus: number;
+  topSixSupport: number;
+  strategyCount: number;
+  relationshipLift: number;
+  combinedScore: number;
+}
+
+const props = defineProps<{
+  dialogData: CombinedPredictionDialogData;
+  embedded?: boolean;
+  numberRequest?: (PossibleDrawNumberRequest & { token: number }) | null;
+}>();
+
 const storageKey = "rand-ai.possible-draw.plans.v2";
-const dialogData = ref<CombinedPredictionDialogData | null>(null);
 const plans = ref<DrawPlan[]>([]);
 const activePlanId = ref("");
 const selectedNumbers = ref<number[]>([]);
@@ -38,10 +55,8 @@ const showLastSeen = ref(true);
 const lastSeenIndex = ref(0);
 const errorMessage = ref("");
 let clickTimer: ReturnType<typeof setTimeout> | null = null;
-let unsubscribeData: (() => void) | null = null;
-let unsubscribeNumberRequest: (() => void) | null = null;
 
-const latestSuite = computed(() => dialogData.value?.predictionSuites.at(-1) ?? null);
+const latestSuite = computed(() => props.dialogData.predictionSuites.at(-1) ?? null);
 const strategies = computed(() => latestSuite.value?.strategies ?? []);
 const strategyById = computed(
   () => new Map(strategies.value.map((strategy) => [strategy.id, strategy])),
@@ -50,21 +65,46 @@ const selectedSet = computed(() => new Set(selectedNumbers.value));
 const droppedSet = computed(() => new Set(droppedNumbers.value));
 const uncertainSet = computed(() => new Set(uncertainNumbers.value));
 const lastDrawSet = computed(
-  () => new Set(dialogData.value?.possibleDraw.lastDrawNumbers ?? []),
+  () => new Set(props.dialogData.possibleDraw.lastDrawNumbers),
 );
-const lastSeenRows = computed(() => dialogData.value?.possibleDraw.lastSeenRows ?? []);
+const lastSeenRows = computed(() => props.dialogData.possibleDraw.lastSeenRows);
 const highlightedLastSeen = computed(() => lastSeenRows.value[lastSeenIndex.value] ?? null);
 const activePlan = computed(() => plans.value.find((plan) => plan.id === activePlanId.value));
 
 const orderedStrategies = computed(() => {
   const order: StrategyId[] = [
     "freshness", "proximity", "emd", "chi_square", "entropy", "markov100",
-    "mkfr", "bayesian", "predictive_grid", "mixed", "svc", "tbl",
+    "mkfr", "mksp", "bayesian", "predictive_grid", "co_occurrence",
+    "doublet_triplet_markov", "mixed", "svc", "tbl",
     "cis", "fresh_random", "randomness",
+    "residual_coverage",
+    "chained",
   ];
   return order
     .map((id) => strategyById.value.get(id))
     .filter((strategy): strategy is StrategyPrediction => strategy !== undefined);
+});
+
+const recalculatedPredictions = computed(() => {
+  const predictions = new Map<StrategyId, RecalculatedPrediction[]>();
+  for (const strategy of orderedStrategies.value) {
+    predictions.set(
+      strategy.id,
+      strategy.numbers
+        .filter(
+          (prediction) =>
+            !selectedSet.value.has(prediction.number) &&
+            !droppedSet.value.has(prediction.number),
+        )
+        .sort((left, right) => left.rank - right.rank)
+        .map((prediction, index) => ({
+          ...prediction,
+          originalRank: prediction.rank,
+          rank: index + 1,
+        })),
+    );
+  }
+  return predictions;
 });
 
 const focusedPredictions = computed(() => {
@@ -74,10 +114,86 @@ const focusedPredictions = computed(() => {
       strategy.id,
       number === null
         ? null
-        : strategy.numbers.find((prediction) => prediction.number === number) ?? null,
+        : recalculatedPredictions.value
+          .get(strategy.id)
+          ?.find((prediction) => prediction.number === number) ?? null,
     ]),
   );
 });
+
+const remainingNumberCount = computed(
+  () => 49 - selectedSet.value.size - droppedSet.value.size,
+);
+const workflowComplete = computed(() => selectedNumbers.value.length === 6);
+const currentWorkflowStep = computed(() => Math.min(selectedNumbers.value.length + 1, 6));
+const workflowCandidates = computed<WorkflowCandidate[]>(() => {
+  const candidates: WorkflowCandidate[] = [];
+  const strategyCount = orderedStrategies.value.length;
+  const possibleNumbers = Array.from({ length: 49 }, (_value, index) => index + 1)
+    .filter(
+      (number) => !selectedSet.value.has(number) && !droppedSet.value.has(number),
+    );
+
+  for (const number of possibleNumbers) {
+    let weightedStrength = 0;
+    let totalWeight = 0;
+    let topSixSupport = 0;
+
+    for (const strategy of orderedStrategies.value) {
+      const rows = recalculatedPredictions.value.get(strategy.id) ?? [];
+      const prediction = rows.find((row) => row.number === number);
+      if (!prediction) continue;
+      const weight = Math.max(strategy.efficacy?.averageHitsPerDraw ?? 0.1, 0.05);
+      const rankStrength = rows.length <= 1
+        ? 1
+        : (rows.length - prediction.rank) / (rows.length - 1);
+      weightedStrength += rankStrength * weight;
+      totalWeight += weight;
+      if (prediction.rank <= Math.min(6, rows.length)) topSixSupport += 1;
+    }
+
+    const relationshipEdges = selectedNumbers.value
+      .map((selected) => edgeByPair.value.get(pairKey(selected, number)))
+      .filter((edge): edge is RelationshipEdge => edge !== undefined);
+    const relationshipLift = relationshipEdges.length
+      ? relationshipEdges.reduce((total, edge) => total + edge.lift, 0) /
+        relationshipEdges.length
+      : 0;
+    const consensus = totalWeight > 0 ? weightedStrength / totalWeight : 0;
+    const supportRate = strategyCount > 0 ? topSixSupport / strategyCount : 0;
+    const relationshipStrength = selectedNumbers.value.length
+      ? Math.min(Math.max(relationshipLift / 2, 0), 1)
+      : 0.5;
+
+    candidates.push({
+      number,
+      consensus,
+      topSixSupport,
+      strategyCount,
+      relationshipLift,
+      combinedScore:
+        consensus * 0.72 + supportRate * 0.18 + relationshipStrength * 0.1,
+    });
+  }
+
+  return candidates.sort(
+    (left, right) =>
+      right.combinedScore - left.combinedScore ||
+      right.topSixSupport - left.topSixSupport ||
+      left.number - right.number,
+  );
+});
+const topWorkflowCandidates = computed(() => workflowCandidates.value.slice(0, 8));
+const topWorkflowCandidateSet = computed(
+  () => new Set(topWorkflowCandidates.value.map((candidate) => candidate.number)),
+);
+const strategyNextChoices = computed(() =>
+  orderedStrategies.value.map((strategy) => ({
+    id: strategy.id,
+    name: strategyFullName(strategy),
+    prediction: recalculatedPredictions.value.get(strategy.id)?.[0] ?? null,
+  })),
+);
 
 const randomnessRows = computed(() => strategyById.value.get("randomness")?.numbers ?? []);
 const agreementScore = computed(() => {
@@ -113,7 +229,7 @@ const entropyStatus = computed(() => {
 });
 
 const edgeByPair = computed(() => {
-  const entries = (dialogData.value?.possibleDraw.relationshipEdges ?? []).map(
+  const entries = props.dialogData.possibleDraw.relationshipEdges.map(
     (edge) => [`${edge.left}-${edge.right}`, edge] as const,
   );
   return new Map<string, RelationshipEdge>(entries);
@@ -216,7 +332,7 @@ function toggleSelected(number: number): void {
   if (selectedSet.value.has(number)) {
     selectedNumbers.value = selectedNumbers.value.filter((item) => item !== number);
   } else if (selectedNumbers.value.length < 6) {
-    selectedNumbers.value = [...selectedNumbers.value, number].sort((left, right) => left - right);
+    selectedNumbers.value = [...selectedNumbers.value, number];
     uncertainNumbers.value = uncertainNumbers.value.filter((item) => item !== number);
   } else {
     void window.randAiDesktop?.showForSureLimitError(number);
@@ -246,9 +362,7 @@ function applyPredictionNumber(request: PossibleDrawNumberRequest): void {
     return;
   }
   uncertainNumbers.value = uncertainNumbers.value.filter((item) => item !== number);
-  selectedNumbers.value = [...selectedNumbers.value, number].sort(
-    (left, right) => left - right,
-  );
+  selectedNumbers.value = [...selectedNumbers.value, number];
 }
 
 function handleClick(event: MouseEvent, number: number): void {
@@ -286,6 +400,28 @@ function addRelated(number: number): void {
   toggleSelected(number);
 }
 
+function chooseWorkflowNumber(number: number): void {
+  clearClickTimer();
+  focusedNumber.value = number;
+  if (!selectedSet.value.has(number)) toggleSelected(number);
+}
+
+function removeWorkflowNumber(number: number): void {
+  clearClickTimer();
+  focusedNumber.value = number;
+  selectedNumbers.value = selectedNumbers.value.filter((item) => item !== number);
+}
+
+function undoLastWorkflowNumber(): void {
+  const number = selectedNumbers.value.at(-1);
+  if (number === undefined) return;
+  removeWorkflowNumber(number);
+}
+
+function selectionStep(number: number): number {
+  return selectedNumbers.value.indexOf(number) + 1;
+}
+
 function resetPlan(): void {
   clearClickTimer();
   selectedNumbers.value = [];
@@ -309,14 +445,43 @@ function rankWidth(prediction: StrategyNumberPrediction | null | undefined): str
   return `${prediction ? Math.max(2, ((50 - prediction.rank) / 49) * 100) : 0}%`;
 }
 
+function strategyFullName(strategy: StrategyPrediction): string {
+  return {
+    freshness: "Freshness",
+    proximity: "Proximity",
+    emd: "Earth Mover's Distance",
+    chi_square: "Chi-Square",
+    entropy: "Entropy",
+    markov100: "Markov 100",
+    mkfr: "Markov Frequency",
+    mksp: "Markov Spatial",
+    bayesian: "Bayesian",
+    predictive_grid: "Predictive Grid",
+    co_occurrence: "Co-occurrence",
+    doublet_triplet_markov: "Doublet & Triplet Markov",
+    mixed: "Mixed Ensemble",
+    svc: "Support Vector Classifier",
+    tbl: "Trend Baseline",
+    cis: "Conditional Independence Score",
+    fresh_random: "Fresh Random",
+    randomness: "Randomness Ensemble",
+    residual_coverage: "Residual Coverage",
+    chained: "Chained Strategy",
+  }[strategy.id] ?? strategy.name;
+}
+
 function cardColor(id: string): string {
   return {
     freshness: "#f58a59", proximity: "#efb23e", emd: "#d9a531",
     entropy: "#c95d42", markov100: "#f3b94e", mkfr: "#1f8f75",
+    mksp: "#517aa3",
     chi_square: "#6256c7", bayesian: "#d477b8",
-    predictive_grid: "#008ca8", mixed: "#dd6b20",
+    predictive_grid: "#008ca8", co_occurrence: "#4f7f3f",
+    doublet_triplet_markov: "#7c3aed", mixed: "#dd6b20",
     svc: "#9567e8", tbl: "#1695a8", cis: "#b12f67",
     fresh_random: "#7b56c2", randomness: "#3264ad",
+    residual_coverage: "#0f766e",
+    chained: "#9a3412",
   }[id] ?? "#6e8195";
 }
 
@@ -334,7 +499,6 @@ function compactDetail(detail: string): string {
 }
 
 function acceptData(data: CombinedPredictionDialogData): void {
-  dialogData.value = data;
   if (focusedNumber.value === null) {
     focusedNumber.value = data.possibleDraw.lastSeenRows[0]?.number ?? 1;
   }
@@ -348,8 +512,20 @@ watch(
   { deep: true },
 );
 
-onMounted(async () => {
-  document.title = "Possible Draw — Rand AI";
+watch(
+  () => props.dialogData,
+  (data) => acceptData(data),
+  { immediate: true },
+);
+
+watch(
+  () => props.numberRequest?.token,
+  () => {
+    if (props.numberRequest) applyPredictionNumber(props.numberRequest);
+  },
+);
+
+onMounted(() => {
   try {
     const stored = JSON.parse(window.localStorage.getItem(storageKey) ?? "null") as
       | { activePlanId: string; plans: DrawPlan[] }
@@ -360,33 +536,19 @@ onMounted(async () => {
     plans.value = [newPlan("Draw 1")];
     loadPlan(plans.value[0]);
   }
-  if (!window.randAiDesktop) {
-    errorMessage.value = "Possible Draw is available inside the Electron application.";
-    return;
-  }
-  unsubscribeData = window.randAiDesktop.onCombinedPredictionData(acceptData);
-  unsubscribeNumberRequest = window.randAiDesktop.onPossibleDrawNumber(
-    applyPredictionNumber,
-  );
-  try {
-    const data = await window.randAiDesktop.getCombinedPredictionData();
-    if (data) acceptData(data);
-    else errorMessage.value = "Analyze a dataset before opening Possible Draw.";
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : String(error);
-  }
+  if (props.numberRequest) applyPredictionNumber(props.numberRequest);
 });
 
 onBeforeUnmount(() => {
   clearClickTimer();
-  unsubscribeData?.();
-  unsubscribeNumberRequest?.();
 });
 </script>
 
 <template>
-  <main class="possible-draw-dialog-shell">
-    <PredictionWorkspaceNavigation active="possible-draw" />
+  <main
+    class="possible-draw-dialog-shell"
+    :class="{ 'embedded-possible-draw': embedded }"
+  >
     <section v-if="latestSuite && dialogData" class="possible-draw-window">
       <header class="possible-draw-toolbar">
         <label class="possible-plan-select">
@@ -421,6 +583,110 @@ onBeforeUnmount(() => {
         <button type="button" @click="resetPlan">Reset</button>
       </header>
 
+      <section class="guided-draw-workflow" aria-labelledby="guided-draw-title">
+        <header class="guided-workflow-header">
+          <div>
+            <span class="guided-workflow-eyebrow">Guided prediction workflow</span>
+            <h1 id="guided-draw-title">
+              {{ workflowComplete ? "Predicted draw complete" : `Choose number ${currentWorkflowStep} of 6` }}
+            </h1>
+            <p>
+              Every chosen number is eliminated from all strategy lists. Remaining ranks,
+              strategy leaders, and the combined recommendation are recalculated after each pick.
+            </p>
+          </div>
+          <div class="guided-workflow-progress" :class="{ complete: workflowComplete }">
+            <strong>{{ selectedNumbers.length }}/6</strong>
+            <span>{{ workflowComplete ? "Complete" : `${remainingNumberCount} candidates remain` }}</span>
+          </div>
+        </header>
+
+        <ol class="guided-pick-steps" aria-label="Six-number prediction sequence">
+          <li
+            v-for="step in 6"
+            :key="step"
+            :class="{
+              complete: selectedNumbers[step - 1] !== undefined,
+              active: !workflowComplete && step === currentWorkflowStep,
+            }"
+          >
+            <button
+              v-if="selectedNumbers[step - 1] !== undefined"
+              type="button"
+              :title="`Remove pick ${step} and recalculate`"
+              @click="removeWorkflowNumber(selectedNumbers[step - 1])"
+            >
+              <span>Pick {{ step }}</span>
+              <strong>{{ selectedNumbers[step - 1] }}</strong>
+              <small>Remove</small>
+            </button>
+            <div v-else>
+              <span>Pick {{ step }}</span>
+              <strong>—</strong>
+              <small>{{ step === currentWorkflowStep ? "Choose next" : "Waiting" }}</small>
+            </div>
+          </li>
+        </ol>
+
+        <div v-if="!workflowComplete" class="guided-recommendations">
+          <div class="guided-section-heading">
+            <div>
+              <strong>Recalculated next choices</strong>
+              <span>Ranked using all {{ orderedStrategies.length }} strategies and relationships to your locked picks.</span>
+            </div>
+            <button
+              type="button"
+              :disabled="selectedNumbers.length === 0"
+              @click="undoLastWorkflowNumber"
+            >
+              Undo last pick
+            </button>
+          </div>
+          <div class="guided-candidate-grid">
+            <button
+              v-for="(candidate, index) in topWorkflowCandidates"
+              :key="candidate.number"
+              type="button"
+              @click="chooseWorkflowNumber(candidate.number)"
+            >
+              <span class="candidate-position">#{{ index + 1 }}</span>
+              <strong>{{ candidate.number }}</strong>
+              <span class="candidate-consensus">
+                {{ Math.round(candidate.consensus * 100) }}% rank strength
+              </span>
+              <small>
+                Top 6 in {{ candidate.topSixSupport }}/{{ candidate.strategyCount }} strategies
+              </small>
+              <small v-if="selectedNumbers.length">
+                Relationship lift ×{{ candidate.relationshipLift.toFixed(2) }}
+              </small>
+            </button>
+          </div>
+        </div>
+
+        <div v-else class="guided-complete-summary">
+          <div>
+            <span>Final predicted draw, in selection order</span>
+            <strong>{{ selectedNumbers.join(" · ") }}</strong>
+          </div>
+          <button type="button" @click="undoLastWorkflowNumber">Reopen last pick</button>
+        </div>
+
+        <details class="guided-strategy-leaders">
+          <summary>All recalculated strategy leaders</summary>
+          <div>
+            <article v-for="choice in strategyNextChoices" :key="choice.id">
+              <span>{{ choice.name }}</span>
+              <strong>{{ choice.prediction?.number ?? "—" }}</strong>
+              <small v-if="choice.prediction">
+                Now #1 · originally #{{ choice.prediction.originalRank }}
+              </small>
+              <small v-else>No remaining candidate</small>
+            </article>
+          </div>
+        </details>
+      </section>
+
       <div class="possible-draw-layout">
         <section class="possible-number-board">
           <div class="draw-grid" role="grid" aria-label="Possible draw numbers">
@@ -437,13 +703,19 @@ onBeforeUnmount(() => {
                 focused: focusedNumber === number,
                 lastDraw: showLastDraw && lastDrawSet.has(number),
                 lastSeen: showLastSeen && highlightedLastSeen?.number === number,
+                recommended: topWorkflowCandidateSet.has(number) && !workflowComplete,
               }"
               :aria-pressed="selectedSet.has(number)"
-              :title="`Number ${number}: click for For Sure, double-click to exclude, Ctrl+double-click for Possible`"
+              :title="selectedSet.has(number)
+                ? `Number ${number}: workflow pick ${selectionStep(number)}`
+                : `Number ${number}: click to choose next, double-click to exclude, Ctrl+double-click for Possible`"
               @click="handleClick($event, number)"
               @dblclick="handleDoubleClick($event, number)"
             >
               {{ number }}
+              <small v-if="selectedSet.has(number)" class="selection-order">
+                {{ selectionStep(number) }}
+              </small>
             </button>
           </div>
           <p class="possible-help">
@@ -457,15 +729,23 @@ onBeforeUnmount(() => {
               v-for="strategy in orderedStrategies"
               :key="strategy.id"
               class="prediction-meter-card"
+              :class="{
+                'prediction-meter-card--compact':
+                  !focusedPredictions.get(strategy.id) &&
+                  !(focusedNumber !== null && (selectedSet.has(focusedNumber) || droppedSet.has(focusedNumber))),
+              }"
               :style="{ '--meter-color': cardColor(strategy.id) }"
             >
-              <h2>{{ strategy.name }}</h2>
+              <h2>{{ strategyFullName(strategy) }}</h2>
               <div class="meter-scale"><span>1</span><span>13</span><span>25</span><span>37</span><span>49</span></div>
               <div class="meter-track">
                 <span :style="{ width: rankWidth(focusedPredictions.get(strategy.id)) }"></span>
               </div>
               <div v-if="focusedPredictions.get(strategy.id)" class="meter-details">
-                <strong>Rank {{ focusedPredictions.get(strategy.id)!.rank }}</strong>
+                <strong>Recalculated rank {{ focusedPredictions.get(strategy.id)!.rank }}</strong>
+                <span v-if="focusedPredictions.get(strategy.id)!.originalRank !== focusedPredictions.get(strategy.id)!.rank">
+                  Was rank {{ focusedPredictions.get(strategy.id)!.originalRank }}
+                </span>
                 <span
                   v-for="detail in focusedPredictions.get(strategy.id)!.details.slice(0, 3)"
                   :key="detail"
@@ -473,7 +753,12 @@ onBeforeUnmount(() => {
                 >{{ compactDetail(detail) }}</span>
                 <span>Score {{ (focusedPredictions.get(strategy.id)!.score * 100).toFixed(1) }}</span>
               </div>
-              <div v-else class="meter-details"><strong>Select a number</strong></div>
+              <div
+                v-else-if="focusedNumber !== null && (selectedSet.has(focusedNumber) || droppedSet.has(focusedNumber))"
+                class="meter-details"
+              >
+                <strong>Eliminated from remaining ranks</strong>
+              </div>
             </article>
           </div>
 

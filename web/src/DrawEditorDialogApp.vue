@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import PredictionWorkspaceNavigation from "./components/PredictionWorkspaceNavigation.vue";
 import type { DrawEditorData, DrawEditorEntry } from "./types";
 
 type EditorMode = "view" | "add" | "edit";
 type DrawVisualization = "grid" | "circle";
+
+defineProps<{ embedded?: boolean }>();
+const emit = defineEmits<{ saved: [] }>();
 
 const data = ref<DrawEditorData | null>(null);
 const currentIndex = ref(0);
@@ -98,6 +100,7 @@ async function save(): Promise<void> {
     );
     mode.value = "view";
     message.value = "YAML saved first; the equivalent pickle was rebuilt. Reanalysis is ready in the main window.";
+    emit("saved");
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
   } finally {
@@ -106,7 +109,6 @@ async function save(): Promise<void> {
 }
 
 onMounted(async () => {
-  document.title = "Draw History — Rand AI";
   if (!window.randAiDesktop) {
     errorMessage.value = "Draw History is available inside the Electron application.";
     loading.value = false;
@@ -124,8 +126,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="draw-editor-shell">
-    <PredictionWorkspaceNavigation active="draw-history" />
+  <main class="draw-editor-shell" :class="{ 'embedded-draw-editor': embedded }">
     <section class="draw-editor-window">
       <header class="draw-editor-header">
         <div>

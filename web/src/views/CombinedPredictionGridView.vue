@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
-import PredictionWorkspaceNavigation from "../components/PredictionWorkspaceNavigation.vue";
 import {
   RANDOM_BENCHMARK_SIMULATIONS,
   randomTailProbability,
@@ -19,6 +18,10 @@ import type {
 const props = defineProps<{
   predictionSuites: PredictionSuite[];
   efficacyHistory: StrategyEfficacyRecord[];
+  embedded?: boolean;
+}>();
+const emit = defineEmits<{
+  sendNumber: [request: { number: number; state: PossibleDrawNumberState }];
 }>();
 
 const referenceOffset = ref(0);
@@ -30,6 +33,7 @@ const efficacyRangeAnchor = ref<"first" | "latest">("first");
 const efficacyRandomBenchmark = shallowRef<RandomBenchmarkSummary | null>(null);
 const efficacyRetestCount = ref(0);
 const isEfficacyRetesting = ref(false);
+const selectedPredictionNumber = ref<number | null>(null);
 let numberActionTimer: ReturnType<typeof setTimeout> | null = null;
 
 const maximumOffset = computed(() => Math.max(0, props.predictionSuites.length - 1));
@@ -46,6 +50,20 @@ const selectedStrategy = computed(
         ) ??
         selectedPrediction.value?.strategies[0] ??
         null,
+);
+const selectedStrategyNumbersByScore = computed(() =>
+  [...(selectedStrategy.value?.numbers ?? [])].sort(
+    (left, right) =>
+      right.score - left.score ||
+      left.rank - right.rank ||
+      left.number - right.number,
+  ),
+);
+const selectedStrategyNumberByNumber = computed(
+  () =>
+    new Map(
+      selectedStrategyNumbersByScore.value.map((entry) => [entry.number, entry]),
+    ),
 );
 const allStrategiesVisible = computed(
   () =>
@@ -66,12 +84,22 @@ const allReportCells = computed(() =>
         .filter((strategy) => strategy.topNumbers.includes(number))
         .map((strategy) => ({
           id: strategy.id,
-          name: strategy.name,
+          name: strategyFullName(strategy),
           color: strategyDisplayColor(strategy.id),
         })),
     };
   }),
 );
+const orderedReportCells = computed(() => {
+  if (!selectedStrategy.value) return allReportCells.value;
+  return selectedStrategyNumbersByScore.value
+    .map((entry) => allReportCells.value[entry.number - 1])
+    .filter((cell) => cell !== undefined);
+});
+const selectedNumberReports = computed(() => {
+  if (selectedPredictionNumber.value === null) return [];
+  return allReportCells.value[selectedPredictionNumber.value - 1]?.reports ?? [];
+});
 const coverageReport = computed(() => {
   const strategyCount = selectedPrediction.value?.strategies.length ?? 0;
   return Array.from({ length: strategyCount }, (_value, index) => {
@@ -206,6 +234,7 @@ watch(efficacySelectionKey, () => {
 });
 
 watch(selectedPrediction, (prediction) => {
+  selectedPredictionNumber.value = null;
   const available = new Set<string>(
     prediction?.strategies.map((strategy) => strategy.id) ?? [],
   );
@@ -313,12 +342,17 @@ function strategyFullName(strategy: StrategyPrediction): string {
     entropy: "Entropy",
     markov100: "Markov 100",
     mkfr: "Markov Freshness",
+    mksp: "Markov Spaces",
     bayesian: "Bayesian",
     predictive_grid: "Predictive Score Grid",
+    co_occurrence: "Next Draw Co-occurrence",
+    doublet_triplet_markov: "Doublet & Triplet Markov",
     mixed: "Mixed Prediction",
     svc: "Support Vector Classifier",
     tbl: "Temporal Behavior Learning",
     cis: "Collective Intelligence Strategy",
+    residual_coverage: "Residual Coverage",
+    chained: "Chained Strategy",
   }[strategy.id] ?? strategy.name;
 }
 
@@ -333,12 +367,17 @@ function strategyColor(strategyId: string): string {
     entropy: "#c95d42",
     markov100: "#e8c238",
     mkfr: "#1f8f75",
+    mksp: "#517aa3",
     bayesian: "#d477b8",
     predictive_grid: "#008ca8",
+    co_occurrence: "#4f7f3f",
+    doublet_triplet_markov: "#7c3aed",
     mixed: "#dd6b20",
     svc: "#9567e8",
     tbl: "#1695a8",
     cis: "#b12f67",
+    residual_coverage: "#0f766e",
+    chained: "#9a3412",
   }[strategyId] ?? "#6e8195";
 }
 
@@ -369,7 +408,7 @@ function cellTitle(
 ): string {
   const outcome = actualNumbers.value.has(entry.number) ? " — drawn next" : "";
   const details = entry.details.length > 0 ? ` — ${entry.details.join(" · ")}` : "";
-  return `Number ${entry.number}: rank ${entry.rank}, ${strategy.name} score ${scoreLabel(entry)}${details}${outcome} — Ctrl+Click: Possible; Ctrl+Double-click: For Sure`;
+  return `Number ${entry.number}: rank ${entry.rank}, ${strategyFullName(strategy)} score ${scoreLabel(entry)}${details}${outcome} — Click: view strategies; Ctrl+Click: Possible; Ctrl+Double-click: For Sure`;
 }
 
 function allCellTitle(cell: (typeof allReportCells.value)[number]): string {
@@ -379,7 +418,17 @@ function allCellTitle(cell: (typeof allReportCells.value)[number]): string {
     cell.reports.length >= 3
       ? ` — high agreement (${cell.reports.length} strategies)`
       : "";
-  return `Number ${cell.number}${outcome}${consensus} — predicted by ${reports || "no report"} — Ctrl+Click: Possible; Ctrl+Double-click: For Sure`;
+  return `Number ${cell.number}${outcome}${consensus} — predicted by ${reports || "no report"} — Click: view strategies; Ctrl+Click: Possible; Ctrl+Double-click: For Sure`;
+}
+
+function mainGridCellTitle(
+  cell: (typeof allReportCells.value)[number],
+): string {
+  const strategy = selectedStrategy.value;
+  const entry = selectedStrategyNumberByNumber.value.get(cell.number);
+  if (!strategy || !entry) return allCellTitle(cell);
+  const reports = cell.reports.map((report) => report.name).join(", ");
+  return `${cellTitle(entry, strategy)} — Pie colors: ${reports || "no strategy Top-6 selections"}`;
 }
 
 function sectorStyle(cell: (typeof allReportCells.value)[number]): Record<string, string> {
@@ -406,11 +455,14 @@ function sendNumberToPossibleDraw(
   number: number,
   state: PossibleDrawNumberState,
 ): void {
-  void window.randAiDesktop?.sendPredictionNumberToPossibleDraw({ number, state });
+  emit("sendNumber", { number, state });
 }
 
 function handlePredictionClick(event: MouseEvent, number: number): void {
-  if (!event.ctrlKey) return;
+  if (!event.ctrlKey) {
+    selectedPredictionNumber.value = number;
+    return;
+  }
   event.preventDefault();
   clearNumberActionTimer();
   numberActionTimer = setTimeout(() => {
@@ -430,152 +482,152 @@ onBeforeUnmount(clearNumberActionTimer);
 </script>
 
 <template>
-  <PredictionWorkspaceNavigation active="predictions">
-    <template #controls>
-      <div
-        v-if="selectedPrediction"
-        class="reference-buttons"
-        aria-label="Prediction history navigation"
-      >
-        <button
-          type="button"
-          :disabled="referenceOffset >= maximumOffset"
-          @click="referenceOffset = maximumOffset"
-        >
-          First
-        </button>
-        <button
-          type="button"
-          :disabled="referenceOffset >= maximumOffset"
-          @click="referenceOffset += 1"
-        >
-          Previous
-        </button>
-        <button
-          type="button"
-          :disabled="referenceOffset === 0"
-          @click="referenceOffset -= 1"
-        >
-          Next
-        </button>
-        <button
-          type="button"
-          :disabled="referenceOffset === 0"
-          @click="referenceOffset = 0"
-        >
-          Latest
-        </button>
-      </div>
-      <div v-if="selectedPrediction" class="prediction-reference-summary">
-        <span>After draw</span>
-        <strong>{{ selectedPrediction.referenceDrawNumber }}</strong>
-        <span aria-hidden="true">→</span>
-        <span>{{ selectedPrediction.targetDrawNumber }}</span>
-      </div>
-    </template>
-  </PredictionWorkspaceNavigation>
-
   <section
     v-if="selectedPrediction && selectedPrediction.strategies.length > 0"
     class="combined-prediction-view"
   >
     <div class="prediction-workspace-layout">
-      <div class="prediction-strategy-tabs" role="tablist" aria-label="Prediction strategy">
-        <button
-          type="button"
-          role="tab"
-          :aria-selected="selectedStrategyId === 'all'"
-          :class="{ active: selectedStrategyId === 'all' }"
-          @click="selectedStrategyId = 'all'"
-        >
-          All
-        </button>
-        <button
-          v-for="strategy in selectedPrediction.strategies"
-          :key="strategy.id"
-          type="button"
-          role="tab"
-          :aria-selected="strategy.id === selectedStrategyId"
-          :class="{ active: strategy.id === selectedStrategyId }"
-          @click="selectedStrategyId = strategy.id"
-        >
-          <span>{{ strategy.name }}</span>
-          <small>{{ efficacyDifferenceFor(strategy) }}</small>
-        </button>
-      </div>
-
-      <div class="prediction-workspace-content">
-        <div v-if="selectedStrategy" class="prediction-strategy-heading">
-          <div>
-            <span>Prediction</span>
-            <h1>{{ selectedStrategy.name }}</h1>
+      <aside
+        class="prediction-strategy-sidebar"
+        aria-label="Prediction navigation and strategies"
+      >
+        <div class="prediction-reference-toolbar">
+          <div
+            class="reference-buttons"
+            aria-label="Prediction history navigation"
+          >
+            <button
+              type="button"
+              :disabled="referenceOffset >= maximumOffset"
+              aria-label="First prediction"
+              title="First"
+              @click="referenceOffset = maximumOffset"
+            >
+              ⏮
+            </button>
+            <button
+              type="button"
+              :disabled="referenceOffset >= maximumOffset"
+              aria-label="Previous prediction"
+              title="Previous"
+              @click="referenceOffset += 1"
+            >
+              ◀
+            </button>
+            <output
+              class="prediction-reference-summary"
+              :aria-label="`Reference draw ${selectedPrediction.referenceDrawNumber}`"
+            >
+              <strong>{{ selectedPrediction.referenceDrawNumber }}</strong>
+            </output>
+            <button
+              type="button"
+              :disabled="referenceOffset === 0"
+              aria-label="Next prediction"
+              title="Next"
+              @click="referenceOffset -= 1"
+            >
+              ▶
+            </button>
+            <button
+              type="button"
+              :disabled="referenceOffset === 0"
+              aria-label="Last prediction"
+              title="Last"
+              @click="referenceOffset = 0"
+            >
+              ⏭
+            </button>
           </div>
-          <p>{{ selectedStrategy.description }}</p>
-          <strong>
-            Top 6: {{ selectedStrategy.topNumbers.join(", ") }}
-          </strong>
         </div>
 
-        <section
-          v-if="selectedStrategy && selectedStrategyEfficacy"
-          class="strategy-efficacy-card"
-          :class="efficacyClass(selectedStrategyEfficacy)"
-          aria-label="Historical efficacy compared with random selections"
-        >
-          <header>
-            <div>
-              <span>Historical Top-6 efficacy</span>
-              <strong>{{ efficacyVerdict(selectedStrategyEfficacy) }}</strong>
-            </div>
-            <b>{{ hitDifferenceLabel(selectedStrategyEfficacy) }}</b>
-          </header>
-          <dl>
-            <div>
-              <dt>Completed predictions</dt>
-              <dd>{{ selectedStrategyEfficacy.evaluatedDraws }}</dd>
-            </div>
-            <div>
-              <dt>{{ selectedStrategy.name }} hits</dt>
-              <dd>
-                {{ formatHitTotal(selectedStrategyEfficacy.strategyHits) }}
-                <small>
-                  {{ selectedStrategyEfficacy.averageHitsPerDraw.toFixed(3) }}/draw
-                </small>
-              </dd>
-            </div>
-            <div>
-              <dt>Random mean</dt>
-              <dd>
-                {{ formatHitTotal(selectedStrategyEfficacy.randomHits) }}
-                <small>
-                  {{ selectedStrategyEfficacy.randomAverageHitsPerDraw.toFixed(3) }}/draw
-                </small>
-              </dd>
-            </div>
-            <div>
-              <dt>Random 95% range</dt>
-              <dd>
-                {{ efficacyRandomRangeLabel }}
-                <small>
-                  Random ≥ result: {{ randomTailLabel(selectedStrategy) }}
-                </small>
-              </dd>
-            </div>
-          </dl>
-          <p>
-            Every completed record in the imported database is evaluated
-            walk-forward: six predicted numbers are compared with the actual next
-            draw. Positive lift means more matches than the random mean. Retest
-            uses 10,000 random datasets to estimate the empirical random range and
-            the chance of reaching the strategy result; it is evidence for
-            comparison, not a guarantee of future results.
-          </p>
-        </section>
+        <div class="prediction-strategy-tabs" role="tablist" aria-label="Prediction strategy">
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="selectedStrategyId === 'all'"
+            :class="{ active: selectedStrategyId === 'all' }"
+            @click="selectedStrategyId = 'all'"
+          >
+            All
+          </button>
+          <button
+            v-for="(strategy, index) in efficacyRanking"
+            :key="strategy.id"
+            type="button"
+            role="tab"
+            :aria-selected="strategy.id === selectedStrategyId"
+            :class="{ active: strategy.id === selectedStrategyId }"
+            :title="`#${index + 1} by effectiveness · ${strategyFullName(strategy)}`"
+            @click="selectedStrategyId = strategy.id"
+          >
+            <span>
+              <b>#{{ index + 1 }}</b>
+              {{ strategyFullName(strategy) }}
+            </span>
+          </button>
+        </div>
+      </aside>
 
-        <div
-          v-if="selectedStrategyId === 'all'"
-          class="all-predictions-wrapper"
-        >
+      <div class="prediction-workspace-content">
+        <div class="prediction-color-legend" role="group" aria-label="Prediction report colors">
+          <label>
+            <input
+              type="checkbox"
+              :checked="allStrategiesVisible"
+              @change="toggleAllStrategyColors"
+            />
+            <span>All colors</span>
+          </label>
+          <label
+            v-for="strategy in efficacyRanking"
+            :key="strategy.id"
+          >
+            <input
+              type="checkbox"
+              :checked="!mutedStrategyIds.has(strategy.id)"
+              :style="{ '--legend-color': strategyColor(strategy.id) }"
+              @change="toggleStrategyColor(strategy.id)"
+            />
+            <span>{{ strategyFullName(strategy) }}</span>
+          </label>
+        </div>
+
+        <div class="prediction-main-grid-row">
+          <div
+            class="all-predictions-grid"
+            role="grid"
+            :aria-label="
+              selectedStrategy
+                ? `${strategyFullName(selectedStrategy)} score order with all prediction report colors`
+                : 'All prediction reports by number from 1 through 49'
+            "
+          >
+            <article
+              v-for="cell in orderedReportCells"
+              :key="cell.number"
+              class="all-predictions-cell"
+              :class="{
+                'has-prediction': cell.reports.length > 0,
+                'is-high-consensus': cell.reports.length >= 3,
+                'is-drawn': actualNumbers.has(cell.number),
+                'is-in-selected-coverage-zone':
+                  selectedCoverageThreshold !== null &&
+                  cell.reports.length >= selectedCoverageThreshold,
+              }"
+              :style="sectorStyle(cell)"
+              :title="mainGridCellTitle(cell)"
+              role="gridcell"
+              tabindex="0"
+              @click="handlePredictionClick($event, cell.number)"
+              @dblclick="handlePredictionDoubleClick($event, cell.number)"
+              @keydown.enter.prevent="selectedPredictionNumber = cell.number"
+              @keydown.space.prevent="selectedPredictionNumber = cell.number"
+            >
+              <strong>{{ cell.number }}</strong>
+            </article>
+          </div>
+
           <section class="prediction-coverage-report" aria-label="Strategy coverage report">
             <header>
               <div>
@@ -612,54 +664,76 @@ onBeforeUnmount(clearNumberActionTimer);
               </li>
             </ul>
           </section>
-          <div class="prediction-color-legend" role="group" aria-label="Prediction report colors">
-            <label>
-              <input
-                type="checkbox"
-                :checked="allStrategiesVisible"
-                @change="toggleAllStrategyColors"
-              />
-              <span>All colors</span>
-            </label>
-            <label
-              v-for="strategy in selectedPrediction.strategies"
-              :key="strategy.id"
-            >
-              <input
-                type="checkbox"
-                :checked="!mutedStrategyIds.has(strategy.id)"
-                :style="{ '--legend-color': strategyColor(strategy.id) }"
-                @change="toggleStrategyColor(strategy.id)"
-              />
-              <span>{{ strategy.name }}</span>
-            </label>
+        </div>
+
+        <div v-if="selectedStrategy" class="prediction-strategy-heading">
+          <div>
+            <span>Prediction</span>
+            <h1>{{ strategyFullName(selectedStrategy) }}</h1>
           </div>
-          <div
-            class="all-predictions-grid"
-            role="grid"
-            aria-label="All prediction reports by number from 1 through 49"
-          >
-            <article
-              v-for="cell in allReportCells"
-              :key="cell.number"
-              class="all-predictions-cell"
-              :class="{
-                'has-prediction': cell.reports.length > 0,
-                'is-high-consensus': cell.reports.length >= 3,
-                'is-drawn': actualNumbers.has(cell.number),
-                'is-in-selected-coverage-zone':
-                  selectedCoverageThreshold !== null &&
-                  cell.reports.length >= selectedCoverageThreshold,
-              }"
-              :style="sectorStyle(cell)"
-              :title="allCellTitle(cell)"
-              role="gridcell"
-              @click="handlePredictionClick($event, cell.number)"
-              @dblclick="handlePredictionDoubleClick($event, cell.number)"
-            >
-              <strong>{{ cell.number }}</strong>
-            </article>
-          </div>
+          <p>{{ selectedStrategy.description }}</p>
+          <strong>
+            Top 6: {{ selectedStrategy.topNumbers.join(", ") }}
+          </strong>
+        </div>
+
+        <section
+          v-if="selectedStrategy && selectedStrategyEfficacy"
+          class="strategy-efficacy-card"
+          :class="efficacyClass(selectedStrategyEfficacy)"
+          aria-label="Historical efficacy compared with random selections"
+        >
+          <header>
+            <div>
+              <span>Historical Top-6 efficacy</span>
+              <strong>{{ efficacyVerdict(selectedStrategyEfficacy) }}</strong>
+            </div>
+            <b>{{ hitDifferenceLabel(selectedStrategyEfficacy) }}</b>
+          </header>
+          <dl>
+            <div>
+              <dt>Completed predictions</dt>
+              <dd>{{ selectedStrategyEfficacy.evaluatedDraws }}</dd>
+            </div>
+            <div>
+              <dt>{{ strategyFullName(selectedStrategy) }} hits</dt>
+              <dd>
+                {{ formatHitTotal(selectedStrategyEfficacy.strategyHits) }}
+                <small>
+                  {{ selectedStrategyEfficacy.averageHitsPerDraw.toFixed(3) }}/draw
+                </small>
+              </dd>
+            </div>
+            <div>
+              <dt>Random mean</dt>
+              <dd>
+                {{ formatHitTotal(selectedStrategyEfficacy.randomHits) }}
+                <small>
+                  {{ selectedStrategyEfficacy.randomAverageHitsPerDraw.toFixed(3) }}/draw
+                </small>
+              </dd>
+            </div>
+            <div>
+              <dt>Random 95% range</dt>
+              <dd>
+                {{ efficacyRandomRangeLabel }}
+                <small>
+                  Random ≥ result: {{ randomTailLabel(selectedStrategy) }}
+                </small>
+              </dd>
+            </div>
+          </dl>
+          <p>
+            Every completed record in the imported database is evaluated
+            walk-forward: six predicted numbers are compared with the actual next
+            draw. Positive lift means more matches than the random mean. Retest
+            uses 10,000 random datasets to estimate the empirical random range and
+            the chance of reaching the strategy result; it is evidence for
+            comparison, not a guarantee of future results.
+          </p>
+        </section>
+
+        <template v-if="selectedStrategyId === 'all'">
           <section
             class="prediction-efficacy-overview"
             aria-label="All strategies compared with random selections"
@@ -768,33 +842,49 @@ onBeforeUnmount(clearNumberActionTimer);
               </table>
             </div>
           </section>
-        </div>
+        </template>
 
-        <div v-else-if="selectedStrategy" class="prediction-report-stack">
-          <section class="prediction-report">
-            <div
-              class="combined-score-grid"
-              role="grid"
-              :aria-label="`${selectedStrategy.name} numbers by rank`"
-            >
-              <div
-                v-for="entry in selectedStrategy.numbers"
-                :key="entry.number"
-                class="combined-score-cell"
-                :class="{ 'is-drawn': actualNumbers.has(entry.number) }"
-                :title="cellTitle(entry, selectedStrategy)"
-                role="gridcell"
-                @click="handlePredictionClick($event, entry.number)"
-                @dblclick="handlePredictionDoubleClick($event, entry.number)"
-              >
-                <span class="prediction-rank">#{{ entry.rank }}</span>
-                <strong>{{ entry.number }}</strong>
-                <small>{{ scoreLabel(entry) }}</small>
-              </div>
-            </div>
-          </section>
-        </div>
       </div>
+    </div>
+
+    <div
+      v-if="selectedPredictionNumber !== null"
+      class="number-popup-backdrop"
+      role="presentation"
+      @click.self="selectedPredictionNumber = null"
+    >
+      <section
+        class="number-popup prediction-strategies-popup"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="`Strategies implying number ${selectedPredictionNumber}`"
+        @keydown.esc="selectedPredictionNumber = null"
+      >
+        <p>Strategies implying number</p>
+        <strong>{{ selectedPredictionNumber }}</strong>
+        <span class="prediction-strategies-popup-summary">
+          {{
+            selectedNumberReports.length === 1
+              ? "1 strategy includes this number in its Top 6"
+              : `${selectedNumberReports.length} strategies include this number in their Top 6`
+          }}
+        </span>
+        <ul v-if="selectedNumberReports.length > 0">
+          <li
+            v-for="report in selectedNumberReports"
+            :key="report.id"
+            :style="{ '--strategy-color': strategyColor(report.id) }"
+          >
+            {{ report.name }}
+          </li>
+        </ul>
+        <p v-else class="prediction-strategies-popup-empty">
+          No active strategy implies this number.
+        </p>
+        <button type="button" autofocus @click="selectedPredictionNumber = null">
+          Close
+        </button>
+      </section>
     </div>
   </section>
 

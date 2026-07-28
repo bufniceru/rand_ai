@@ -1,0 +1,51 @@
+
+> rand-ai-desktop@0.1.0 dev
+> vite --host 127.0.0.1 --port 4174 --strictPort
+
+
+  [32m[1mVITE[22m v7.3.6[39m  [2mready in [0m[1m587[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m4174[22m/[39m
+[2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
+[2m8:31:50 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:50 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:50 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:50 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:50 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:50 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:50 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:50 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:50 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:50 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:51 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:51 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:51 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:51 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:51 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:51 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:51 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:31:52 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked/LICENSES.chromium.html[22m
+[2m8:33:45 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:33:46 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:33:46 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:33:46 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:33:46 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:34:16 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:01 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:01 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:01 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:01 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:01 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:01 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:01 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:01 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:01 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:02 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:02 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:02 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:02 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:02 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:02 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:02 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:02 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m
+[2m8:36:03 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2melectron-package/win-unpacked.tmp/LICENSES.chromium.html[22m

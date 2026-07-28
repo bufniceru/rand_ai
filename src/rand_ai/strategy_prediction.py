@@ -6,6 +6,7 @@ import math
 from collections import deque
 from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass, replace
+from heapq import nlargest
 from itertools import combinations
 
 from rand_ai.draw import Draw
@@ -18,13 +19,50 @@ _EXPECTED_RANDOM_HITS_PER_DRAW = _NUMBERS_PER_DRAW * _NUMBERS_PER_DRAW / _NUMBER
 _MAX_GAP_BUCKET = 35
 _MARKOV_PRIOR_STRENGTH = 8.0
 _MARKOV_DECAY = 0.5 ** (1 / 500)
+_BAYESIAN_GAP_PRIOR_STRENGTH = 1024.0
+_BAYESIAN_GAP_RECENCY_HALF_LIFE = 1000
+_BAYESIAN_GAP_DECAY = 0.5 ** (1 / _BAYESIAN_GAP_RECENCY_HALF_LIFE)
+_BAYESIAN_RECENT_GAP_WEIGHT = 0.15
+_BAYESIAN_NUMBER_PRIOR_STRENGTH = 64.0
+_BAYESIAN_NUMBER_RECENCY_HALF_LIFE = 100
+_BAYESIAN_NUMBER_DECAY = 0.5 ** (1 / _BAYESIAN_NUMBER_RECENCY_HALF_LIFE)
+_BAYESIAN_RECENT_NUMBER_WEIGHT = 0.35
+_BAYESIAN_LIFETIME_GAP_WEIGHT = (
+    1 - _BAYESIAN_RECENT_GAP_WEIGHT - _BAYESIAN_RECENT_NUMBER_WEIGHT
+)
+_PREDICTIVE_GRID_EMD_WEIGHT = 0.30
+_CO_OCCURRENCE_ADJUSTED_WEIGHT = 0.10
+_CO_OCCURRENCE_PRIOR_STRENGTH = 4.0
+_CO_OCCURRENCE_RECENT_WEIGHT = 0.10
+_CO_OCCURRENCE_RECENT_WINDOW = 100
+_DOUBLET_TRIPLET_MARKOV_PRIOR_STRENGTH = 8.0
+_DOUBLET_TRIPLET_MARKOV_RECENT_WINDOW = 120
 _MKFR_MAX_ORDER = 20
 _MKFR_PRIOR_STRENGTH = 8.0
 _MKFR_MIN_CONTEXT_SUPPORT = 8
+_MKSP_MAX_ORDER = 20
+_MKSP_PRIOR_STRENGTH = 8.0
+_MKSP_MIN_CONTEXT_SUPPORT = 8
+_MKSP_VALUE_COUNT = 44
+_MKSP_ANALOGUE_LIMIT = 512
+_MKSP_ANALOGUE_PRIOR_STRENGTH = 4.0
+_MKSP_ANALOGUE_BLEND = 0.70
+_MKSP_CONTEXT_DECAY = 0.86
+_MKSP_RECENCY_HALF_LIFE = 800
+_MKSP_SIMILARITY_SHARPNESS = 10.0
+_MKSP_BEAM_WIDTH = 8
 _RANDOM_SEED = 20260626
 _FRESH_RANDOM_SEED_OFFSET = 7919
 _FRESH_RANDOM_INFLUENCE = 0.35
-_CIS_MINIMUM_TRAINING_DRAWS = 36
+_CHAIN_EFFECTIVENESS_PRIOR_DRAWS = 24.0
+_CHAIN_EFFECTIVENESS_MINIMUM = 0.50
+_CHAIN_EFFECTIVENESS_MAXIMUM = 1.50
+_CIS_MINIMUM_TRAINING_DRAWS = 72
+_CIS_EXPERT_PRIOR_DRAWS = 24.0
+_CIS_RECENT_WINDOW = 40
+_CIS_LEARNER_MAX_BLEND = 0.15
+_CIS_LEARNER_EVIDENCE_DRAWS = 24.0
+_CIS_LEARNER_MIN_ADVANTAGE = 0.10
 _PROXIMITY_BUCKETS = ("paired", "tight", "near", "balanced", "wide", "isolated")
 _EARTH_MOVER_BUCKETS = ("Overlap", "Near", "Close", "Middle", "Far", "Distant")
 _PRIMES = {
@@ -46,7 +84,7 @@ _PRIMES = {
 }
 
 PredictionProgress = Callable[[int, int], None]
-STRATEGY_IDS = (
+_BASE_STRATEGY_IDS = (
     "proximity",
     "freshness",
     "emd",
@@ -56,41 +94,71 @@ STRATEGY_IDS = (
     "entropy",
     "markov100",
     "mkfr",
+    "mksp",
     "bayesian",
     "predictive_grid",
+    "co_occurrence",
+    "doublet_triplet_markov",
     "mixed",
     "svc",
     "tbl",
     "cis",
 )
+_CHAIN_EXPERT_IDS = (
+    "freshness",
+    "proximity",
+    "emd",
+    "chi_square",
+    "entropy",
+    "markov100",
+    "mkfr",
+    "mksp",
+    "bayesian",
+    "predictive_grid",
+    "co_occurrence",
+    "doublet_triplet_markov",
+    "mixed",
+    "svc",
+    "tbl",
+    "cis",
+)
+STRATEGY_IDS = (*_BASE_STRATEGY_IDS, "residual_coverage", "chained")
 _CIS_EXPERTS = (
-    ("freshness", "Freshness", 0.15),
-    ("proximity", "Proximity", 0.12),
-    ("emd", "EMD", 0.10),
-    ("bayesian", "Bayesian", 0.15),
-    ("markov100", "100 Markov", 0.10),
-    ("mixed", "Mixed", 0.12),
-    ("randomness", "Randomness", 0.04),
-    ("fresh_random", "Fresh Random", 0.05),
-    ("svc", "SVC", 0.08),
-    ("tbl", "TBL", 0.09),
+    ("freshness", "Freshness", 0.06),
+    ("proximity", "Proximity", 0.05),
+    ("emd", "EMD", 0.12),
+    ("entropy", "Entropy", 0.08),
+    ("markov100", "100 Markov", 0.05),
+    ("mkfr", "Markov Frequency", 0.10),
+    ("mksp", "Markov Spaces", 0.14),
+    ("bayesian", "Bayesian", 0.07),
+    ("predictive_grid", "Predictive Grid", 0.08),
+    ("co_occurrence", "Co-occurrence", 0.08),
+    ("mixed", "Mixed", 0.07),
+    ("svc", "SVC", 0.05),
+    ("tbl", "TBL", 0.05),
 )
 _STRATEGY_DEPENDENCIES = {
     "fresh_random": {"freshness", "randomness"},
     "mixed": {"freshness", "proximity", "emd", "bayesian"},
-    "predictive_grid": {"markov100"},
+    "predictive_grid": {"emd", "markov100"},
     "cis": {
         "freshness",
         "proximity",
         "emd",
+        "entropy",
         "bayesian",
         "markov100",
+        "mkfr",
+        "mksp",
+        "predictive_grid",
+        "co_occurrence",
         "mixed",
-        "randomness",
-        "fresh_random",
         "svc",
         "tbl",
     },
+    "residual_coverage": set(_BASE_STRATEGY_IDS),
+    "chained": set(_CHAIN_EXPERT_IDS),
 }
 
 
@@ -152,6 +220,7 @@ class PredictionSuite:
 
 
 EfficacyRecordCallback = Callable[[StrategyEfficacyRecord], None]
+PredictionSuiteCallback = Callable[[PredictionSuite], None]
 
 
 def _clamp(value: float, minimum: float, maximum: float) -> float:
@@ -349,6 +418,19 @@ def _gap_entropy_percent(numbers: Sequence[int]) -> float:
     return entropy / math.log2(_NUMBERS_PER_DRAW) * 100
 
 
+def _spaces_for_numbers(numbers: Collection[int]) -> tuple[int, ...]:
+    ordered = sorted(numbers)
+    if len(ordered) != _NUMBERS_PER_DRAW:
+        raise ValueError("Space states require exactly six numbers")
+    return (
+        (ordered[0] - 1) + (_NUMBER_COUNT - ordered[-1]),
+        *(
+            right - left - 1
+            for left, right in zip(ordered, ordered[1:])
+        ),
+    )
+
+
 class _StrategyState:
     """Maintain incremental state for the enabled prediction strategy plugins."""
 
@@ -369,6 +451,54 @@ class _StrategyState:
         self.occurrences: list[list[int]] = [[] for _ in range(_NUMBER_COUNT + 1)]
         self.recent_draws: deque[set[int]] = deque(maxlen=100)
         self.pair_counts: dict[tuple[int, int], int] = {}
+        doublet_triplet_markov_enabled = (
+            "doublet_triplet_markov" in self.enabled_strategy_ids
+        )
+        self.doublet_markov_counts = (
+            [0] * (_NUMBER_COUNT + 1)
+            if doublet_triplet_markov_enabled
+            else []
+        )
+        self.triplet_markov_counts = (
+            [0] * (_NUMBER_COUNT + 1)
+            if doublet_triplet_markov_enabled
+            else []
+        )
+        self.doublet_markov_transitions = (
+            [
+                [0] * (_NUMBER_COUNT + 1)
+                for _ in range(_NUMBER_COUNT + 1)
+            ]
+            if doublet_triplet_markov_enabled
+            else []
+        )
+        self.triplet_markov_transitions = (
+            [
+                [0] * (_NUMBER_COUNT + 1)
+                for _ in range(_NUMBER_COUNT + 1)
+            ]
+            if doublet_triplet_markov_enabled
+            else []
+        )
+        self.doublet_triplet_transition_totals = (
+            [0] * (_NUMBER_COUNT + 1)
+            if doublet_triplet_markov_enabled
+            else []
+        )
+        self.doublet_triplet_shape_counts = (
+            [0, 0, 0] if doublet_triplet_markov_enabled else []
+        )
+        self.doublet_triplet_shape_transitions = (
+            [[0, 0, 0] for _ in range(3)]
+            if doublet_triplet_markov_enabled
+            else []
+        )
+        self.doublet_triplet_shape_transition_totals = (
+            [0, 0, 0] if doublet_triplet_markov_enabled else []
+        )
+        self.doublet_triplet_recent_groups: deque[
+            tuple[frozenset[int], frozenset[int]]
+        ] = deque(maxlen=_DOUBLET_TRIPLET_MARKOV_RECENT_WINDOW)
         self.previous_draw: set[int] = set()
         self.previous_previous_draw: set[int] = set()
         self.current_month = 0
@@ -386,6 +516,9 @@ class _StrategyState:
         self.markov_hits = [0.0] * (_MAX_GAP_BUCKET + 1)
         self.bayesian_opportunities = [0] * (_MAX_GAP_BUCKET + 1)
         self.bayesian_hits = [0] * (_MAX_GAP_BUCKET + 1)
+        self.bayesian_recent_opportunities = [0.0] * (_MAX_GAP_BUCKET + 1)
+        self.bayesian_recent_hits = [0.0] * (_MAX_GAP_BUCKET + 1)
+        self.bayesian_recent_number_hits = [0.0] * (_NUMBER_COUNT + 1)
         self.mkfr_histories: list[deque[int]] = (
             [deque(maxlen=_MKFR_MAX_ORDER) for _ in range(_NUMBER_COUNT + 1)]
             if "mkfr" in self.enabled_strategy_ids
@@ -396,6 +529,32 @@ class _StrategyState:
             if "mkfr" in self.enabled_strategy_ids
             else []
         )
+        self.mksp_histories: list[deque[int]] = (
+            [deque(maxlen=_MKSP_MAX_ORDER) for _ in range(_NUMBERS_PER_DRAW)]
+            if "mksp" in self.enabled_strategy_ids
+            else []
+        )
+        self.mksp_transitions: list[
+            list[dict[tuple[int, ...], dict[int, int]]]
+        ] = (
+            [
+                [{} for _ in range(_MKSP_MAX_ORDER)]
+                for _ in range(_NUMBERS_PER_DRAW)
+            ]
+            if "mksp" in self.enabled_strategy_ids
+            else []
+        )
+        self.mksp_value_counts: list[list[int]] = (
+            [[0] * _MKSP_VALUE_COUNT for _ in range(_NUMBERS_PER_DRAW)]
+            if "mksp" in self.enabled_strategy_ids
+            else []
+        )
+        self.mksp_anchor_counts: list[int] = (
+            [0] * _MKSP_VALUE_COUNT
+            if "mksp" in self.enabled_strategy_ids
+            else []
+        )
+        self.mksp_observations: list[tuple[tuple[int, ...], int]] = []
         self.svc_weights = [0.0] * 11
         self.tbl_weights = [0.0] * 14
         self.cis_weights = [0.0] * (22 + len(_CIS_EXPERTS) * 4)
@@ -407,12 +566,28 @@ class _StrategyState:
             strategy_id: 0 for strategy_id, _label, _weight in _CIS_EXPERTS
         }
         self.cis_recent_hits = {
-            strategy_id: deque(maxlen=100)
+            strategy_id: deque(maxlen=_CIS_RECENT_WINDOW)
             for strategy_id, _label, _weight in _CIS_EXPERTS
         }
+        self.cis_recent_ensemble_hits: deque[int] = deque(
+            maxlen=_CIS_RECENT_WINDOW
+        )
+        self.cis_recent_learner_hits: deque[int] = deque(
+            maxlen=_CIS_RECENT_WINDOW
+        )
         self.cis_prior_rankings: dict[str, list[int]] = {}
         self.cis_pending_rankings: dict[str, list[int]] = {}
         self.cis_pending_features: dict[int, tuple[float, ...]] = {}
+        self.cis_pending_ensemble_scores: dict[int, float] = {}
+        self.cis_pending_learner_scores: dict[int, float] = {}
+        self.chain_evaluated_draws = 0
+        self.chain_total_hits = {
+            strategy_id: 0 for strategy_id in _CHAIN_EXPERT_IDS
+        }
+        self.chain_recent_hits = {
+            strategy_id: deque(maxlen=40) for strategy_id in _CHAIN_EXPERT_IDS
+        }
+        self.chain_pending_rankings: dict[str, list[int]] = {}
         self.prior_rankings = {
             "freshness": list(range(1, _NUMBER_COUNT + 1)),
             "proximity": list(range(1, _NUMBER_COUNT + 1)),
@@ -529,7 +704,11 @@ class _StrategyState:
         window_size: int,
     ) -> float:
         recent = list(self.cis_recent_hits[strategy_id])[-window_size:]
-        return _average(recent) / _NUMBERS_PER_DRAW if recent else 0.0
+        smoothed_hits = (
+            sum(recent)
+            + _CIS_EXPERT_PRIOR_DRAWS * _EXPECTED_RANDOM_HITS_PER_DRAW
+        ) / (len(recent) + _CIS_EXPERT_PRIOR_DRAWS)
+        return smoothed_hits / _NUMBERS_PER_DRAW
 
     def _cis_expert_weight(
         self,
@@ -537,16 +716,41 @@ class _StrategyState:
         base_weight: float,
     ) -> float:
         evaluated = self.cis_evaluated_draws[strategy_id]
-        long_term = (
-            _BASE_PROBABILITY
-            if evaluated == 0
-            else self.cis_total_hits[strategy_id] / (evaluated * _NUMBERS_PER_DRAW)
+        long_term_hits = (
+            self.cis_total_hits[strategy_id]
+            + _CIS_EXPERT_PRIOR_DRAWS * _EXPECTED_RANDOM_HITS_PER_DRAW
+        ) / (evaluated + _CIS_EXPERT_PRIOR_DRAWS)
+        recent = list(self.cis_recent_hits[strategy_id])
+        recent_hits = (
+            sum(recent)
+            + _CIS_EXPERT_PRIOR_DRAWS * _EXPECTED_RANDOM_HITS_PER_DRAW
+        ) / (len(recent) + _CIS_EXPERT_PRIOR_DRAWS)
+        confidence = evaluated / (evaluated + _CIS_EXPERT_PRIOR_DRAWS)
+        excess_hits = confidence * (
+            0.70 * (recent_hits - _EXPECTED_RANDOM_HITS_PER_DRAW)
+            + 0.30 * (long_term_hits - _EXPECTED_RANDOM_HITS_PER_DRAW)
         )
-        return base_weight * (
-            0.45
-            + self._cis_expert_accuracy(strategy_id, 20) * 1.4
-            + self._cis_expert_accuracy(strategy_id, 50) * 0.8
-            + long_term * 0.9
+        return base_weight * math.exp(
+            _clamp(excess_hits * 3.0, -1.5, 1.5)
+        )
+
+    def _cis_learner_blend(self) -> float:
+        evaluated = min(
+            len(self.cis_recent_ensemble_hits),
+            len(self.cis_recent_learner_hits),
+        )
+        if self.cis_draw_count < _CIS_MINIMUM_TRAINING_DRAWS or evaluated == 0:
+            return 0.0
+        advantage = (
+            sum(self.cis_recent_learner_hits)
+            - sum(self.cis_recent_ensemble_hits)
+        ) / (evaluated + _CIS_LEARNER_EVIDENCE_DRAWS)
+        confidence = evaluated / (evaluated + _CIS_LEARNER_EVIDENCE_DRAWS)
+        return min(
+            _CIS_LEARNER_MAX_BLEND,
+            max(0.0, advantage - _CIS_LEARNER_MIN_ADVANTAGE)
+            * 0.5
+            * confidence,
         )
 
     def _cis_previous_draw_features(self) -> tuple[float, float, float]:
@@ -637,7 +841,7 @@ class _StrategyState:
             recommendation_entropy if math.isfinite(recommendation_entropy) else 0.0,
             weighted_agreement,
             weighted_agreement * (1 - min(disagreement * 2, 1)),
-            self.draw_count / self.total_draw_count,
+            min(self.draw_count / 500, 1),
             (month - 1) / 11 if month else 0.0,
             season,
             previous_entropy,
@@ -684,17 +888,55 @@ class _StrategyState:
         )
 
     def _train_cis(self, drawn: set[int]) -> None:
-        learning_rate = 0.08 / math.sqrt(self.cis_draw_count + 1)
-        positive_weight = (_NUMBER_COUNT - _NUMBERS_PER_DRAW) / _NUMBERS_PER_DRAW
-        for number, features in self.cis_pending_features.items():
-            target = float(number in drawn)
-            predicted = self._cis_probability(features)
-            error = (target - predicted) * (positive_weight if target else 1)
-            for index, feature in enumerate(features):
-                self.cis_weights[index] = (
-                    self.cis_weights[index] * (1 - learning_rate * 0.0006)
-                    + learning_rate * error * feature
+        if self.cis_pending_ensemble_scores and self.cis_pending_learner_scores:
+            ensemble_top = set(
+                nlargest(
+                    _NUMBERS_PER_DRAW,
+                    self.cis_pending_ensemble_scores,
+                    key=self.cis_pending_ensemble_scores.__getitem__,
                 )
+            )
+            learner_top = set(
+                nlargest(
+                    _NUMBERS_PER_DRAW,
+                    self.cis_pending_learner_scores,
+                    key=self.cis_pending_learner_scores.__getitem__,
+                )
+            )
+            self.cis_recent_ensemble_hits.append(len(drawn & ensemble_top))
+            self.cis_recent_learner_hits.append(len(drawn & learner_top))
+
+        learning_rate = 0.018 / math.sqrt(1 + self.cis_draw_count / 250)
+        decay = 1 - learning_rate * 0.0008
+        self.cis_weights = [weight * decay for weight in self.cis_weights]
+        positives = [
+            number for number in drawn if number in self.cis_pending_features
+        ]
+        hard_negatives = nlargest(
+            12,
+            (
+                number
+                for number in self.cis_pending_features
+                if number not in drawn
+            ),
+            key=lambda number: self.cis_pending_learner_scores.get(number, 0.0),
+        )
+        pair_count = max(len(positives) * len(hard_negatives), 1)
+        pair_rate = learning_rate / pair_count
+        for positive in positives:
+            positive_features = self.cis_pending_features[positive]
+            for negative in hard_negatives:
+                negative_features = self.cis_pending_features[negative]
+                differences = tuple(
+                    positive_feature - negative_feature
+                    for positive_feature, negative_feature in zip(
+                        positive_features,
+                        negative_features,
+                    )
+                )
+                gradient = _sigmoid(-self._dot(self.cis_weights, differences))
+                for index, difference in enumerate(differences):
+                    self.cis_weights[index] += pair_rate * gradient * difference
 
         for strategy_id, ranking in self.cis_pending_rankings.items():
             hits = len(drawn.intersection(ranking[:_NUMBERS_PER_DRAW]))
@@ -704,12 +946,89 @@ class _StrategyState:
             self.cis_prior_rankings[strategy_id] = list(ranking)
         self.cis_draw_count += 1
 
+    def _train_chained_effectiveness(self, drawn: set[int]) -> None:
+        if not self.chain_pending_rankings:
+            return
+        for strategy_id, ranking in self.chain_pending_rankings.items():
+            hits = len(drawn.intersection(ranking[:_NUMBERS_PER_DRAW]))
+            self.chain_total_hits[strategy_id] += hits
+            self.chain_recent_hits[strategy_id].append(hits)
+        self.chain_evaluated_draws += 1
+
+    def _chain_expert_weight(self, strategy_id: str) -> float:
+        evaluated = self.chain_evaluated_draws
+        long_term_hits = self.chain_total_hits[strategy_id]
+        smoothed_hits = (
+            long_term_hits
+            + _CHAIN_EFFECTIVENESS_PRIOR_DRAWS
+            * _EXPECTED_RANDOM_HITS_PER_DRAW
+        ) / (evaluated + _CHAIN_EFFECTIVENESS_PRIOR_DRAWS)
+        recent = self.chain_recent_hits[strategy_id]
+        recent_hits = _average(recent) if recent else _EXPECTED_RANDOM_HITS_PER_DRAW
+        evidence = min(evaluated / _CHAIN_EFFECTIVENESS_PRIOR_DRAWS, 1)
+        blended_hits = (
+            smoothed_hits * (1 - 0.25 * evidence)
+            + recent_hits * 0.25 * evidence
+        )
+        return _clamp(
+            blended_hits / _EXPECTED_RANDOM_HITS_PER_DRAW,
+            _CHAIN_EFFECTIVENESS_MINIMUM,
+            _CHAIN_EFFECTIVENESS_MAXIMUM,
+        )
+
+    @staticmethod
+    def _consecutive_group_starts(
+        numbers: Collection[int],
+        size: int,
+    ) -> frozenset[int]:
+        drawn = set(numbers)
+        return frozenset(
+            start
+            for start in range(1, _NUMBER_COUNT - size + 2)
+            if all(start + offset in drawn for offset in range(size))
+        )
+
+    @classmethod
+    def _doublet_triplet_shape_state(
+        cls,
+        numbers: Collection[int],
+    ) -> int:
+        if cls._consecutive_group_starts(numbers, 3):
+            return 2
+        if cls._consecutive_group_starts(numbers, 2):
+            return 1
+        return 0
+
     @staticmethod
     def _dot(weights: Sequence[float], features: Sequence[float]) -> float:
         return sum(weight * feature for weight, feature in zip(weights, features))
 
     def train(self, drawn: set[int]) -> None:
         """Learn the current draw using only the state available before it."""
+        if (
+            "doublet_triplet_markov" in self.enabled_strategy_ids
+            and self.previous_draw
+        ):
+            doublet_starts = self._consecutive_group_starts(drawn, 2)
+            triplet_starts = self._consecutive_group_starts(drawn, 3)
+            previous_state = self._doublet_triplet_shape_state(
+                self.previous_draw
+            )
+            current_state = self._doublet_triplet_shape_state(drawn)
+            self.doublet_triplet_shape_transitions[previous_state][
+                current_state
+            ] += 1
+            self.doublet_triplet_shape_transition_totals[previous_state] += 1
+            for previous_number in self.previous_draw:
+                self.doublet_triplet_transition_totals[previous_number] += 1
+                for start in doublet_starts:
+                    self.doublet_markov_transitions[previous_number][start] += 1
+                for start in triplet_starts:
+                    self.triplet_markov_transitions[previous_number][start] += 1
+
+        if "chained" in self.enabled_strategy_ids:
+            self._train_chained_effectiveness(drawn)
+
         if "cis" in self.enabled_strategy_ids:
             self._train_cis(drawn)
 
@@ -729,9 +1048,30 @@ class _StrategyState:
                     )
                     counts[target] += 1
 
+        if "mksp" in self.enabled_strategy_ids:
+            for position, target in enumerate(_spaces_for_numbers(drawn)):
+                history_values = tuple(self.mksp_histories[position])
+                for order in range(
+                    1,
+                    min(len(history_values), _MKSP_MAX_ORDER) + 1,
+                ):
+                    context = history_values[-order:]
+                    counts = self.mksp_transitions[position][
+                        order - 1
+                    ].setdefault(context, {})
+                    counts[target] = counts.get(target, 0) + 1
+
         gap_models_enabled = bool(
             self.enabled_strategy_ids.intersection({"markov100", "bayesian"})
         )
+        if self.draw_count > 0 and "bayesian" in self.enabled_strategy_ids:
+            for bucket in range(_MAX_GAP_BUCKET + 1):
+                self.bayesian_recent_opportunities[bucket] *= _BAYESIAN_GAP_DECAY
+                self.bayesian_recent_hits[bucket] *= _BAYESIAN_GAP_DECAY
+            for number in range(1, _NUMBER_COUNT + 1):
+                self.bayesian_recent_number_hits[
+                    number
+                ] *= _BAYESIAN_NUMBER_DECAY
         if self.draw_count > 0 and gap_models_enabled:
             for bucket in range(_MAX_GAP_BUCKET + 1):
                 if "markov100" in self.enabled_strategy_ids:
@@ -743,11 +1083,16 @@ class _StrategyState:
                     self.markov_opportunities[bucket] += 1
                 if "bayesian" in self.enabled_strategy_ids:
                     self.bayesian_opportunities[bucket] += 1
+                    self.bayesian_recent_opportunities[bucket] += 1
                 if number in drawn:
                     if "markov100" in self.enabled_strategy_ids:
                         self.markov_hits[bucket] += 1
                     if "bayesian" in self.enabled_strategy_ids:
                         self.bayesian_hits[bucket] += 1
+                        self.bayesian_recent_hits[bucket] += 1
+        if "bayesian" in self.enabled_strategy_ids:
+            for number in drawn:
+                self.bayesian_recent_number_hits[number] += 1
 
         positive_weight = (_NUMBER_COUNT - _NUMBERS_PER_DRAW) / _NUMBERS_PER_DRAW
         if "svc" in self.enabled_strategy_ids:
@@ -803,13 +1148,29 @@ class _StrategyState:
                 if entropy_percent >= 92:
                     self.high_entropy_hits[number] += 1
 
-        grid_or_tbl_enabled = bool(
-            self.enabled_strategy_ids.intersection({"predictive_grid", "tbl"})
+        pair_history_enabled = bool(
+            self.enabled_strategy_ids.intersection(
+                {"co_occurrence", "predictive_grid", "tbl"}
+            )
         )
-        if grid_or_tbl_enabled:
+        if pair_history_enabled:
             for left, right in combinations(ordered, 2):
                 key = (left, right)
                 self.pair_counts[key] = self.pair_counts.get(key, 0) + 1
+
+        if "doublet_triplet_markov" in self.enabled_strategy_ids:
+            doublet_starts = self._consecutive_group_starts(drawn, 2)
+            triplet_starts = self._consecutive_group_starts(drawn, 3)
+            for start in doublet_starts:
+                self.doublet_markov_counts[start] += 1
+            for start in triplet_starts:
+                self.triplet_markov_counts[start] += 1
+            self.doublet_triplet_shape_counts[
+                self._doublet_triplet_shape_state(drawn)
+            ] += 1
+            self.doublet_triplet_recent_groups.append(
+                (doublet_starts, triplet_starts)
+            )
 
         if "predictive_grid" in self.enabled_strategy_ids and self.previous_draw:
             for previous in self.previous_draw:
@@ -817,17 +1178,36 @@ class _StrategyState:
                     self.transition_counts[previous][current] += 1
                 self.transition_totals[previous] += len(drawn)
 
-        if self.enabled_strategy_ids.intersection({"cis", "predictive_grid", "tbl"}):
+        if self.enabled_strategy_ids.intersection(
+            {
+                "cis",
+                "co_occurrence",
+                "doublet_triplet_markov",
+                "mksp",
+                "predictive_grid",
+                "tbl",
+            }
+        ):
             self.previous_previous_draw = self.previous_draw
             self.previous_draw = set(drawn)
         self.current_month = int(draw_date[5:7]) if draw_date else 0
-        if self.enabled_strategy_ids.intersection({"predictive_grid", "svc", "tbl"}):
+        if self.enabled_strategy_ids.intersection(
+            {"co_occurrence", "predictive_grid", "svc", "tbl"}
+        ):
             self.recent_draws.append(drawn)
         if "emd" in self.enabled_strategy_ids:
             self.draw_vectors.append(tuple(sorted(drawn)))
         if "mkfr" in self.enabled_strategy_ids:
             for number in range(1, _NUMBER_COUNT + 1):
                 self.mkfr_histories[number].append(int(number in drawn))
+        if "mksp" in self.enabled_strategy_ids:
+            spaces = _spaces_for_numbers(drawn)
+            for position, space in enumerate(spaces):
+                self.mksp_histories[position].append(space)
+                self.mksp_value_counts[position][space] += 1
+            anchor = min(drawn) - 1
+            self.mksp_anchor_counts[anchor] += 1
+            self.mksp_observations.append((spaces, anchor))
         self.draw_count += 1
 
     @staticmethod
@@ -981,28 +1361,91 @@ class _StrategyState:
         *,
         weighted: bool,
     ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
-        opportunities = (
-            self.markov_opportunities if weighted else self.bayesian_opportunities
-        )
-        hits = self.markov_hits if weighted else self.bayesian_hits
-        probabilities = [
-            (hit + _MARKOV_PRIOR_STRENGTH * _BASE_PROBABILITY)
-            / (opportunity + _MARKOV_PRIOR_STRENGTH)
-            for hit, opportunity in zip(hits, opportunities)
-        ]
-        raw = {
-            number: probabilities[min(gaps[number], _MAX_GAP_BUCKET)]
-            for number in range(1, _NUMBER_COUNT + 1)
-        }
-        scaled = _scale_scores(raw)
-        details: dict[int, tuple[str, ...]] = {
-            number: (
-                f"Gap bucket {min(gaps[number], _MAX_GAP_BUCKET)}",
-                f"Posterior probability {raw[number]:.2%}",
+        if weighted:
+            probabilities = [
+                (hit + _MARKOV_PRIOR_STRENGTH * _BASE_PROBABILITY)
+                / (opportunity + _MARKOV_PRIOR_STRENGTH)
+                for hit, opportunity in zip(
+                    self.markov_hits,
+                    self.markov_opportunities,
+                )
+            ]
+            raw = {
+                number: probabilities[min(gaps[number], _MAX_GAP_BUCKET)]
+                for number in range(1, _NUMBER_COUNT + 1)
+            }
+            details: dict[int, tuple[str, ...]] = {
+                number: (
+                    f"Gap bucket {min(gaps[number], _MAX_GAP_BUCKET)}",
+                    f"Posterior probability {raw[number]:.2%}",
+                )
+                for number in raw
+            }
+            return _scale_scores(raw), details
+
+        lifetime_gap_probabilities = [
+            (hit + _BAYESIAN_GAP_PRIOR_STRENGTH * _BASE_PROBABILITY)
+            / (opportunity + _BAYESIAN_GAP_PRIOR_STRENGTH)
+            for hit, opportunity in zip(
+                self.bayesian_hits,
+                self.bayesian_opportunities,
             )
-            for number in raw
-        }
-        return scaled, details
+        ]
+        recent_gap_probabilities = [
+            (hit + _BAYESIAN_GAP_PRIOR_STRENGTH * _BASE_PROBABILITY)
+            / (opportunity + _BAYESIAN_GAP_PRIOR_STRENGTH)
+            for hit, opportunity in zip(
+                self.bayesian_recent_hits,
+                self.bayesian_recent_opportunities,
+            )
+        ]
+        effective_recent_draws = (
+            sum(self.bayesian_recent_number_hits) / _NUMBERS_PER_DRAW
+        )
+        recent_number_probabilities = [
+            (
+                self.bayesian_recent_number_hits[number]
+                + _BAYESIAN_NUMBER_PRIOR_STRENGTH * _BASE_PROBABILITY
+            )
+            / (effective_recent_draws + _BAYESIAN_NUMBER_PRIOR_STRENGTH)
+            for number in range(_NUMBER_COUNT + 1)
+        ]
+        raw: dict[int, float] = {}
+        details = {}
+        for number in range(1, _NUMBER_COUNT + 1):
+            bucket = min(gaps[number], _MAX_GAP_BUCKET)
+            lifetime_gap = lifetime_gap_probabilities[bucket]
+            recent_gap = recent_gap_probabilities[bucket]
+            recent_number = recent_number_probabilities[number]
+            raw[number] = (
+                _BAYESIAN_LIFETIME_GAP_WEIGHT * lifetime_gap
+                + _BAYESIAN_RECENT_GAP_WEIGHT * recent_gap
+                + _BAYESIAN_RECENT_NUMBER_WEIGHT * recent_number
+            )
+            details[number] = (
+                f"Model-averaged probability {raw[number]:.2%}",
+                f"Gap bucket {bucket}",
+                (
+                    f"Lifetime gap {lifetime_gap:.2%} "
+                    f"({_BAYESIAN_LIFETIME_GAP_WEIGHT:.0%} weight)"
+                ),
+                (
+                    f"Recent gap {recent_gap:.2%} "
+                    f"({_BAYESIAN_RECENT_GAP_WEIGHT:.0%} weight, "
+                    f"{_BAYESIAN_GAP_RECENCY_HALF_LIFE}-draw half-life)"
+                ),
+                (
+                    f"Recent number {recent_number:.2%} "
+                    f"({_BAYESIAN_RECENT_NUMBER_WEIGHT:.0%} weight, "
+                    f"{_BAYESIAN_NUMBER_RECENCY_HALF_LIFE}-draw half-life)"
+                ),
+                (
+                    f"Hierarchical prior strengths "
+                    f"{_BAYESIAN_GAP_PRIOR_STRENGTH:.0f} gap / "
+                    f"{_BAYESIAN_NUMBER_PRIOR_STRENGTH:.0f} number"
+                ),
+            )
+        return _scale_scores(raw), details
 
     def _mkfr_baseline_probability(self, number: int) -> float:
         return (self.appearances[number] + _MKFR_PRIOR_STRENGTH * _BASE_PROBABILITY) / (
@@ -1053,6 +1496,303 @@ class _StrategyState:
             )
         return _scale_scores(raw), details
 
+    def _mksp_baseline_probability(self, position: int, value: int) -> float:
+        return (
+            self.mksp_value_counts[position][value]
+            + _MKSP_PRIOR_STRENGTH / _MKSP_VALUE_COUNT
+        ) / (self.draw_count + _MKSP_PRIOR_STRENGTH)
+
+    def _mksp_probability(
+        self,
+        position: int,
+        value: int,
+    ) -> tuple[float, int, int]:
+        history_values = tuple(self.mksp_histories[position])
+        active_orders = min(len(history_values), _MKSP_MAX_ORDER)
+        probability = self._mksp_baseline_probability(position, value)
+        selected_support = 0
+        selected_order = 0
+        for order in range(1, active_orders + 1):
+            context = history_values[-order:]
+            counts = self.mksp_transitions[position][order - 1].get(
+                context,
+                {},
+            )
+            opportunities = sum(counts.values())
+            if opportunities < _MKSP_MIN_CONTEXT_SUPPORT:
+                continue
+            probability = (
+                counts.get(value, 0) + _MKSP_PRIOR_STRENGTH * probability
+            ) / (opportunities + _MKSP_PRIOR_STRENGTH)
+            selected_support = opportunities
+            selected_order = order
+        return probability, selected_support, selected_order
+
+    def _mksp_analogue_weights(
+        self,
+    ) -> list[tuple[tuple[int, ...], int, float]]:
+        observation_count = len(self.mksp_observations)
+        if observation_count < 2:
+            return []
+
+        weighted_analogues = []
+        first_target = max(1, observation_count - _MKSP_ANALOGUE_LIMIT)
+        maximum_space_distance = (
+            _NUMBERS_PER_DRAW * (_MKSP_VALUE_COUNT - 1)
+        )
+        for target_index in range(first_target, observation_count):
+            order = min(_MKSP_MAX_ORDER, target_index)
+            weighted_distance = 0.0
+            context_weight = 0.0
+            for lag in range(1, order + 1):
+                lag_weight = _MKSP_CONTEXT_DECAY ** (lag - 1)
+                current_spaces = self.mksp_observations[-lag][0]
+                historical_spaces = self.mksp_observations[target_index - lag][0]
+                lag_distance = sum(
+                    abs(current - historical)
+                    for current, historical in zip(
+                        current_spaces,
+                        historical_spaces,
+                    )
+                ) / maximum_space_distance
+                weighted_distance += lag_weight * lag_distance
+                context_weight += lag_weight
+
+            normalized_distance = weighted_distance / context_weight
+            similarity = math.exp(
+                -_MKSP_SIMILARITY_SHARPNESS * normalized_distance
+            )
+            age = observation_count - target_index
+            recency = 0.5 ** (age / _MKSP_RECENCY_HALF_LIFE)
+            length_confidence = 0.35 + 0.65 * order / _MKSP_MAX_ORDER
+            spaces, anchor = self.mksp_observations[target_index]
+            weighted_analogues.append(
+                (spaces, anchor, similarity * recency * length_confidence)
+            )
+        return weighted_analogues
+
+    @staticmethod
+    def _mksp_normalize(values: Sequence[float]) -> tuple[float, ...]:
+        total = sum(values)
+        if total <= 0:
+            return tuple(1 / len(values) for _value in values)
+        return tuple(value / total for value in values)
+
+    def _mksp_distributions(
+        self,
+    ) -> tuple[
+        tuple[tuple[float, ...], ...],
+        tuple[float, ...],
+        float,
+        int,
+        tuple[int, ...],
+        tuple[int, ...],
+    ]:
+        analogues = self._mksp_analogue_weights()
+        analogue_weight = sum(weight for _spaces, _anchor, weight in analogues)
+        squared_weight = sum(
+            weight * weight for _spaces, _anchor, weight in analogues
+        )
+        effective_support = (
+            analogue_weight * analogue_weight / squared_weight
+            if squared_weight > 0
+            else 0.0
+        )
+
+        weighted_space_counts = [
+            [0.0] * _MKSP_VALUE_COUNT for _position in range(_NUMBERS_PER_DRAW)
+        ]
+        weighted_anchor_counts = [0.0] * _MKSP_VALUE_COUNT
+        for spaces, anchor, weight in analogues:
+            for position, value in enumerate(spaces):
+                weighted_space_counts[position][value] += weight
+            weighted_anchor_counts[anchor] += weight
+
+        space_distributions = []
+        selected_orders = []
+        selected_supports = []
+        for position in range(_NUMBERS_PER_DRAW):
+            baseline = self._mksp_normalize(
+                tuple(
+                    self._mksp_baseline_probability(position, value)
+                    for value in range(_MKSP_VALUE_COUNT)
+                )
+            )
+            analogue_distribution = self._mksp_normalize(
+                tuple(
+                    weighted_space_counts[position][value]
+                    + _MKSP_ANALOGUE_PRIOR_STRENGTH * baseline[value]
+                    for value in range(_MKSP_VALUE_COUNT)
+                )
+            )
+            exact_distribution = self._mksp_normalize(
+                tuple(
+                    self._mksp_probability(position, value)[0]
+                    for value in range(_MKSP_VALUE_COUNT)
+                )
+            )
+            distribution = self._mksp_normalize(
+                tuple(
+                    _MKSP_ANALOGUE_BLEND * analogue_distribution[value]
+                    + (1 - _MKSP_ANALOGUE_BLEND) * exact_distribution[value]
+                    for value in range(_MKSP_VALUE_COUNT)
+                )
+            )
+            selected_value = max(
+                range(_MKSP_VALUE_COUNT),
+                key=distribution.__getitem__,
+            )
+            _probability, support, order = self._mksp_probability(
+                position,
+                selected_value,
+            )
+            space_distributions.append(distribution)
+            selected_orders.append(order)
+            selected_supports.append(support)
+
+        anchor_total = sum(self.mksp_anchor_counts)
+        anchor_baseline = tuple(
+            (
+                self.mksp_anchor_counts[value]
+                + _MKSP_ANALOGUE_PRIOR_STRENGTH / _MKSP_VALUE_COUNT
+            )
+            / (anchor_total + _MKSP_ANALOGUE_PRIOR_STRENGTH)
+            for value in range(_MKSP_VALUE_COUNT)
+        )
+        anchor_distribution = self._mksp_normalize(
+            tuple(
+                weighted_anchor_counts[value]
+                + _MKSP_ANALOGUE_PRIOR_STRENGTH * anchor_baseline[value]
+                for value in range(_MKSP_VALUE_COUNT)
+            )
+        )
+        return (
+            tuple(space_distributions),
+            anchor_distribution,
+            effective_support,
+            len(analogues),
+            tuple(selected_orders),
+            tuple(selected_supports),
+        )
+
+    @staticmethod
+    def _mksp_internal_beam(
+        distributions: Sequence[Sequence[float]],
+    ) -> dict[int, list[tuple[float, tuple[int, ...]]]]:
+        states: dict[int, list[tuple[float, tuple[int, ...]]]] = {
+            0: [(0.0, ())]
+        }
+        for position in range(1, _NUMBERS_PER_DRAW):
+            candidates: dict[int, list[tuple[float, tuple[int, ...]]]] = {}
+            for total, paths in states.items():
+                for log_probability, prefix in paths:
+                    for value, probability in enumerate(distributions[position]):
+                        next_total = total + value
+                        if next_total > _MKSP_VALUE_COUNT - 1:
+                            break
+                        candidates.setdefault(next_total, []).append(
+                            (
+                                log_probability + math.log(probability),
+                                (*prefix, value),
+                            )
+                        )
+            states = {
+                total: nlargest(
+                    _MKSP_BEAM_WIDTH,
+                    paths,
+                    key=lambda path: (path[0], path[1]),
+                )
+                for total, paths in candidates.items()
+            }
+        return states
+
+    def _mksp_scores(
+        self,
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        (
+            distributions,
+            anchor_distribution,
+            effective_support,
+            analogue_count,
+            selected_orders,
+            selected_supports,
+        ) = self._mksp_distributions()
+        internal_beam = self._mksp_internal_beam(distributions)
+        generated: list[tuple[float, tuple[int, ...], tuple[int, ...]]] = []
+        for internal_total, paths in internal_beam.items():
+            outer_space = (_MKSP_VALUE_COUNT - 1) - internal_total
+            outer_probability = distributions[0][outer_space]
+            for internal_log_probability, internal_spaces in paths:
+                spaces = (outer_space, *internal_spaces)
+                for anchor in range(outer_space + 1):
+                    first_number = anchor + 1
+                    numbers = [first_number]
+                    for space in internal_spaces:
+                        numbers.append(numbers[-1] + space + 1)
+                    generated.append(
+                        (
+                            math.log(outer_probability)
+                            + internal_log_probability
+                            + math.log(anchor_distribution[anchor]),
+                            tuple(numbers),
+                            spaces,
+                        )
+                    )
+
+        maximum_log_probability = max(
+            log_probability for log_probability, _numbers, _spaces in generated
+        )
+        weighted_generated = [
+            (
+                math.exp(log_probability - maximum_log_probability),
+                numbers,
+                spaces,
+            )
+            for log_probability, numbers, spaces in generated
+        ]
+        total_weight = sum(
+            weight for weight, _numbers, _spaces in weighted_generated
+        )
+        marginals = {
+            number: 0.0 for number in range(1, _NUMBER_COUNT + 1)
+        }
+        best_contribution: dict[
+            int,
+            tuple[float, tuple[int, ...], tuple[int, ...]],
+        ] = {}
+        for weight, numbers, spaces in weighted_generated:
+            for number in numbers:
+                marginals[number] += weight
+                previous_best = best_contribution.get(number)
+                if previous_best is None or weight > previous_best[0]:
+                    best_contribution[number] = (weight, numbers, spaces)
+
+        details: dict[int, tuple[str, ...]] = {}
+        for number in range(1, _NUMBER_COUNT + 1):
+            marginal = marginals[number] / total_weight
+            _weight, best_draw, best_spaces = best_contribution[number]
+            details[number] = (
+                f"Marginal probability {marginal:.2%}",
+                f"Random baseline {_BASE_PROBABILITY:.2%}",
+                f"Best generated draw {','.join(str(value) for value in best_draw)}",
+                (
+                    "Best six-space state "
+                    f"{','.join(str(value) for value in best_spaces)} "
+                    f"(sum {sum(best_spaces)})"
+                ),
+                (
+                    f"Analogue support {effective_support:.1f} effective "
+                    f"/ {analogue_count} candidates"
+                ),
+                (
+                    f"Exact orders /{_MKSP_MAX_ORDER}: "
+                    f"{','.join(str(order) for order in selected_orders)}; "
+                    f"support {min(selected_supports)}–{max(selected_supports)}"
+                ),
+                f"Valid-draw beam width {_MKSP_BEAM_WIDTH}",
+            )
+        return _scale_scores(marginals), details
+
     @staticmethod
     def _combine_rankings(
         sources: Sequence[tuple[Sequence[int], float]],
@@ -1081,9 +1821,292 @@ class _StrategyState:
             )
         return scores, details
 
+    @staticmethod
+    def _residual_coverage_scores(
+        rankings: dict[str, list[int]],
+        gaps: dict[int, int],
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        """Rank numbers outside every base Top-6, preferring overdue candidates."""
+        source_count = max(len(rankings), 1)
+        maximum_gap = max(gaps.values(), default=1) or 1
+        scores: dict[int, float] = {}
+        details: dict[int, tuple[str, ...]] = {}
+        for number in range(1, _NUMBER_COUNT + 1):
+            ranks = [
+                ranking.index(number) + 1
+                for ranking in rankings.values()
+            ]
+            support = sum(rank <= _NUMBERS_PER_DRAW for rank in ranks)
+            mean_rank = _average(ranks) if ranks else float(_NUMBER_COUNT)
+            near_miss_strength = _average(
+                [_rank_strength(ranking, number) for ranking in rankings.values()]
+            )
+            if support == 0:
+                scores[number] = (
+                    0.55
+                    + 0.4498 * gaps[number] / maximum_gap
+                    + 0.0001 * near_miss_strength
+                )
+                coverage_label = "Outside every base Top-6"
+            else:
+                scores[number] = (
+                    0.43 * (1 - support / source_count)
+                    + 0.01 * gaps[number] / maximum_gap
+                )
+                coverage_label = "Already covered by the base portfolio"
+            details[number] = (
+                f"Base Top-6 support {support}/{source_count}",
+                coverage_label,
+                f"Current gap {gaps[number]}",
+                f"Average base rank {mean_rank:.1f}",
+            )
+        return scores, details
+
+    def _chain_conditional_score(
+        self,
+        selected: Sequence[int],
+        number: int,
+    ) -> tuple[float, float]:
+        if not selected:
+            return 0.5, 1.0
+        prior_strength = _CO_OCCURRENCE_PRIOR_STRENGTH
+        baseline = (
+            self.appearances[number] + prior_strength * _BASE_PROBABILITY
+        ) / (self.draw_count + prior_strength)
+        log_lifts: list[float] = []
+        for seed in selected:
+            pair_count = self.pair_counts.get(tuple(sorted((seed, number))), 0)
+            conditional = (
+                pair_count + prior_strength * baseline
+            ) / (self.appearances[seed] + prior_strength)
+            log_lifts.append(
+                math.log(max(conditional, 1e-12) / max(baseline, 1e-12))
+            )
+        average_log_lift = _average(log_lifts)
+        return _sigmoid(average_log_lift), math.exp(average_log_lift)
+
+    @staticmethod
+    def _chain_shape_score(
+        selected: Sequence[int],
+        number: int,
+    ) -> float:
+        proposed = tuple((*selected, number))
+        count = len(proposed)
+        if count <= 1:
+            return 0.5
+        ordered = sorted(proposed)
+        odd_count = sum(value % 2 for value in proposed)
+        parity_difference = abs(odd_count - (count - odd_count))
+        parity_score = 1 - max(parity_difference - count % 2, 0) / count
+        span = ordered[-1] - ordered[0]
+        expected_span = 48 * (count - 1) / (count + 1)
+        span_score = math.exp(-abs(span - expected_span) / max(expected_span, 1))
+        minimum_gap = min(
+            right - left for left, right in zip(ordered, ordered[1:])
+        )
+        spacing_score = min(minimum_gap / 5, 1)
+        decade_count = len({(value - 1) // 10 for value in proposed})
+        coverage_score = decade_count / min(count, 5)
+        entropy_score = (
+            _gap_entropy_percent(proposed) / 100
+            if count == _NUMBERS_PER_DRAW
+            else 0.5
+        )
+        return _clamp(
+            0.25 * parity_score
+            + 0.25 * span_score
+            + 0.20 * spacing_score
+            + 0.15 * coverage_score
+            + 0.15 * entropy_score,
+            0,
+            1,
+        )
+
+    def _chained_scores(
+        self,
+        rankings: dict[str, list[int]],
+        gaps: dict[int, int],
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        """Greedily chain consensus, relationships, shape, and residual coverage."""
+        expert_rankings = {
+            strategy_id: rankings[strategy_id]
+            for strategy_id in _CHAIN_EXPERT_IDS
+            if strategy_id in rankings
+        }
+        self.chain_pending_rankings = {
+            strategy_id: list(ranking)
+            for strategy_id, ranking in expert_rankings.items()
+        }
+        if not expert_rankings:
+            neutral = {number: 0.0 for number in range(1, _NUMBER_COUNT + 1)}
+            return neutral, {}
+
+        rank_maps = {
+            strategy_id: {
+                number: rank for rank, number in enumerate(ranking, start=1)
+            }
+            for strategy_id, ranking in expert_rankings.items()
+        }
+        weights = {
+            strategy_id: self._chain_expert_weight(strategy_id)
+            for strategy_id in expert_rankings
+        }
+        total_weight = sum(weights.values()) or 1.0
+        source_count = len(expert_rankings)
+        maximum_gap = max(gaps.values(), default=1) or 1
+
+        def components(
+            number: int,
+            selected: Sequence[int],
+        ) -> tuple[float, float, float, float, int, str, float]:
+            strengths = {
+                strategy_id: (
+                    _NUMBER_COUNT - rank_maps[strategy_id][number]
+                ) / (_NUMBER_COUNT - 1)
+                for strategy_id in expert_rankings
+            }
+            top_six_support = sum(
+                rank_maps[strategy_id][number] <= _NUMBERS_PER_DRAW
+                for strategy_id in expert_rankings
+            )
+            weighted_strength = sum(
+                strengths[strategy_id] * weights[strategy_id]
+                for strategy_id in expert_rankings
+            ) / total_weight
+            consensus = (
+                0.92 * weighted_strength
+                + 0.08 * top_six_support / source_count
+            )
+            conditional, relationship_lift = self._chain_conditional_score(
+                selected,
+                number,
+            )
+            shape = (
+                0.5
+                if len(selected) >= _NUMBERS_PER_DRAW
+                else self._chain_shape_score(selected, number)
+            )
+            residual = (
+                0.70 * (1 - top_six_support / source_count)
+                + 0.30 * gaps[number] / maximum_gap
+            )
+            strongest_expert = max(
+                expert_rankings,
+                key=lambda strategy_id: (
+                    strengths[strategy_id] * weights[strategy_id],
+                    strategy_id,
+                ),
+            )
+            return (
+                consensus,
+                conditional,
+                shape,
+                residual,
+                top_six_support,
+                strongest_expert,
+                relationship_lift,
+            )
+
+        stage_weights = (
+            (0.78, 0.07, 0.12, 0.03),
+            (0.62, 0.18, 0.15, 0.05),
+            (0.62, 0.18, 0.15, 0.05),
+            (0.58, 0.19, 0.15, 0.08),
+            (0.52, 0.20, 0.13, 0.15),
+            (0.44, 0.20, 0.12, 0.24),
+        )
+        ranking: list[int] = []
+        raw_scores: dict[int, float] = {}
+        component_rows: dict[
+            int,
+            tuple[float, float, float, float, int, str, float],
+        ] = {}
+        available = set(range(1, _NUMBER_COUNT + 1))
+        for step, weights_for_step in enumerate(stage_weights, start=1):
+            candidate_scores: dict[int, float] = {}
+            for number in available:
+                row = components(number, ranking)
+                candidate_scores[number] = sum(
+                    component * weight
+                    for component, weight in zip(row[:4], weights_for_step)
+                )
+            selected_number = max(
+                candidate_scores,
+                key=lambda candidate: (
+                    candidate_scores[candidate],
+                    gaps[candidate],
+                    -candidate,
+                ),
+            )
+            ranking.append(selected_number)
+            available.remove(selected_number)
+            raw_scores[selected_number] = candidate_scores[selected_number]
+            component_rows[selected_number] = components(
+                selected_number,
+                ranking[:-1],
+            )
+
+        reserve_scores: dict[int, float] = {}
+        for number in available:
+            row = components(number, ranking)
+            reserve_scores[number] = (
+                0.65 * row[0] + 0.20 * row[1] + 0.15 * row[3]
+            )
+            raw_scores[number] = reserve_scores[number]
+            component_rows[number] = row
+        ranking.extend(
+            sorted(
+                available,
+                key=lambda number: (
+                    -reserve_scores[number],
+                    -gaps[number],
+                    number,
+                ),
+            )
+        )
+
+        scores = {
+            number: (_NUMBER_COUNT - rank) / (_NUMBER_COUNT - 1)
+            for rank, number in enumerate(ranking, start=1)
+        }
+        details: dict[int, tuple[str, ...]] = {}
+        for rank, number in enumerate(ranking, start=1):
+            (
+                consensus,
+                conditional,
+                shape,
+                residual,
+                top_six_support,
+                strongest_expert,
+                relationship_lift,
+            ) = component_rows[number]
+            details[number] = (
+                (
+                    f"Chain pick {rank}/{_NUMBERS_PER_DRAW}"
+                    if rank <= _NUMBERS_PER_DRAW
+                    else f"Reserve rank {rank}"
+                ),
+                f"Effectiveness-weighted consensus {consensus:.1%}",
+                (
+                    f"Conditional relationship {conditional:.1%} "
+                    f"({relationship_lift:.2f}× lift)"
+                ),
+                f"Draw-shape fit {shape:.1%}",
+                f"Residual coverage {residual:.1%}",
+                f"Base Top-6 support {top_six_support}/{source_count}",
+                (
+                    f"Strongest expert {strongest_expert} "
+                    f"({weights[strongest_expert]:.2f}× weight)"
+                ),
+                f"Stage score {raw_scores[number]:.1%}",
+                f"Effectiveness history {self.chain_evaluated_draws} draws",
+            )
+        return scores, details
+
     def _predictive_grid_scores(
         self,
         gaps: dict[int, int],
+        earth_mover_scores: dict[int, float],
     ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
         gap_probabilities = [
             (hit + _MARKOV_PRIOR_STRENGTH * _BASE_PROBABILITY)
@@ -1110,7 +2133,10 @@ class _StrategyState:
                 for previous in self.previous_draw
             ]
             transition_raw[number] = _average(transition_values)
-            frequency_raw[number] = self.appearances[number] / max(self.draw_count, 1)
+            frequency_raw[number] = self.appearances[number] / max(
+                self.draw_count,
+                1,
+            )
             recent_raw[number] = float(self._recent_count(number, 20))
             gap_raw[number] = float(gaps[number])
             affinities = [
@@ -1133,18 +2159,23 @@ class _StrategyState:
             "gap": _scale_scores(gap_raw),
             "pair": _scale_scores(pair_raw),
         }
+        history_weight = 1 - _PREDICTIVE_GRID_EMD_WEIGHT
         scores = {
             number: (
-                0.35 * components["markov"][number]
-                + 0.20 * components["transition"][number]
-                + 0.15 * components["frequency"][number]
-                + 0.15 * components["recent"][number]
-                + 0.10 * components["gap"][number]
-                + 0.05 * components["pair"][number]
+                history_weight
+                * (
+                    0.35 * components["markov"][number]
+                    + 0.20 * components["transition"][number]
+                    + 0.15 * components["frequency"][number]
+                    + 0.15 * components["recent"][number]
+                    + 0.10 * components["gap"][number]
+                    + 0.05 * components["pair"][number]
+                )
+                + _PREDICTIVE_GRID_EMD_WEIGHT * earth_mover_scores[number]
             )
             for number in range(1, _NUMBER_COUNT + 1)
         }
-        details = {
+        details: dict[int, tuple[str, ...]] = {
             number: (
                 f"Gap-state Markov {components['markov'][number]:.1%}",
                 f"Last-draw transition {components['transition'][number]:.1%}",
@@ -1152,6 +2183,394 @@ class _StrategyState:
                 f"Recent-20 activity {components['recent'][number]:.1%}",
                 f"Current gap {components['gap'][number]:.1%}",
                 f"Pair affinity {components['pair'][number]:.1%}",
+                f"Earth-mover similarity {earth_mover_scores[number]:.1%}",
+            )
+            for number in range(1, _NUMBER_COUNT + 1)
+        }
+        return scores, details
+
+    def _doublet_triplet_markov_scores(
+        self,
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        """Rank numbers through consecutive-group recurrence and Markov transitions."""
+        prior_strength = _DOUBLET_TRIPLET_MARKOV_PRIOR_STRENGTH
+        recent_length = len(self.doublet_triplet_recent_groups)
+
+        def group_components(
+            size: int,
+            lifetime_counts: Sequence[int],
+            transitions: Sequence[Sequence[int]],
+            recent_index: int,
+        ) -> tuple[
+            dict[int, float],
+            dict[int, float],
+            dict[int, float],
+            dict[int, float],
+        ]:
+            starts = range(1, _NUMBER_COUNT - size + 2)
+            baseline_probability = (
+                math.comb(_NUMBER_COUNT - size, _NUMBERS_PER_DRAW - size)
+                / math.comb(_NUMBER_COUNT, _NUMBERS_PER_DRAW)
+            )
+            lifetime = {
+                start: (
+                    lifetime_counts[start]
+                    + prior_strength * baseline_probability
+                )
+                / (self.draw_count + prior_strength)
+                for start in starts
+            }
+            recent = {
+                start: (
+                    sum(
+                        start in groups[recent_index]
+                        for groups in self.doublet_triplet_recent_groups
+                    )
+                    + prior_strength * lifetime[start]
+                )
+                / (recent_length + prior_strength)
+                for start in starts
+            }
+            conditional: dict[int, float] = {}
+            for start in starts:
+                if self.previous_draw:
+                    conditional[start] = _average(
+                        [
+                            (
+                                transitions[previous][start]
+                                + prior_strength * lifetime[start]
+                            )
+                            / (
+                                self.doublet_triplet_transition_totals[previous]
+                                + prior_strength
+                            )
+                            for previous in self.previous_draw
+                        ]
+                    )
+                else:
+                    conditional[start] = lifetime[start]
+            lifetime_scaled = _scale_scores(lifetime)
+            recent_scaled = _scale_scores(recent)
+            conditional_scaled = _scale_scores(conditional)
+            combined = {
+                start: (
+                    0.30 * lifetime_scaled[start]
+                    + 0.22 * recent_scaled[start]
+                    + 0.48 * conditional_scaled[start]
+                )
+                for start in starts
+            }
+            return combined, lifetime, recent, conditional
+
+        (
+            doublet_scores,
+            doublet_lifetime,
+            doublet_recent,
+            doublet_conditional,
+        ) = group_components(
+            2,
+            self.doublet_markov_counts,
+            self.doublet_markov_transitions,
+            0,
+        )
+        (
+            triplet_scores,
+            triplet_lifetime,
+            triplet_recent,
+            triplet_conditional,
+        ) = group_components(
+            3,
+            self.triplet_markov_counts,
+            self.triplet_markov_transitions,
+            1,
+        )
+
+        previous_state = self._doublet_triplet_shape_state(self.previous_draw)
+        shape_total = sum(self.doublet_triplet_shape_counts)
+        shape_prior = [
+            (
+                self.doublet_triplet_shape_counts[state] / shape_total
+                if shape_total
+                else (0.65, 0.30, 0.05)[state]
+            )
+            for state in range(3)
+        ]
+        transition_total = (
+            self.doublet_triplet_shape_transition_totals[previous_state]
+            if self.previous_draw
+            else 0
+        )
+        next_shape_probabilities = [
+            (
+                self.doublet_triplet_shape_transitions[previous_state][state]
+                + prior_strength * shape_prior[state]
+            )
+            / (transition_total + prior_strength)
+            for state in range(3)
+        ]
+        next_doublet_probability = (
+            next_shape_probabilities[1] + next_shape_probabilities[2]
+        )
+        next_triplet_probability = next_shape_probabilities[2]
+        doublet_shape_weight = 0.55 + 0.45 * next_doublet_probability
+        triplet_shape_weight = 0.45 + 0.55 * next_triplet_probability
+
+        raw_scores: dict[int, float] = {}
+        details: dict[int, tuple[str, ...]] = {}
+        for number in range(1, _NUMBER_COUNT + 1):
+            containing_doublets = [
+                start
+                for start in doublet_scores
+                if start <= number < start + 2
+            ]
+            containing_triplets = [
+                start
+                for start in triplet_scores
+                if start <= number < start + 3
+            ]
+            strongest_doublet = max(
+                containing_doublets,
+                key=lambda start: (doublet_scores[start], -start),
+                default=0,
+            )
+            strongest_triplet = max(
+                containing_triplets,
+                key=lambda start: (triplet_scores[start], -start),
+                default=0,
+            )
+            doublet_support = (
+                0.70
+                * max(
+                    (doublet_scores[start] for start in containing_doublets),
+                    default=0.0,
+                )
+                + 0.30
+                * _average(
+                    [doublet_scores[start] for start in containing_doublets]
+                )
+            )
+            triplet_support = (
+                0.68
+                * max(
+                    (triplet_scores[start] for start in containing_triplets),
+                    default=0.0,
+                )
+                + 0.32
+                * _average(
+                    [triplet_scores[start] for start in containing_triplets]
+                )
+            )
+            raw_scores[number] = (
+                0.46 * doublet_shape_weight * doublet_support
+                + 0.54 * triplet_shape_weight * triplet_support
+            )
+            details[number] = (
+                (
+                    f"Strongest doublet {strongest_doublet}-"
+                    f"{strongest_doublet + 1}: "
+                    f"{doublet_scores[strongest_doublet]:.1%} group score, "
+                    f"{doublet_conditional[strongest_doublet]:.2%} Markov"
+                    if strongest_doublet
+                    else "No consecutive doublet support"
+                ),
+                (
+                    f"Strongest triplet {strongest_triplet}-"
+                    f"{strongest_triplet + 1}-"
+                    f"{strongest_triplet + 2}: "
+                    f"{triplet_scores[strongest_triplet]:.1%} group score, "
+                    f"{triplet_conditional[strongest_triplet]:.2%} Markov"
+                    if strongest_triplet
+                    else "No consecutive triplet support"
+                ),
+                (
+                    f"Next shape: doublet {next_doublet_probability:.1%}, "
+                    f"triplet {next_triplet_probability:.1%}"
+                ),
+                (
+                    f"Recent window {recent_length}; "
+                    f"conditioned on {len(self.previous_draw)} prior numbers"
+                ),
+                (
+                    f"Lifetime/recent best: "
+                    f"{doublet_lifetime.get(strongest_doublet, 0):.2%}/"
+                    f"{doublet_recent.get(strongest_doublet, 0):.2%} doublet, "
+                    f"{triplet_lifetime.get(strongest_triplet, 0):.2%}/"
+                    f"{triplet_recent.get(strongest_triplet, 0):.2%} triplet"
+                ),
+            )
+
+        candidate_groups = [
+            (
+                score * triplet_shape_weight,
+                3,
+                start,
+            )
+            for start, score in triplet_scores.items()
+        ] + [
+            (
+                score * doublet_shape_weight,
+                2,
+                start,
+            )
+            for start, score in doublet_scores.items()
+        ]
+        selected: set[int] = set()
+        for group_score, size, start in sorted(
+            candidate_groups,
+            key=lambda item: (-item[0], -item[1], item[2]),
+        ):
+            if group_score <= 0:
+                break
+            members = set(range(start, start + size))
+            new_members = sorted(
+                members.difference(selected),
+                key=lambda member: (-raw_scores[member], member),
+            )
+            admitted = set(
+                new_members[: _NUMBERS_PER_DRAW - len(selected)]
+            )
+            for member in members.intersection(selected).union(admitted):
+                raw_scores[member] += 0.30 * group_score
+            selected.update(admitted)
+            if len(selected) == _NUMBERS_PER_DRAW:
+                break
+
+        return _scale_scores(raw_scores), details
+
+    def _co_occurrence_scores(
+        self,
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        recent_draws = tuple(
+            list(self.recent_draws)[-_CO_OCCURRENCE_RECENT_WINDOW:]
+        )
+        recent_length = len(recent_draws)
+        recent_appearances = {
+            number: sum(number in draw for draw in recent_draws)
+            for number in range(1, _NUMBER_COUNT + 1)
+        }
+        expected_pair_count = (
+            self.draw_count
+            * math.comb(_NUMBERS_PER_DRAW, 2)
+            / math.comb(_NUMBER_COUNT, 2)
+        )
+        raw_scores: dict[int, float] = {}
+        legacy_scores: dict[int, float] = {}
+        details: dict[int, tuple[str, ...]] = {}
+        for number in range(1, _NUMBER_COUNT + 1):
+            baseline = (
+                self.appearances[number]
+                + _CO_OCCURRENCE_PRIOR_STRENGTH * _BASE_PROBABILITY
+            ) / (self.draw_count + _CO_OCCURRENCE_PRIOR_STRENGTH)
+            recent_baseline = (
+                recent_appearances[number]
+                + _CO_OCCURRENCE_PRIOR_STRENGTH * baseline
+            ) / (recent_length + _CO_OCCURRENCE_PRIOR_STRENGTH)
+            partner_evidence: list[tuple[int, float, float, int, int]] = []
+            for partner in sorted(
+                previous for previous in self.previous_draw if previous != number
+            ):
+                pair_count = self.pair_counts.get(
+                    tuple(sorted((number, partner))),
+                    0,
+                )
+                lifetime_conditional = (
+                    pair_count
+                    + _CO_OCCURRENCE_PRIOR_STRENGTH * baseline
+                ) / (
+                    self.appearances[partner]
+                    + _CO_OCCURRENCE_PRIOR_STRENGTH
+                )
+                lifetime_log_lift = math.log(
+                    max(lifetime_conditional, 1e-12)
+                    / max(baseline, 1e-12)
+                )
+                recent_pair_count = sum(
+                    number in draw and partner in draw
+                    for draw in recent_draws
+                )
+                recent_conditional = (
+                    recent_pair_count
+                    + _CO_OCCURRENCE_PRIOR_STRENGTH * recent_baseline
+                ) / (
+                    recent_appearances[partner]
+                    + _CO_OCCURRENCE_PRIOR_STRENGTH
+                )
+                recent_log_lift = math.log(
+                    max(recent_conditional, 1e-12)
+                    / max(recent_baseline, 1e-12)
+                )
+                blended_log_lift = (
+                    (1 - _CO_OCCURRENCE_RECENT_WEIGHT)
+                    * lifetime_log_lift
+                    + _CO_OCCURRENCE_RECENT_WEIGHT
+                    * recent_log_lift
+                )
+                partner_evidence.append(
+                    (
+                        partner,
+                        blended_log_lift,
+                        lifetime_log_lift,
+                        pair_count,
+                        recent_pair_count,
+                    )
+                )
+
+            average_log_lift = _average(
+                [evidence[1] for evidence in partner_evidence]
+            )
+            total_pair_count = sum(
+                evidence[3] for evidence in partner_evidence
+            )
+            legacy_average_lift = _average(
+                [
+                    evidence[3] / expected_pair_count
+                    if expected_pair_count
+                    else 0.0
+                    for evidence in partner_evidence
+                ]
+            )
+            positive_partners = sum(
+                evidence[1] > 0 for evidence in partner_evidence
+            )
+            (
+                strongest_partner,
+                strongest_log_lift,
+                _strongest_lifetime_log_lift,
+                strongest_count,
+                strongest_recent_count,
+            ) = max(
+                partner_evidence,
+                key=lambda evidence: (evidence[1], -evidence[0]),
+                default=(0, 0.0, 0.0, 0, 0),
+            )
+            raw_scores[number] = average_log_lift
+            legacy_scores[number] = (
+                legacy_average_lift * 70
+                + total_pair_count / max(self.draw_count, 1) * 30
+            )
+            details[number] = (
+                f"Adjusted average lift {math.exp(average_log_lift):.2f}×",
+                (
+                    f"Positive latest-draw partners "
+                    f"{positive_partners}/{len(partner_evidence)}"
+                ),
+                f"Recent window {recent_length} draws",
+                (
+                    f"Strongest partner {strongest_partner}: "
+                    f"{math.exp(strongest_log_lift):.2f}× lift, "
+                    f"{strongest_count} lifetime / "
+                    f"{strongest_recent_count} recent pairs"
+                    if strongest_partner
+                    else "No latest-draw partner history yet"
+                ),
+                "Bayesian-smoothed conditional association",
+            )
+        adjusted = _scale_scores(raw_scores)
+        legacy = _scale_scores(legacy_scores)
+        scores = {
+            number: (
+                _CO_OCCURRENCE_ADJUSTED_WEIGHT * adjusted[number]
+                + (1 - _CO_OCCURRENCE_ADJUSTED_WEIGHT) * legacy[number]
             )
             for number in range(1, _NUMBER_COUNT + 1)
         }
@@ -1206,7 +2625,13 @@ class _StrategyState:
             )
             for number in range(1, _NUMBER_COUNT + 1)
         }
-        warm_up = self.cis_draw_count < _CIS_MINIMUM_TRAINING_DRAWS
+        self.cis_pending_ensemble_scores = {}
+        self.cis_pending_learner_scores = {
+            number: self._cis_probability(features)
+            for number, features in self.cis_pending_features.items()
+        }
+        learner_scores = _scale_scores(self.cis_pending_learner_scores)
+        learner_blend = self._cis_learner_blend()
         scores: dict[int, float] = {}
         details: dict[int, tuple[str, ...]] = {}
         for number, features in self.cis_pending_features.items():
@@ -1220,22 +2645,24 @@ class _StrategyState:
                 for strategy_id, _label, _base_weight in _CIS_EXPERTS
                 if strategy_id in rankings
             ]
-            probability = self._cis_probability(features)
-            if warm_up:
-                contribution_total = sum(
-                    contribution for _strategy_id, contribution in contributions
-                )
-                dynamic_weight_total = sum(
-                    dynamic_weights[strategy_id]
-                    for strategy_id, _label, _base_weight in _CIS_EXPERTS
-                    if strategy_id in rankings
-                )
-                scores[number] = contribution_total / max(
-                    dynamic_weight_total,
-                    1e-12,
-                )
-            else:
-                scores[number] = probability
+            contribution_total = sum(
+                contribution for _strategy_id, contribution in contributions
+            )
+            dynamic_weight_total = sum(
+                dynamic_weights[strategy_id]
+                for strategy_id, _label, _base_weight in _CIS_EXPERTS
+                if strategy_id in rankings
+            )
+            ensemble_score = contribution_total / max(
+                dynamic_weight_total,
+                1e-12,
+            )
+            self.cis_pending_ensemble_scores[number] = ensemble_score
+            probability = self.cis_pending_learner_scores[number]
+            scores[number] = (
+                (1 - learner_blend) * ensemble_score
+                + learner_blend * learner_scores[number]
+            )
             supporters = sorted(
                 contributions,
                 key=lambda item: (-item[1], item[0]),
@@ -1244,12 +2671,8 @@ class _StrategyState:
                 strategy_id for strategy_id, _contribution in supporters
             )
             details[number] = (
-                (
-                    f"Warm-up ensemble {self.cis_draw_count}/"
-                    f"{_CIS_MINIMUM_TRAINING_DRAWS} draws"
-                    if warm_up
-                    else f"Learned probability {probability:.2%}"
-                ),
+                f"Adaptive ensemble {1 - learner_blend:.0%}",
+                f"Guarded ranking learner {learner_blend:.0%} ({probability:.2%})",
                 f"Strongest experts: {supporter_text}",
                 f"Consensus {features[7]:.0%}",
                 f"Opposition {features[9]:.0%}",
@@ -1314,6 +2737,7 @@ class _StrategyState:
                     proximity_details,
                 )
 
+        earth_mover_scores: dict[int, float] = {}
         if "emd" in enabled:
             earth_mover_scores, earth_mover_details = self._earth_mover_scores()
             rankings["emd"] = _ranking_from_scores(
@@ -1416,6 +2840,25 @@ class _StrategyState:
                     mkfr_details,
                 )
 
+        if "mksp" in enabled:
+            mksp_scores, mksp_details = self._mksp_scores()
+            rankings["mksp"] = _ranking_from_scores(
+                mksp_scores,
+                gaps,
+            )
+            if "mksp" in requested:
+                built["mksp"] = _strategy(
+                    "mksp",
+                    "MKSP",
+                    (
+                        "Analogue-weighted six-position Markov spaces through "
+                        "order 20, decoded into complete valid draws."
+                    ),
+                    mksp_scores,
+                    gaps,
+                    mksp_details,
+                )
+
         if "bayesian" in enabled:
             bayesian_scores, bayesian_details = self._gap_model_scores(
                 gaps, weighted=False
@@ -1428,7 +2871,10 @@ class _StrategyState:
                 built["bayesian"] = _strategy(
                     "bayesian",
                     "Baye",
-                    "Beta-smoothed Bayesian gap-state posterior ranking.",
+                    (
+                        "Hierarchically shrunk Bayesian model average of "
+                        "lifetime gap, recent gap, and recent number posteriors."
+                    ),
                     bayesian_scores,
                     gaps,
                     bayesian_details,
@@ -1578,7 +3024,10 @@ class _StrategyState:
                 )
 
         if "predictive_grid" in enabled:
-            grid_scores, grid_details = self._predictive_grid_scores(gaps)
+            grid_scores, grid_details = self._predictive_grid_scores(
+                gaps,
+                earth_mover_scores,
+            )
             rankings["predictive_grid"] = _ranking_from_scores(
                 grid_scores,
                 gaps,
@@ -1587,10 +3036,56 @@ class _StrategyState:
                 built["predictive_grid"] = _strategy(
                     "predictive_grid",
                     "Grid",
-                    "Six-component predictive score grid from PyLotto.",
+                    (
+                        "Seven-component score grid blending historical "
+                        "signals with earth-mover draw similarity."
+                    ),
                     grid_scores,
                     gaps,
                     grid_details,
+                )
+
+        if "co_occurrence" in enabled:
+            co_occurrence_scores, co_occurrence_details = (
+                self._co_occurrence_scores()
+            )
+            rankings["co_occurrence"] = _ranking_from_scores(
+                co_occurrence_scores,
+                gaps,
+            )
+            if "co_occurrence" in requested:
+                built["co_occurrence"] = _strategy(
+                    "co_occurrence",
+                    "CoOc",
+                    (
+                        "Pair-count ranking stabilized with candidate-adjusted, "
+                        "Bayesian-smoothed lifetime and recent lift."
+                    ),
+                    co_occurrence_scores,
+                    gaps,
+                    co_occurrence_details,
+                )
+
+        if "doublet_triplet_markov" in enabled:
+            (
+                doublet_triplet_markov_scores,
+                doublet_triplet_markov_details,
+            ) = self._doublet_triplet_markov_scores()
+            rankings["doublet_triplet_markov"] = _ranking_from_scores(
+                doublet_triplet_markov_scores,
+                gaps,
+            )
+            if "doublet_triplet_markov" in requested:
+                built["doublet_triplet_markov"] = _strategy(
+                    "doublet_triplet_markov",
+                    "Doublet & Triplet Markov",
+                    (
+                        "First-order Markov model of consecutive doublets and "
+                        "triplets, blended with lifetime and recent recurrence."
+                    ),
+                    doublet_triplet_markov_scores,
+                    gaps,
+                    doublet_triplet_markov_details,
                 )
 
         if "cis" in enabled:
@@ -1600,10 +3095,64 @@ class _StrategyState:
                 built["cis"] = _strategy(
                     "cis",
                     "CIS",
-                    "Collective Intelligence Strategy learning from ten expert rankings.",
+                    (
+                        "Collective Intelligence Strategy v2: a leakage-free, "
+                        "performance-weighted expert portfolio with a guarded "
+                        "online ranking correction."
+                    ),
                     cis_scores,
                     gaps,
                     cis_details,
+                )
+
+        if "residual_coverage" in enabled:
+            displayed_rankings = {
+                strategy_id: (
+                    [item.number for item in built[strategy_id].numbers]
+                    if strategy_id in built
+                    else ranking
+                )
+                for strategy_id, ranking in rankings.items()
+            }
+            residual_scores, residual_details = self._residual_coverage_scores(
+                displayed_rankings,
+                gaps,
+            )
+            rankings["residual_coverage"] = _ranking_from_scores(
+                residual_scores,
+                gaps,
+            )
+            if "residual_coverage" in requested:
+                built["residual_coverage"] = _strategy(
+                    "residual_coverage",
+                    "RCOV",
+                    (
+                        "Diversity-first ensemble complement selecting numbers "
+                        "outside every base Top-6, with longest current gaps first."
+                    ),
+                    residual_scores,
+                    gaps,
+                    residual_details,
+                )
+
+        if "chained" in enabled:
+            chained_scores, chained_details = self._chained_scores(
+                rankings,
+                gaps,
+            )
+            rankings["chained"] = _ranking_from_scores(chained_scores, gaps)
+            if "chained" in requested:
+                built["chained"] = _strategy(
+                    "chained",
+                    "Chained Strategy",
+                    (
+                        "Sequential leakage-safe chain of effectiveness-weighted "
+                        "consensus, conditional relationships, draw-shape fit, "
+                        "and residual coverage."
+                    ),
+                    chained_scores,
+                    gaps,
+                    chained_details,
                 )
 
         return tuple(
@@ -1618,6 +3167,7 @@ def build_prediction_suites(
     enabled_strategy_ids: Collection[str] = STRATEGY_IDS,
     progress: PredictionProgress | None = None,
     efficacy_record: EfficacyRecordCallback | None = None,
+    evaluated_suite: PredictionSuiteCallback | None = None,
 ) -> tuple[PredictionSuite, ...]:
     """Evaluate all draws and retain only the requested display history."""
     requested = set(enabled_strategy_ids)
@@ -1656,22 +3206,26 @@ def build_prediction_suites(
             )
             if record is not None and efficacy_record is not None:
                 efficacy_record(record)
+            if record is not None and evaluated_suite is not None:
+                evaluated_suite(compared)
             if draw_index >= history_start:
                 suites.append(compared)
-        elif draw_index >= history_start:
+        else:
             actual = (
                 tuple(ball.value for ball in draws[draw_index + 1].balls)
                 if draw_index + 1 < total
                 else ()
             )
-            suites.append(
-                PredictionSuite(
-                    reference_draw_number=draw_index + 1,
-                    target_draw_number=draw_index + 2,
-                    actual_numbers=actual,
-                    strategies=(),
-                )
+            empty_suite = PredictionSuite(
+                reference_draw_number=draw_index + 1,
+                target_draw_number=draw_index + 2,
+                actual_numbers=actual,
+                strategies=(),
             )
+            if actual and evaluated_suite is not None:
+                evaluated_suite(empty_suite)
+            if draw_index >= history_start:
+                suites.append(empty_suite)
         if progress is not None:
             progress(draw_index + 1, total)
     return tuple(suites)

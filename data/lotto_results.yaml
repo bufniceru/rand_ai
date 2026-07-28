@@ -1,7 +1,7 @@
 lotto_results:
-  total_draws: 2560
+  total_draws: 2561
   first_draw: '1993-08-15'
-  last_draw: '2026-07-23'
+  last_draw: '2026-07-26'
   draws:
   - date: '1993-08-15'
     numbers:
@@ -20483,3 +20483,11 @@ lotto_results:
     - 30
     - 43
     - 44
+  - date: '2026-07-26'
+    numbers:
+    - 10
+    - 11
+    - 20
+    - 31
+    - 35
+    - 39

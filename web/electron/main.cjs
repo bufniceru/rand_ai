@@ -8,14 +8,7 @@ const maximumUploadBytes = 100 * 1024 * 1024;
 const recentDatasetLimit = 10;
 const bridgeProgressPrefix = "RAND_AI_PROGRESS ";
 let mainWindow = null;
-let lastSeenWindow = null;
-let lastSeenGapWindow = null;
-let combinedPredictionWindow = null;
-let possibleDrawWindow = null;
-let drawEditorWindow = null;
 let activeDatasetPath = null;
-let activeLastSeenData = null;
-let activePredictionData = null;
 let recentDatasets = [];
 const reportPlugins = [
   { id: "overview", label: "Overview" },
@@ -23,12 +16,29 @@ const reportPlugins = [
   { id: "spaces", label: "Spaces" },
   { id: "relationships", label: "Relationships" },
   { id: "randomness", label: "Randomness" },
+  { id: "autocorrelation", label: "Autocorrelation" },
+  { id: "co-occurrence", label: "Co-occurrence" },
+  { id: "prediction-audit", label: "Prediction Audit" },
+  { id: "draw-comparison", label: "Latest Draw vs Predictions" },
+  { id: "strategy-effectiveness", label: "Strategy Effectiveness" },
   { id: "gaps", label: "Gaps" },
   { id: "last-seen", label: "Last Seen Highlight" },
   { id: "last-seen-gap", label: "Last Seen Gap Highlight" },
+  { id: "last-seen-space", label: "Last Seen Space Highlight" },
   { id: "predictions", label: "Predictions" },
   { id: "possible-draw", label: "Possible Draw" },
 ];
+const legacyReportPluginIds = reportPlugins
+  .map((plugin) => plugin.id)
+  .filter(
+    (reportId) =>
+      reportId !== "autocorrelation" &&
+      reportId !== "co-occurrence" &&
+      reportId !== "prediction-audit" &&
+      reportId !== "draw-comparison" &&
+      reportId !== "strategy-effectiveness" &&
+      reportId !== "last-seen-space",
+  );
 let enabledReportIds = new Set(reportPlugins.map((plugin) => plugin.id));
 const legacyStrategyPluginIds = [
   "proximity",
@@ -52,12 +62,20 @@ const strategyPlugins = [
   { id: "entropy", label: "Entr" },
   { id: "markov100", label: "Mark" },
   { id: "mkfr", label: "MKFR" },
+  { id: "mksp", label: "MKSP" },
   { id: "bayesian", label: "Baye" },
   { id: "predictive_grid", label: "Grid" },
+  { id: "co_occurrence", label: "CoOc" },
+  {
+    id: "doublet_triplet_markov",
+    label: "Doublet & Triplet Markov",
+  },
   { id: "mixed", label: "Mix" },
   { id: "svc", label: "SVC" },
   { id: "tbl", label: "TBL" },
   { id: "cis", label: "CIS" },
+  { id: "residual_coverage", label: "Residual Coverage" },
+  { id: "chained", label: "Chained Strategy" },
 ];
 let enabledStrategyIds = new Set(strategyPlugins.map((plugin) => plugin.id));
 
@@ -67,6 +85,11 @@ const dashboardViews = [
   ["spaces", "Spaces"],
   ["relationships", "Relationships"],
   ["randomness", "Randomness"],
+  ["autocorrelation", "Autocorrelation"],
+  ["co-occurrence", "Co-occurrence"],
+  ["prediction-audit", "Prediction Audit"],
+  ["draw-comparison", "Latest Draw vs Predictions"],
+  ["strategy-effectiveness", "Strategy Effectiveness"],
   ["gaps", "Gaps"],
   ["export", "Export"],
 ];
@@ -110,11 +133,15 @@ function loadReportPreferences() {
       return new Set(reportPlugins.map((plugin) => plugin.id));
     }
     const knownIds = new Set(reportPlugins.map((plugin) => plugin.id));
-    return new Set(
+    const selected = new Set(
       parsed.enabledReports.filter(
         (reportId) => typeof reportId === "string" && knownIds.has(reportId),
       ),
     );
+    if (legacyReportPluginIds.every((reportId) => selected.has(reportId))) {
+      for (const plugin of reportPlugins) selected.add(plugin.id);
+    }
+    return selected;
   } catch (error) {
     if (error?.code !== "ENOENT") {
       console.warn("Could not load report plugin preferences:", error);
@@ -372,28 +399,9 @@ function sendMenuAction(action, payload = {}) {
   }
 }
 
-function closeDisabledReportWindows() {
-  const windows = [
-    ["last-seen", lastSeenWindow],
-    ["last-seen-gap", lastSeenGapWindow],
-    ["predictions", combinedPredictionWindow],
-    ["possible-draw", possibleDrawWindow],
-  ];
-  for (const [reportId, reportWindow] of windows) {
-    if (
-      !enabledReportIds.has(reportId) &&
-      reportWindow &&
-      !reportWindow.isDestroyed()
-    ) {
-      reportWindow.close();
-    }
-  }
-}
-
 function updateReportPlugins(nextEnabledReportIds) {
   enabledReportIds = new Set(nextEnabledReportIds);
   saveReportPreferences();
-  closeDisabledReportWindows();
   buildApplicationMenu();
   sendMenuAction("reportPluginsChanged", reportPluginState());
 }
@@ -411,14 +419,6 @@ function updateStrategyPlugins(nextEnabledStrategyIds) {
   return strategyPluginState();
 }
 
-function lastSeenDialogData() {
-  return activeLastSeenData;
-}
-
-function combinedPredictionDialogData() {
-  return activePredictionData;
-}
-
 function loadRenderer(window, query = {}) {
   if (devServerUrl) {
     const url = new URL(devServerUrl);
@@ -429,223 +429,6 @@ function loadRenderer(window, query = {}) {
     return;
   }
   window.loadFile(path.join(__dirname, "..", "dist", "index.html"), { query });
-}
-
-function createLastSeenWindow() {
-  if (!enabledReportIds.has("last-seen")) return;
-  if (!activeLastSeenData) {
-    dialog.showMessageBox(mainWindow, {
-      type: "info",
-      title: "Last Seen Highlight",
-      message: "Analyze a dataset first.",
-      detail: "The Last Seen Highlight dialog uses the active draw history.",
-    });
-    return;
-  }
-  if (lastSeenWindow && !lastSeenWindow.isDestroyed()) {
-    if (lastSeenWindow.isMinimized()) lastSeenWindow.restore();
-    lastSeenWindow.focus();
-    return;
-  }
-
-  lastSeenWindow = new BrowserWindow({
-    parent: mainWindow,
-    title: "Last Seen Highlight — Rand AI",
-    width: 1440,
-    height: 920,
-    minWidth: 980,
-    minHeight: 680,
-    backgroundColor: "#eef3f7",
-    show: false,
-    autoHideMenuBar: true,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  });
-  lastSeenWindow.once("ready-to-show", () => {
-    lastSeenWindow.maximize();
-    lastSeenWindow.show();
-  });
-  lastSeenWindow.on("closed", () => {
-    lastSeenWindow = null;
-  });
-  loadRenderer(lastSeenWindow, { window: "last-seen" });
-}
-
-function createLastSeenGapWindow() {
-  if (!enabledReportIds.has("last-seen-gap")) return;
-  if (!activeLastSeenData) {
-    dialog.showMessageBox(mainWindow, {
-      type: "info",
-      title: "Last Seen Gap Highlight",
-      message: "Analyze a dataset first.",
-      detail: "The Last Seen Gap Highlight dialog uses the active draw history.",
-    });
-    return;
-  }
-  if (lastSeenGapWindow && !lastSeenGapWindow.isDestroyed()) {
-    if (lastSeenGapWindow.isMinimized()) lastSeenGapWindow.restore();
-    lastSeenGapWindow.focus();
-    return;
-  }
-
-  lastSeenGapWindow = new BrowserWindow({
-    parent: mainWindow,
-    title: "Last Seen Gap Highlight — Rand AI",
-    width: 1440,
-    height: 920,
-    minWidth: 980,
-    minHeight: 680,
-    backgroundColor: "#eef3f7",
-    show: false,
-    autoHideMenuBar: true,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  });
-  lastSeenGapWindow.once("ready-to-show", () => {
-    lastSeenGapWindow.maximize();
-    lastSeenGapWindow.show();
-  });
-  lastSeenGapWindow.on("closed", () => {
-    lastSeenGapWindow = null;
-  });
-  loadRenderer(lastSeenGapWindow, { window: "last-seen-gap" });
-}
-
-function createCombinedPredictionWindow() {
-  if (!enabledReportIds.has("predictions")) return;
-  if (!activePredictionData) {
-    dialog.showMessageBox(mainWindow, {
-      type: "info",
-      title: "Predictions",
-      message: "Analyze a dataset first.",
-      detail: "The named predictions are calculated while the dataset is imported.",
-    });
-    return;
-  }
-  if (combinedPredictionWindow && !combinedPredictionWindow.isDestroyed()) {
-    if (combinedPredictionWindow.isMinimized()) combinedPredictionWindow.restore();
-    combinedPredictionWindow.focus();
-    return;
-  }
-
-  combinedPredictionWindow = new BrowserWindow({
-    parent: mainWindow,
-    title: "Predictions — Rand AI",
-    width: 1120,
-    height: 920,
-    minWidth: 760,
-    minHeight: 680,
-    backgroundColor: "#eef3f7",
-    show: false,
-    autoHideMenuBar: true,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  });
-  combinedPredictionWindow.once("ready-to-show", () => {
-    combinedPredictionWindow.maximize();
-    combinedPredictionWindow.show();
-  });
-  combinedPredictionWindow.on("closed", () => {
-    combinedPredictionWindow = null;
-  });
-  loadRenderer(combinedPredictionWindow, { window: "combined-prediction" });
-}
-
-function createPossibleDrawWindow() {
-  if (!enabledReportIds.has("possible-draw")) return;
-  if (!activePredictionData) {
-    dialog.showMessageBox(mainWindow, {
-      type: "info",
-      title: "Possible Draw",
-      message: "Analyze a dataset first.",
-      detail: "Possible Draw uses the Python-calculated prediction strategies.",
-    });
-    return;
-  }
-  if (possibleDrawWindow && !possibleDrawWindow.isDestroyed()) {
-    if (possibleDrawWindow.isMinimized()) possibleDrawWindow.restore();
-    possibleDrawWindow.focus();
-    return;
-  }
-
-  possibleDrawWindow = new BrowserWindow({
-    parent: mainWindow,
-    title: "Possible Draw — Rand AI",
-    width: 1480,
-    height: 960,
-    minWidth: 1060,
-    minHeight: 720,
-    backgroundColor: "#eef3f7",
-    show: false,
-    autoHideMenuBar: true,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  });
-  possibleDrawWindow.once("ready-to-show", () => {
-    possibleDrawWindow.maximize();
-    possibleDrawWindow.show();
-  });
-  possibleDrawWindow.on("closed", () => {
-    possibleDrawWindow = null;
-  });
-  loadRenderer(possibleDrawWindow, { window: "possible-draw" });
-}
-
-function createDrawEditorWindow() {
-  if (!activeDatasetPath) {
-    dialog.showMessageBox(mainWindow, {
-      type: "info",
-      title: "Draw History",
-      message: "Analyze a YAML-managed dataset first.",
-      detail: "The editor updates the paired YAML first and then rebuilds its pickle.",
-    });
-    return;
-  }
-  if (drawEditorWindow && !drawEditorWindow.isDestroyed()) {
-    if (drawEditorWindow.isMinimized()) drawEditorWindow.restore();
-    drawEditorWindow.focus();
-    return;
-  }
-  drawEditorWindow = new BrowserWindow({
-    parent: mainWindow,
-    title: "Draw History — Rand AI",
-    width: 1040,
-    height: 900,
-    minWidth: 760,
-    minHeight: 680,
-    backgroundColor: "#eef3f7",
-    show: false,
-    autoHideMenuBar: true,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  });
-  drawEditorWindow.once("ready-to-show", () => {
-    drawEditorWindow.show();
-  });
-  drawEditorWindow.on("closed", () => {
-    drawEditorWindow = null;
-  });
-  loadRenderer(drawEditorWindow, { window: "draw-editor" });
 }
 
 async function chooseDataset() {
@@ -746,6 +529,17 @@ function buildApplicationMenu() {
       ],
     },
     {
+      label: "Analyze",
+      submenu: [
+        {
+          label: "Reanalyze",
+          accelerator: "F5",
+          enabled: activeDatasetPath !== null,
+          click: () => sendMenuAction("reanalyze"),
+        },
+      ],
+    },
+    {
       label: "View",
       submenu: [
         ...dashboardViews.map(([id, label]) => ({
@@ -756,38 +550,50 @@ function buildApplicationMenu() {
           click: () => sendMenuAction("openView", { view: id }),
         })),
         {
-          label: "Last Seen Highlight...",
+          label: "Last Seen Highlight",
           accelerator: "CmdOrCtrl+Shift+L",
           enabled:
             activeDatasetPath !== null && enabledReportIds.has("last-seen"),
-          click: () => createLastSeenWindow(),
+          click: () => sendMenuAction("openWorkspaceTab", { tab: "last-seen" }),
         },
         {
-          label: "Last Seen Gap Highlight...",
+          label: "Last Seen Gap Highlight",
           accelerator: "CmdOrCtrl+Shift+G",
           enabled:
             activeDatasetPath !== null && enabledReportIds.has("last-seen-gap"),
-          click: () => createLastSeenGapWindow(),
+          click: () =>
+            sendMenuAction("openWorkspaceTab", { tab: "last-seen-gap" }),
         },
         {
-          label: "Predictions...",
+          label: "Last Seen Space Highlight",
+          accelerator: "CmdOrCtrl+Shift+S",
+          enabled:
+            activeDatasetPath !== null &&
+            enabledReportIds.has("last-seen-space"),
+          click: () =>
+            sendMenuAction("openWorkspaceTab", { tab: "last-seen-space" }),
+        },
+        {
+          label: "Predictions",
           accelerator: "CmdOrCtrl+Shift+P",
           enabled:
             activeDatasetPath !== null && enabledReportIds.has("predictions"),
-          click: () => createCombinedPredictionWindow(),
+          click: () => sendMenuAction("openWorkspaceTab", { tab: "predictions" }),
         },
         {
-          label: "Possible Draw...",
+          label: "Possible Draw",
           accelerator: "CmdOrCtrl+Shift+D",
           enabled:
             activeDatasetPath !== null && enabledReportIds.has("possible-draw"),
-          click: () => createPossibleDrawWindow(),
+          click: () =>
+            sendMenuAction("openWorkspaceTab", { tab: "possible-draw" }),
         },
         {
-          label: "Draw History Editor...",
+          label: "Draw History Editor",
           accelerator: "CmdOrCtrl+Shift+H",
           enabled: activeDatasetPath !== null,
-          click: () => createDrawEditorWindow(),
+          click: () =>
+            sendMenuAction("openWorkspaceTab", { tab: "draw-history" }),
         },
         { type: "separator" },
         { role: "reload" },
@@ -908,126 +714,22 @@ ipcMain.handle("dataset:analyze", async (event, request) => {
     true,
     sendProgress,
   );
-  sendProgress({ percent: 98, message: "Updating highlight data and application menus" });
+  sendProgress({ percent: 98, message: "Updating the tabbed workspace and application menus" });
   activeDatasetPath = filePath;
   addRecentDataset(filePath, stats.size);
-  const activeReports = new Set(payload.options.enabledReports);
-  activeLastSeenData =
-    activeReports.has("last-seen") || activeReports.has("last-seen-gap")
-      ? {
-          dataset: payload.dataset,
-          history: payload.history,
-        }
-      : null;
-  activePredictionData =
-    activeReports.has("predictions") || activeReports.has("possible-draw")
-      ? {
-          dataset: payload.dataset,
-          predictions: payload.combinedPredictions,
-          predictionSuites: payload.predictionSuites,
-          strategyEfficacyHistory: payload.strategyEfficacyHistory,
-          history: payload.history,
-          possibleDraw: payload.possibleDraw,
-        }
-      : null;
-  if (lastSeenWindow && !lastSeenWindow.isDestroyed()) {
-    lastSeenWindow.webContents.send("last-seen:updated", lastSeenDialogData());
-  }
-  if (lastSeenGapWindow && !lastSeenGapWindow.isDestroyed()) {
-    lastSeenGapWindow.webContents.send("last-seen:updated", lastSeenDialogData());
-  }
-  if (combinedPredictionWindow && !combinedPredictionWindow.isDestroyed()) {
-    combinedPredictionWindow.webContents.send(
-      "combined-prediction:updated",
-      combinedPredictionDialogData(),
-    );
-  }
-  if (possibleDrawWindow && !possibleDrawWindow.isDestroyed()) {
-    possibleDrawWindow.webContents.send(
-      "combined-prediction:updated",
-      combinedPredictionDialogData(),
-    );
-  }
   buildApplicationMenu();
   sendProgress({ percent: 100, message: "Analysis ready" });
   return payload;
 });
 
-ipcMain.handle("last-seen:open", () => {
-  createLastSeenWindow();
-});
-
-ipcMain.handle("last-seen-gap:open", () => {
-  createLastSeenGapWindow();
-});
-
-ipcMain.handle("last-seen:data", () => lastSeenDialogData());
-
-ipcMain.handle("combined-prediction:open", () => {
-  createCombinedPredictionWindow();
-});
-
-ipcMain.handle("possible-draw:open", () => {
-  createPossibleDrawWindow();
-});
-
-ipcMain.handle("possible-draw:add-number", (_event, request) => {
-  const number = Number(request?.number);
-  const state = request?.state;
-  if (!Number.isInteger(number) || number < 1 || number > 49) {
-    throw new RangeError("Possible Draw numbers must be integers from 1 through 49.");
-  }
-  if (!["possible", "for-sure"].includes(state)) {
-    throw new TypeError("Possible Draw state must be possible or for-sure.");
-  }
-  if (!enabledReportIds.has("possible-draw")) {
-    dialog.showMessageBox(combinedPredictionWindow ?? mainWindow, {
-      type: "error",
-      title: "Possible Draw unavailable",
-      message: "Possible Draw is disabled.",
-      detail: "Enable Possible Draw in Settings before sending prediction numbers.",
-    });
-    return;
-  }
-  if (!activePredictionData) {
-    dialog.showMessageBox(combinedPredictionWindow ?? mainWindow, {
-      type: "error",
-      title: "Possible Draw unavailable",
-      message: "Analyze a dataset first.",
-      detail: "Prediction numbers can be sent after the active dataset is analyzed.",
-    });
-    return;
-  }
-
-  createPossibleDrawWindow();
-  const target = possibleDrawWindow;
-  if (!target || target.isDestroyed()) return;
-  const deliver = () => {
-    if (!target.isDestroyed()) {
-      target.webContents.send("possible-draw:number-requested", { number, state });
-      if (target.isMinimized()) target.restore();
-      target.focus();
-    }
-  };
-  if (target.webContents.isLoading()) {
-    target.webContents.once("did-finish-load", deliver);
-  } else {
-    deliver();
-  }
-});
-
 ipcMain.handle("possible-draw:for-sure-limit-error", (event, requestedNumber) => {
-  const parent = BrowserWindow.fromWebContents(event.sender) ?? possibleDrawWindow ?? mainWindow;
+  const parent = BrowserWindow.fromWebContents(event.sender) ?? mainWindow;
   return dialog.showMessageBox(parent, {
     type: "error",
     title: "For Sure limit reached",
     message: "No more than six numbers can be marked For Sure.",
     detail: `Number ${requestedNumber} was not added. Remove a For Sure number before trying again.`,
   });
-});
-
-ipcMain.handle("draw-editor:open", () => {
-  createDrawEditorWindow();
 });
 
 ipcMain.handle("draw-editor:data", async () => {
@@ -1057,17 +759,53 @@ ipcMain.handle("draw-editor:save", async (_event, request) => {
   const payload = await runBridge(argumentsList, true);
   const stats = await fs.promises.stat(activeDatasetPath);
   addRecentDataset(activeDatasetPath, stats.size);
-  sendMenuAction("datasetSelected", {
-    dataset: {
-      path: activeDatasetPath,
-      name: path.basename(activeDatasetPath),
-      sizeBytes: stats.size,
-    },
-  });
   return payload;
 });
 
-ipcMain.handle("combined-prediction:data", () => combinedPredictionDialogData());
+ipcMain.handle("draw-comparison:save-pdf", async (event, request) => {
+  const parent = BrowserWindow.fromWebContents(event.sender) ?? mainWindow;
+  const requestedName =
+    typeof request?.suggestedName === "string"
+      ? path.basename(request.suggestedName)
+      : "rand-ai-draw-comparison.pdf";
+  const safeStem =
+    requestedName
+      .replace(/\.pdf$/i, "")
+      .replace(/[^a-zA-Z0-9._-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "rand-ai-draw-comparison";
+  const result = await dialog.showSaveDialog(parent, {
+    title: "Save draw comparison report",
+    defaultPath: `${safeStem}.pdf`,
+    filters: [{ name: "PDF document", extensions: ["pdf"] }],
+  });
+  if (result.canceled || !result.filePath) {
+    return { canceled: true };
+  }
+  const pdf = await event.sender.printToPDF({
+    printBackground: true,
+    landscape: true,
+    pageSize: "A4",
+    preferCSSPageSize: true,
+  });
+  fs.writeFileSync(result.filePath, pdf);
+  return { canceled: false, path: result.filePath };
+});
+
+ipcMain.handle("draw-comparison:print", async (event) => {
+  await new Promise((resolve, reject) => {
+    event.sender.print(
+      {
+        silent: false,
+        printBackground: true,
+        landscape: true,
+      },
+      (success, failureReason) => {
+        if (success) resolve();
+        else reject(new Error(failureReason || "Printing failed."));
+      },
+    );
+  });
+});
 
 ipcMain.handle("analysis:export", async (_event, request) => {
   if (!activeDatasetPath) {

@@ -28,12 +28,20 @@ const strategyDescriptions: Record<StrategyId, string> = {
   entropy: "Gap-entropy history with overdue adjustment.",
   markov100: "Recency-weighted gap-state Markov model.",
   mkfr: "Variable-order D/!D context transition lift.",
-  bayesian: "Bayesian gap-state posterior ranking.",
-  predictive_grid: "Six-component Markov, transition, and history score grid.",
+  mksp: "Order-20 space analogues decoded into complete valid draws.",
+  bayesian: "Hierarchically shrunk Bayesian model of gap and recent-number posteriors.",
+  predictive_grid: "Seven-component history grid with earth-mover similarity.",
+  co_occurrence: "Pair counts stabilized with candidate-adjusted recent lift.",
+  doublet_triplet_markov:
+    "Consecutive doublet/triplet recurrence with first-order next-draw Markov transitions.",
   mixed: "Weighted consensus of four complementary strategies.",
   svc: "Online support-vector classification model.",
   tbl: "Temporal behavior learning ensemble.",
   cis: "Online learner combining ten strategy experts.",
+  residual_coverage:
+    "Diversity-first complement covering numbers outside every base Top-6.",
+  chained:
+    "Sequential effectiveness-weighted consensus, relationships, shape, and residual coverage.",
 };
 
 const selectedCount = computed(() => selectedStrategyIds.value.size);

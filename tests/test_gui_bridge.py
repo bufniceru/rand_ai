@@ -85,12 +85,20 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
         "enabledStrategies": list(DEFAULT_STRATEGY_IDS),
     }
     assert len(payload["history"]) == 3
+    assert payload["analysisHistory"] == [
+        {"date": None, "numbers": [1, 2, 3, 4, 5, 6]},
+        {"date": None, "numbers": [1, 10, 20, 30, 40, 49]},
+        {"date": None, "numbers": [5, 12, 19, 27, 36, 45]},
+    ]
     assert payload["history"][1]["numbers"][0] == {
         "value": 1,
         "gap": 0,
         "leftSpace": 0,
         "rightSpace": 8,
     }
+    assert [
+        number["rightSpace"] for number in payload["history"][1]["numbers"][:-1]
+    ] == [8, 9, 9, 9, 8]
     assert len(payload["combinedPredictions"]) == 3
     assert payload["combinedPredictions"][0]["actualNumbers"] == [
         1,
@@ -118,12 +126,17 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
         "Entr",
         "Mark",
         "MKFR",
+        "MKSP",
         "Baye",
         "Grid",
+        "CoOc",
+        "Doublet & Triplet Markov",
         "Mix",
         "SVC",
         "TBL",
         "CIS",
+        "RCOV",
+        "Chained Strategy",
     ]
     assert all(
         len(strategy["numbers"]) == 49
@@ -143,6 +156,41 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
     assert set(efficacy_history[0]["strategyHits"]) == {
         strategy["id"] for strategy in latest_suite["strategies"]
     }
+    audit_history = payload["predictionAuditHistory"]
+    assert len(audit_history) == 2
+    assert audit_history[0]["targetDrawNumber"] == 2
+    assert audit_history[0]["date"] is None
+    assert [item["number"] for item in audit_history[0]["numbers"]] == [
+        1,
+        10,
+        20,
+        30,
+        40,
+        49,
+    ]
+    assert all(
+        set(strategy) == {"id", "name"}
+        for item in audit_history[0]["numbers"]
+        for strategy in item["strategies"]
+    )
+    comparison = payload["latestDrawComparison"]
+    assert len(payload["drawComparisonHistory"]) == 2
+    assert payload["drawComparisonHistory"][-1] == comparison
+    assert comparison["referenceDrawNumber"] == 2
+    assert comparison["targetDrawNumber"] == 3
+    assert comparison["date"] is None
+    assert comparison["actualNumbers"] == [5, 12, 19, 27, 36, 45]
+    assert len(comparison["strategies"]) == len(DEFAULT_STRATEGY_IDS)
+    assert all(
+        len(strategy["predictedNumbers"]) == 6
+        and strategy["hitCount"] == len(strategy["matchedNumbers"])
+        and set(strategy["matchedNumbers"]).issubset(comparison["actualNumbers"])
+        and set(strategy["missedPredictions"]).isdisjoint(
+            comparison["actualNumbers"]
+        )
+        and strategy["efficacy"]["evaluatedDraws"] == 2
+        for strategy in comparison["strategies"]
+    )
     assert payload["possibleDraw"]["lastDrawNumbers"] == [5, 12, 19, 27, 36, 45]
     assert len(payload["possibleDraw"]["lastSeenRows"]) == 49
     assert len(payload["possibleDraw"]["relationshipEdges"]) == 1176
@@ -189,9 +237,13 @@ def test_disabled_report_plugins_are_not_calculated_or_returned(
         "draw_structure_distributions",
     }
     assert payload["history"] == []
+    assert payload["analysisHistory"] == []
     assert payload["combinedPredictions"] == []
     assert payload["predictionSuites"] == []
     assert payload["strategyEfficacyHistory"] == []
+    assert payload["predictionAuditHistory"] == []
+    assert payload["drawComparisonHistory"] == []
+    assert payload["latestDrawComparison"] is None
     assert payload["possibleDraw"]["relationshipEdges"] == []
 
 
@@ -206,6 +258,32 @@ def test_numbers_report_builds_shared_frequency_table_without_overview(
     )
 
     assert "number_frequencies" in payload["tables"]
+
+
+def test_co_occurrence_report_receives_complete_history_without_autocorrelation(
+    tmp_path: Path,
+) -> None:
+    payload = build_analysis_payload(
+        _draws(),
+        _pickle_path(tmp_path),
+        enabled_reports=("co-occurrence",),
+        enabled_strategies=(),
+    )
+
+    assert len(payload["analysisHistory"]) == 3
+    assert payload["options"]["enabledReports"] == ["co-occurrence"]
+
+
+def test_last_seen_space_report_receives_history(tmp_path: Path) -> None:
+    payload = build_analysis_payload(
+        _draws(),
+        _pickle_path(tmp_path),
+        enabled_reports=("last-seen-space",),
+        enabled_strategies=(),
+    )
+
+    assert len(payload["history"]) == 3
+    assert payload["options"]["enabledReports"] == ["last-seen-space"]
 
 
 def test_possible_draw_prepares_its_prediction_dependency(
@@ -240,6 +318,83 @@ def test_analysis_emits_only_enabled_strategy_plugins(tmp_path: Path) -> None:
     assert [
         strategy["id"] for strategy in payload["predictionSuites"][-1]["strategies"]
     ] == ["freshness", "entropy"]
+
+
+def test_full_history_prediction_reports_use_compact_audit_records(
+    tmp_path: Path,
+) -> None:
+    payload = build_analysis_payload(
+        _draws(),
+        _pickle_path(tmp_path),
+        enabled_reports=("prediction-audit", "strategy-effectiveness"),
+        enabled_strategies=("freshness", "entropy"),
+    )
+
+    assert payload["predictionSuites"] == []
+    assert len(payload["predictionAuditHistory"]) == 2
+    assert len(payload["strategyEfficacyHistory"]) == 2
+    assert all(
+        {
+            strategy["id"]
+            for item in record["numbers"]
+            for strategy in item["strategies"]
+        }.issubset({"freshness", "entropy"})
+        for record in payload["predictionAuditHistory"]
+    )
+
+
+def test_draw_comparison_returns_only_the_latest_compact_result(
+    tmp_path: Path,
+) -> None:
+    payload = build_analysis_payload(
+        _draws(),
+        _pickle_path(tmp_path),
+        enabled_reports=("draw-comparison",),
+        enabled_strategies=("freshness", "chained"),
+    )
+
+    comparison = payload["latestDrawComparison"]
+    assert payload["predictionSuites"] == []
+    assert payload["predictionAuditHistory"] == []
+    assert payload["options"]["enabledReports"] == ["draw-comparison"]
+    assert len(payload["drawComparisonHistory"]) == 2
+    assert comparison["targetDrawNumber"] == 3
+    assert [strategy["id"] for strategy in comparison["strategies"]] == [
+        "freshness",
+        "chained",
+    ]
+    assert all(
+        set(strategy) == {
+            "id",
+            "name",
+            "description",
+            "predictedNumbers",
+            "matchedNumbers",
+            "missedPredictions",
+            "missedActualNumbers",
+            "hitCount",
+            "efficacy",
+        }
+        for strategy in comparison["strategies"]
+    )
+
+
+def test_prediction_audit_keeps_drawn_numbers_when_all_strategies_are_disabled(
+    tmp_path: Path,
+) -> None:
+    payload = build_analysis_payload(
+        _draws(),
+        _pickle_path(tmp_path),
+        enabled_reports=("prediction-audit",),
+        enabled_strategies=(),
+    )
+
+    assert len(payload["predictionAuditHistory"]) == 2
+    assert all(
+        len(record["numbers"]) == 6
+        and all(item["strategies"] == [] for item in record["numbers"])
+        for record in payload["predictionAuditHistory"]
+    )
 
 
 def test_analyzes_and_exports_trusted_file(tmp_path: Path) -> None:

@@ -5,9 +5,15 @@ export type ReportId =
   | "spaces"
   | "relationships"
   | "randomness"
+  | "autocorrelation"
+  | "co-occurrence"
+  | "prediction-audit"
+  | "draw-comparison"
+  | "strategy-effectiveness"
   | "gaps"
   | "last-seen"
   | "last-seen-gap"
+  | "last-seen-space"
   | "predictions"
   | "possible-draw";
 export type StrategyId =
@@ -20,20 +26,38 @@ export type StrategyId =
   | "entropy"
   | "markov100"
   | "mkfr"
+  | "mksp"
   | "bayesian"
   | "predictive_grid"
+  | "co_occurrence"
+  | "doublet_triplet_markov"
   | "mixed"
   | "svc"
   | "tbl"
-  | "cis";
+  | "cis"
+  | "residual_coverage"
+  | "chained";
 export type ViewId =
   | "overview"
   | "numbers"
   | "spaces"
   | "relationships"
   | "randomness"
+  | "autocorrelation"
+  | "co-occurrence"
+  | "prediction-audit"
+  | "draw-comparison"
+  | "strategy-effectiveness"
   | "gaps"
   | "export";
+export type WorkspaceTabId =
+  | "statistics"
+  | "last-seen"
+  | "last-seen-gap"
+  | "last-seen-space"
+  | "predictions"
+  | "possible-draw"
+  | "draw-history";
 
 export interface AnalysisOptions {
   selectedNumbers: number[];
@@ -99,14 +123,148 @@ export interface HistoryDraw {
   numbers: HistoryNumber[];
 }
 
+export interface AnalysisHistoryDraw {
+  date: string | null;
+  numbers: number[];
+}
+
 export interface AnalysisPayload {
   dataset: DatasetSummary;
   options: AnalysisOptions;
   tables: Record<string, TablePayload>;
   history: HistoryDraw[];
+  analysisHistory: AnalysisHistoryDraw[];
   combinedPredictions: CombinedPredictionHistory[];
   predictionSuites: PredictionSuite[];
+  strategyEfficacyHistory: StrategyEfficacyRecord[];
+  predictionAuditHistory: PredictionAuditRecord[];
+  drawComparisonHistory: LatestDrawComparison[];
+  latestDrawComparison: LatestDrawComparison | null;
   possibleDraw: PossibleDrawAnalysis;
+}
+
+export interface CoOccurrenceBand {
+  id: string;
+  label: string;
+  description: string;
+  color: string;
+}
+
+export interface CoOccurrenceEdge {
+  pair: string;
+  numbers: [number, number];
+  count: number;
+  expected: number;
+  lift: number;
+  residual: number;
+  share: number;
+  rank: number;
+  bandId: string;
+  label: string;
+}
+
+export interface CoOccurrenceNode {
+  number: number;
+  appearances: number;
+  weightedDegree: number;
+  averagePartnerCount: number;
+  strongestPartner: number | null;
+  strongestPartnerCount: number;
+  strongestPartnerLift: number;
+  rank: number;
+}
+
+export interface CoOccurrencePrediction {
+  number: number;
+  rank: number;
+  score: number;
+  averageLift: number;
+  totalCount: number;
+  strongestPartner: number | null;
+  strongestPartnerCount: number;
+  strongestPartnerLift: number;
+  bandId: string;
+  label: string;
+}
+
+export interface CoOccurrenceModel {
+  bands: CoOccurrenceBand[];
+  drawCount: number;
+  totalPairEvents: number;
+  expectedPairCount: number;
+  pairUniverseSize: number;
+  maxEdgeCount: number;
+  maxWeightedDegree: number;
+  edges: CoOccurrenceEdge[];
+  nodes: CoOccurrenceNode[];
+  predictions: CoOccurrencePrediction[];
+  networkEdges: CoOccurrenceEdge[];
+  latestProfile: {
+    date: string | null;
+    signature: string;
+    edges: CoOccurrenceEdge[];
+  };
+  interpretation: string;
+}
+
+export interface AutocorrelationBand {
+  id: string;
+  label: string;
+  description: string;
+  color: string;
+}
+
+export interface AutocorrelationLagSummary {
+  lag: number;
+  pairCount: number;
+  averageOverlap: number;
+  expectedOverlap: number;
+  overlapDelta: number;
+  overlapRate: number;
+  averageDoublets: number;
+  expectedDoublets: number;
+  doubletDelta: number;
+  averageTriplets: number;
+  expectedTriplets: number;
+  tripletDelta: number;
+  numberPresenceCorrelation: number;
+  sumCorrelation: number;
+  oddCountCorrelation: number;
+  lowCountCorrelation: number;
+  score: number;
+  bandId: string;
+  label: string;
+}
+
+export interface AutocorrelationNumberSummary {
+  number: number;
+  appearances: number;
+  strongestLag: number;
+  strongestCorrelation: number;
+  score: number;
+  bandId: string;
+  label: string;
+  rank: number;
+}
+
+export interface AutocorrelationModel {
+  bands: AutocorrelationBand[];
+  drawCount: number;
+  maxLag: number;
+  expectedOverlap: number;
+  expectedDoublets: number;
+  expectedTriplets: number;
+  lagSummaries: AutocorrelationLagSummary[];
+  numberSummaries: AutocorrelationNumberSummary[];
+  strongestLag: AutocorrelationLagSummary | null;
+  strongestPositiveLag: AutocorrelationLagSummary | null;
+  strongestNegativeLag: AutocorrelationLagSummary | null;
+  latestProfile: {
+    date: string | null;
+    signature: string;
+    numbers: AutocorrelationNumberSummary[];
+  };
+  interpretation: string;
 }
 
 export interface CombinedPredictionNumber {
@@ -181,6 +339,43 @@ export interface StrategyEfficacyRecord {
   strategyHits: Partial<Record<StrategyId, number>>;
 }
 
+export interface PredictionAuditStrategy {
+  id: StrategyId;
+  name: string;
+}
+
+export interface PredictionAuditNumber {
+  number: number;
+  strategies: PredictionAuditStrategy[];
+}
+
+export interface PredictionAuditRecord {
+  referenceDrawNumber: number;
+  targetDrawNumber: number;
+  date: string | null;
+  numbers: PredictionAuditNumber[];
+}
+
+export interface DrawComparisonStrategy {
+  id: StrategyId;
+  name: string;
+  description: string;
+  predictedNumbers: number[];
+  matchedNumbers: number[];
+  missedPredictions: number[];
+  missedActualNumbers: number[];
+  hitCount: number;
+  efficacy: StrategyEfficacy | null;
+}
+
+export interface LatestDrawComparison {
+  referenceDrawNumber: number;
+  targetDrawNumber: number;
+  date: string | null;
+  actualNumbers: number[];
+  strategies: DrawComparisonStrategy[];
+}
+
 export interface StrategyPrediction {
   id: StrategyId;
   name: string;
@@ -200,11 +395,6 @@ export interface PredictionSuite {
 export interface AnalysisProgress {
   percent: number;
   message: string;
-}
-
-export interface LastSeenDialogData {
-  dataset: DatasetSummary;
-  history: HistoryDraw[];
 }
 
 export interface DrawEditorEntry {
@@ -234,7 +424,9 @@ export interface FigureSpec {
 export type MenuAction =
   | { action: "datasetSelected"; dataset: DatasetSelection }
   | { action: "openView"; view: ViewId }
+  | { action: "openWorkspaceTab"; tab: WorkspaceTabId }
   | { action: "openSettings" }
+  | { action: "reanalyze" }
   | ({ action: "reportPluginsChanged" } & ReportPluginState)
   | ({ action: "strategyPluginsChanged" } & StrategyPluginState)
   | { action: "export" };
@@ -242,6 +434,10 @@ export type MenuAction =
 export interface ExportResult {
   canceled: boolean;
   path?: string;
+}
+
+export interface DrawComparisonPdfRequest {
+  suggestedName: string;
 }
 
 export type PossibleDrawNumberState = "possible" | "for-sure";
@@ -266,28 +462,13 @@ export interface DesktopApi {
   exportAnalysis(request: {
     options: AnalysisOptions;
   }): Promise<ExportResult>;
-  openLastSeenDialog(): Promise<void>;
-  openLastSeenGapDialog(): Promise<void>;
-  openCombinedPredictionDialog(): Promise<void>;
-  openPossibleDrawDialog(): Promise<void>;
-  sendPredictionNumberToPossibleDraw(
-    request: PossibleDrawNumberRequest,
-  ): Promise<void>;
+  saveDrawComparisonPdf(
+    request: DrawComparisonPdfRequest,
+  ): Promise<ExportResult>;
+  printDrawComparison(): Promise<void>;
   showForSureLimitError(number: number): Promise<void>;
-  onPossibleDrawNumber(
-    callback: (request: PossibleDrawNumberRequest) => void,
-  ): () => void;
-  openDrawEditorDialog(): Promise<void>;
   getDrawEditorData(): Promise<DrawEditorData>;
   saveDraw(request: DrawSaveRequest): Promise<DrawEditorData>;
-  getCombinedPredictionData(): Promise<CombinedPredictionDialogData | null>;
-  onCombinedPredictionData(
-    callback: (data: CombinedPredictionDialogData) => void,
-  ): () => void;
-  getLastSeenData(): Promise<LastSeenDialogData | null>;
-  onLastSeenData(
-    callback: (data: LastSeenDialogData) => void,
-  ): () => void;
   onMenuAction(callback: (message: MenuAction) => void): () => void;
 }
 

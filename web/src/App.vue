@@ -2,26 +2,40 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import SettingsDialog from "./components/SettingsDialog.vue";
 import TrustDialog from "./components/TrustDialog.vue";
+import DrawEditorDialogApp from "./DrawEditorDialogApp.vue";
 import { buildFigures } from "./lib/figureBuilders";
+import PossibleDrawDialogApp from "./PossibleDrawDialogApp.vue";
+import AutocorrelationView from "./views/AutocorrelationView.vue";
+import CoOccurrenceView from "./views/CoOccurrenceView.vue";
+import CombinedPredictionGridView from "./views/CombinedPredictionGridView.vue";
 import ExportView from "./views/ExportView.vue";
 import GapsView from "./views/GapsView.vue";
+import LastSeenGapHighlightView from "./views/LastSeenGapHighlightView.vue";
+import LastSeenHighlightView from "./views/LastSeenHighlightView.vue";
+import LastSeenSpaceHighlightView from "./views/LastSeenSpaceHighlightView.vue";
+import LatestDrawComparisonView from "./views/LatestDrawComparisonView.vue";
 import NumbersView from "./views/NumbersView.vue";
 import OverviewView from "./views/OverviewView.vue";
+import PredictionAuditView from "./views/PredictionAuditView.vue";
 import RandomnessView from "./views/RandomnessView.vue";
 import RelationshipsView from "./views/RelationshipsView.vue";
 import SpacesView from "./views/SpacesView.vue";
+import StrategyEffectivenessView from "./views/StrategyEffectivenessView.vue";
 import type {
   AnalysisOptions,
   AnalysisPayload,
   AnalysisProgress,
+  CombinedPredictionDialogData,
   DatasetSelection,
   MenuAction,
+  PossibleDrawNumberRequest,
   ReportId,
   ReportPluginState,
   StrategyId,
   StrategyPlugin,
   StrategyPluginState,
   ViewId,
+  WorkspaceTabId,
 } from "./types";
 
 const views: { id: ViewId; label: string; shortLabel: string }[] = [
@@ -30,11 +44,64 @@ const views: { id: ViewId; label: string; shortLabel: string }[] = [
   { id: "spaces", label: "Spaces", shortLabel: "Spaces" },
   { id: "relationships", label: "Relationships", shortLabel: "Relationships" },
   { id: "randomness", label: "Randomness", shortLabel: "Randomness" },
+  {
+    id: "autocorrelation",
+    label: "Autocorrelation",
+    shortLabel: "Autocorrelation",
+  },
+  {
+    id: "co-occurrence",
+    label: "Co-occurrence",
+    shortLabel: "Co-occurrence",
+  },
+  {
+    id: "prediction-audit",
+    label: "Prediction Audit",
+    shortLabel: "Prediction Audit",
+  },
+  {
+    id: "draw-comparison",
+    label: "Latest Draw vs Predictions",
+    shortLabel: "Draw vs Predictions",
+  },
+  {
+    id: "strategy-effectiveness",
+    label: "Strategy Effectiveness",
+    shortLabel: "Effectiveness",
+  },
   { id: "gaps", label: "Gaps", shortLabel: "Gaps" },
   { id: "export", label: "Export", shortLabel: "Export" },
 ];
 
+const workspaceTabs: {
+  id: WorkspaceTabId;
+  label: string;
+  reportId?: ReportId;
+}[] = [
+  { id: "statistics", label: "Statistics" },
+  { id: "last-seen", label: "Last seen", reportId: "last-seen" },
+  {
+    id: "last-seen-gap",
+    label: "Last seen gaps",
+    reportId: "last-seen-gap",
+  },
+  {
+    id: "last-seen-space",
+    label: "Last seen spaces",
+    reportId: "last-seen-space",
+  },
+  { id: "predictions", label: "Predictions", reportId: "predictions" },
+  {
+    id: "possible-draw",
+    label: "Possible Draw",
+    reportId: "possible-draw",
+  },
+  { id: "draw-history", label: "Draw History" },
+];
+
 const activeView = ref<ViewId>("overview");
+const activeWorkspaceTab = ref<WorkspaceTabId>("statistics");
+const visitedWorkspaceTabs = ref<Set<WorkspaceTabId>>(new Set(["statistics"]));
 const enabledReportIds = ref<ReportId[]>([]);
 const enabledStrategyIds = ref<StrategyId[]>([]);
 const strategyPlugins = ref<StrategyPlugin[]>([]);
@@ -43,6 +110,10 @@ const savingSettings = ref(false);
 const pendingDataset = ref<DatasetSelection | null>(null);
 const activeDataset = ref<DatasetSelection | null>(null);
 const analysis = ref<AnalysisPayload | null>(null);
+const analysisStale = ref(false);
+const possibleDrawNumberRequest = ref<
+  (PossibleDrawNumberRequest & { token: number }) | null
+>(null);
 const loading = ref(false);
 const loadingDataset = ref<DatasetSelection | null>(null);
 const loadingProgress = ref(0);
@@ -64,6 +135,7 @@ let progressTimer: ReturnType<typeof setInterval> | null = null;
 let loadingProgressTarget = 1;
 let progressCompletionResolver: (() => void) | null = null;
 let reportRefreshPending = false;
+let possibleDrawRequestToken = 0;
 
 const figures = computed(() =>
   analysis.value ? buildFigures(analysis.value) : {},
@@ -75,8 +147,35 @@ const enabledViews = computed(() =>
       enabledReportIds.value.includes(view.id as ReportId),
   ),
 );
+const enabledWorkspaceTabs = computed(() =>
+  workspaceTabs.filter(
+    (tab) => !tab.reportId || enabledReportIds.value.includes(tab.reportId),
+  ),
+);
 const activeViewLabel = computed(
   () => views.find((view) => view.id === activeView.value)?.label ?? "Overview",
+);
+const activeWorkspaceLabel = computed(() => {
+  if (activeWorkspaceTab.value === "statistics") {
+    return `Statistics · ${activeViewLabel.value}`;
+  }
+  return (
+    workspaceTabs.find((tab) => tab.id === activeWorkspaceTab.value)?.label ??
+    "Statistics"
+  );
+});
+const combinedPredictionData = computed<CombinedPredictionDialogData | null>(
+  () =>
+    analysis.value
+      ? {
+          dataset: analysis.value.dataset,
+          predictions: analysis.value.combinedPredictions,
+          predictionSuites: analysis.value.predictionSuites,
+          strategyEfficacyHistory: analysis.value.strategyEfficacyHistory,
+          history: analysis.value.history,
+          possibleDraw: analysis.value.possibleDraw,
+        }
+      : null,
 );
 
 function isReportEnabled(reportId: ReportId): boolean {
@@ -88,10 +187,33 @@ function ensureActiveView(): void {
   activeView.value = enabledViews.value[0]?.id ?? "export";
 }
 
+function ensureActiveWorkspaceTab(): void {
+  if (
+    enabledWorkspaceTabs.value.some(
+      (tab) => tab.id === activeWorkspaceTab.value,
+    )
+  ) {
+    return;
+  }
+  selectWorkspaceTab("statistics");
+}
+
+function selectWorkspaceTab(tabId: WorkspaceTabId): void {
+  if (!enabledWorkspaceTabs.value.some((tab) => tab.id === tabId)) return;
+  activeWorkspaceTab.value = tabId;
+  if (!visitedWorkspaceTabs.value.has(tabId)) {
+    visitedWorkspaceTabs.value = new Set([
+      ...visitedWorkspaceTabs.value,
+      tabId,
+    ]);
+  }
+}
+
 function acceptReportPluginState(state: ReportPluginState): void {
   enabledReportIds.value = [...state.enabledReports];
   options.enabledReports = [...state.enabledReports];
   ensureActiveView();
+  ensureActiveWorkspaceTab();
 }
 
 function acceptStrategyPluginState(state: StrategyPluginState): void {
@@ -207,8 +329,11 @@ async function analyzeDataset(
       path: dataset.path,
       options: requestedOptions,
     });
+    const datasetChanged = activeDataset.value?.path !== dataset.path;
     activeDataset.value = dataset;
     analysis.value = payload;
+    analysisStale.value = false;
+    if (datasetChanged) selectWorkspaceTab("statistics");
     options.selectedNumbers = [...payload.options.selectedNumbers];
     options.trendBins = payload.options.trendBins;
     options.correlationMethod = payload.options.correlationMethod;
@@ -290,49 +415,33 @@ async function exportAnalysis(): Promise<void> {
   }
 }
 
-async function openLastSeenDialog(): Promise<void> {
-  if (!window.randAiDesktop || !analysis.value) return;
-  try {
-    await window.randAiDesktop.openLastSeenDialog();
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : String(error);
-  }
+function handlePossibleDrawNumberRequest(
+  request: PossibleDrawNumberRequest,
+): void {
+  possibleDrawRequestToken += 1;
+  possibleDrawNumberRequest.value = {
+    ...request,
+    token: possibleDrawRequestToken,
+  };
+  selectWorkspaceTab("possible-draw");
 }
 
-async function openLastSeenGapDialog(): Promise<void> {
-  if (!window.randAiDesktop || !analysis.value) return;
-  try {
-    await window.randAiDesktop.openLastSeenGapDialog();
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : String(error);
-  }
+function handleDrawHistorySaved(): void {
+  analysisStale.value = true;
+  statusMessage.value =
+    "Draw history saved · Statistics need Analyze → Reanalyze";
 }
 
-async function openCombinedPredictionDialog(): Promise<void> {
-  if (!window.randAiDesktop || !analysis.value) return;
-  try {
-    await window.randAiDesktop.openCombinedPredictionDialog();
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : String(error);
-  }
-}
-
-async function openPossibleDrawDialog(): Promise<void> {
-  if (!window.randAiDesktop || !analysis.value) return;
-  try {
-    await window.randAiDesktop.openPossibleDrawDialog();
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : String(error);
-  }
-}
-
-async function openDrawEditorDialog(): Promise<void> {
-  if (!window.randAiDesktop || !analysis.value) return;
-  try {
-    await window.randAiDesktop.openDrawEditorDialog();
-  } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : String(error);
-  }
+function handleWorkspaceShortcut(event: KeyboardEvent): void {
+  if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  const tabId = {
+    Digit1: "predictions",
+    Digit2: "possible-draw",
+    Digit3: "draw-history",
+  }[event.code] as WorkspaceTabId | undefined;
+  if (!tabId) return;
+  event.preventDefault();
+  selectWorkspaceTab(tabId);
 }
 
 function handleMenuAction(message: MenuAction): void {
@@ -341,11 +450,20 @@ function handleMenuAction(message: MenuAction): void {
     return;
   }
   if (message.action === "openView") {
+    selectWorkspaceTab("statistics");
     activeView.value = message.view;
+    return;
+  }
+  if (message.action === "openWorkspaceTab") {
+    selectWorkspaceTab(message.tab);
     return;
   }
   if (message.action === "openSettings") {
     void openSettings();
+    return;
+  }
+  if (message.action === "reanalyze") {
+    if (activeDataset.value && !loading.value) void applyOptions();
     return;
   }
   if (message.action === "reportPluginsChanged") {
@@ -368,6 +486,7 @@ function handleMenuAction(message: MenuAction): void {
 }
 
 onMounted(async () => {
+  window.addEventListener("keydown", handleWorkspaceShortcut);
   unsubscribeMenu = window.randAiDesktop?.onMenuAction(handleMenuAction) ?? null;
   unsubscribeAnalysisProgress =
     window.randAiDesktop?.onAnalysisProgress(handleAnalysisProgress) ?? null;
@@ -386,6 +505,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener("keydown", handleWorkspaceShortcut);
   if (progressTimer !== null) clearInterval(progressTimer);
   unsubscribeMenu?.();
   unsubscribeAnalysisProgress?.();
@@ -402,74 +522,40 @@ onBeforeUnmount(() => {
           <span>Draw statistics desktop</span>
         </div>
       </div>
-      <div class="toolbar-actions">
-        <button class="button secondary" type="button" @click="chooseDataset">
-          Open dataset
-        </button>
+      <nav
+        v-if="analysis"
+        class="toolbar-workspace-tabs"
+        role="tablist"
+        aria-label="Main workspaces"
+      >
         <button
-          v-if="isReportEnabled('last-seen')"
-          class="button secondary"
-          :disabled="!analysis || loading"
+          v-for="tab in enabledWorkspaceTabs"
+          :key="tab.id"
+          :class="{
+            active: activeWorkspaceTab === tab.id,
+            stale: tab.id === 'statistics' && analysisStale,
+          }"
+          :disabled="loading"
           type="button"
-          @click="applyOptions"
+          role="tab"
+          :aria-selected="activeWorkspaceTab === tab.id"
+          :tabindex="activeWorkspaceTab === tab.id ? 0 : -1"
+          @click="selectWorkspaceTab(tab.id)"
         >
-          Reanalyze
+          <span>{{ tab.label }}</span>
+          <small v-if="tab.id === 'statistics' && analysisStale">
+            Reanalyze
+          </small>
         </button>
-        <button
-          v-if="isReportEnabled('last-seen-gap')"
-          class="button secondary"
-          :disabled="!analysis || loading"
-          type="button"
-          @click="openLastSeenDialog"
-        >
-          Last seen
-        </button>
-        <button
-          v-if="isReportEnabled('predictions')"
-          class="button secondary"
-          :disabled="!analysis || loading"
-          type="button"
-          @click="openLastSeenGapDialog"
-        >
-          Last seen gaps
-        </button>
-        <button
-          v-if="isReportEnabled('possible-draw')"
-          class="button secondary"
-          :disabled="!analysis || loading"
-          type="button"
-          @click="openCombinedPredictionDialog"
-        >
-          Predictions
-        </button>
-        <button
-          class="button secondary"
-          :disabled="!analysis || loading"
-          type="button"
-          @click="openPossibleDrawDialog"
-        >
-          Possible draw
-        </button>
-        <button
-          class="button secondary"
-          :disabled="!analysis || loading"
-          type="button"
-          @click="openDrawEditorDialog"
-        >
-          Draw history
-        </button>
-        <button
-          class="button primary"
-          :disabled="!analysis || exporting"
-          type="button"
-          @click="exportAnalysis"
-        >
-          {{ exporting ? "Exporting…" : "Export" }}
-        </button>
-      </div>
+      </nav>
     </header>
 
-    <nav v-if="analysis" class="workspace-tabs" aria-label="Statistics views">
+    <nav
+      v-if="analysis"
+      v-show="activeWorkspaceTab === 'statistics'"
+      class="workspace-tabs"
+      aria-label="Statistics views"
+    >
       <button
         v-for="view in enabledViews"
         :key="view.id"
@@ -481,7 +567,11 @@ onBeforeUnmount(() => {
       </button>
     </nav>
 
-    <div v-if="analysis" class="dashboard-layout">
+    <div
+      v-if="analysis"
+      v-show="activeWorkspaceTab === 'statistics'"
+      class="dashboard-layout"
+    >
       <aside class="control-panel">
         <div>
           <p class="eyebrow">Analysis controls</p>
@@ -549,6 +639,26 @@ onBeforeUnmount(() => {
           :analysis="analysis"
           :figures="figures"
         />
+        <AutocorrelationView
+          v-else-if="activeView === 'autocorrelation' && analysis.options.enabledReports.includes('autocorrelation')"
+          :analysis="analysis"
+        />
+        <CoOccurrenceView
+          v-else-if="activeView === 'co-occurrence' && analysis.options.enabledReports.includes('co-occurrence')"
+          :analysis="analysis"
+        />
+        <PredictionAuditView
+          v-else-if="activeView === 'prediction-audit' && analysis.options.enabledReports.includes('prediction-audit')"
+          :analysis="analysis"
+        />
+        <LatestDrawComparisonView
+          v-else-if="activeView === 'draw-comparison' && analysis.options.enabledReports.includes('draw-comparison')"
+          :analysis="analysis"
+        />
+        <StrategyEffectivenessView
+          v-else-if="activeView === 'strategy-effectiveness' && analysis.options.enabledReports.includes('strategy-effectiveness')"
+          :analysis="analysis"
+        />
         <GapsView
           v-else-if="activeView === 'gaps' && analysis.options.enabledReports.includes('gaps')"
           :analysis="analysis"
@@ -564,13 +674,87 @@ onBeforeUnmount(() => {
       </main>
     </div>
 
-    <main v-else class="welcome-screen">
+    <main
+      v-if="analysis && visitedWorkspaceTabs.has('last-seen')"
+      v-show="activeWorkspaceTab === 'last-seen'"
+      class="workspace-tab-panel last-seen-dialog-shell embedded-workspace-panel"
+      role="tabpanel"
+      aria-label="Last seen"
+    >
+      <LastSeenHighlightView :history="analysis.history" />
+    </main>
+
+    <main
+      v-if="analysis && visitedWorkspaceTabs.has('last-seen-gap')"
+      v-show="activeWorkspaceTab === 'last-seen-gap'"
+      class="workspace-tab-panel last-seen-dialog-shell embedded-workspace-panel"
+      role="tabpanel"
+      aria-label="Last seen gaps"
+    >
+      <LastSeenGapHighlightView :history="analysis.history" />
+    </main>
+
+    <main
+      v-if="analysis && visitedWorkspaceTabs.has('last-seen-space')"
+      v-show="activeWorkspaceTab === 'last-seen-space'"
+      class="workspace-tab-panel last-seen-dialog-shell embedded-workspace-panel"
+      role="tabpanel"
+      aria-label="Last seen spaces"
+    >
+      <LastSeenSpaceHighlightView :history="analysis.history" />
+    </main>
+
+    <main
+      v-if="analysis && visitedWorkspaceTabs.has('predictions')"
+      v-show="activeWorkspaceTab === 'predictions'"
+      class="workspace-tab-panel combined-prediction-dialog-shell embedded-workspace-panel"
+      role="tabpanel"
+      aria-label="Predictions"
+    >
+      <CombinedPredictionGridView
+        :prediction-suites="analysis.predictionSuites"
+        :efficacy-history="analysis.strategyEfficacyHistory"
+        embedded
+        @send-number="handlePossibleDrawNumberRequest"
+      />
+    </main>
+
+    <section
+      v-if="combinedPredictionData && visitedWorkspaceTabs.has('possible-draw')"
+      v-show="activeWorkspaceTab === 'possible-draw'"
+      class="workspace-tab-panel embedded-workspace-panel"
+      role="tabpanel"
+      aria-label="Possible Draw"
+    >
+      <PossibleDrawDialogApp
+        :dialog-data="combinedPredictionData"
+        :number-request="possibleDrawNumberRequest"
+        embedded
+      />
+    </section>
+
+    <section
+      v-if="analysis && visitedWorkspaceTabs.has('draw-history')"
+      v-show="activeWorkspaceTab === 'draw-history'"
+      class="workspace-tab-panel embedded-workspace-panel"
+      role="tabpanel"
+      aria-label="Draw History"
+    >
+      <DrawEditorDialogApp
+        :key="analysis.dataset.path"
+        embedded
+        @saved="handleDrawHistorySaved"
+      />
+    </section>
+
+    <main v-if="!analysis" class="welcome-screen">
       <section class="welcome-card">
         <p class="eyebrow">Vue 3 + Electron</p>
         <h1>Explore draw history without a browser dashboard.</h1>
         <p>
           Open a trusted Draws pickle to calculate exact frequency, space,
-          relationship, randomness, and last-seen views with the existing Python engine.
+          relationship, randomness, autocorrelation, and last-seen views with
+          the existing Python engine.
         </p>
         <button class="button primary large" type="button" @click="chooseDataset">
           Open trusted dataset
@@ -633,7 +817,7 @@ onBeforeUnmount(() => {
       <span :class="{ ready: Boolean(analysis) && !loading }">{{ statusMessage }}</span>
       <span>Dataset: {{ loadingDataset?.name ?? analysis?.dataset.name ?? activeDataset?.name ?? "none" }}</span>
       <span>Draws: {{ analysis?.dataset.drawCount.toLocaleString() ?? "—" }}</span>
-      <span>View: {{ analysis ? activeViewLabel : "Welcome" }}</span>
+      <span>View: {{ analysis ? activeWorkspaceLabel : "Welcome" }}</span>
       <span>Python engine · Vue renderer · Electron shell</span>
     </footer>
   </div>

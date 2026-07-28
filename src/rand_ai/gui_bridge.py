@@ -34,9 +34,15 @@ REPORT_IDS = (
     "spaces",
     "relationships",
     "randomness",
+    "autocorrelation",
+    "co-occurrence",
+    "prediction-audit",
+    "draw-comparison",
+    "strategy-effectiveness",
     "gaps",
     "last-seen",
     "last-seen-gap",
+    "last-seen-space",
     "predictions",
     "possible-draw",
 )
@@ -223,6 +229,60 @@ def _strategy_payload(strategy: StrategyPrediction) -> dict[str, Any]:
     }
 
 
+def _draw_comparison_payload(
+    suite: PredictionSuite,
+    target_date: str | None,
+) -> dict[str, Any]:
+    """Return a compact comparison of one completed draw and its prior forecast."""
+    actual = set(suite.actual_numbers)
+    return {
+        "referenceDrawNumber": suite.reference_draw_number,
+        "targetDrawNumber": suite.target_draw_number,
+        "date": target_date,
+        "actualNumbers": list(suite.actual_numbers),
+        "strategies": [
+            {
+                "id": strategy.strategy_id,
+                "name": strategy.name,
+                "description": strategy.description,
+                "predictedNumbers": list(strategy.top_numbers),
+                "matchedNumbers": [
+                    number for number in strategy.top_numbers if number in actual
+                ],
+                "missedPredictions": [
+                    number for number in strategy.top_numbers if number not in actual
+                ],
+                "missedActualNumbers": [
+                    number
+                    for number in suite.actual_numbers
+                    if number not in strategy.top_numbers
+                ],
+                "hitCount": len(actual.intersection(strategy.top_numbers)),
+                "efficacy": (
+                    None
+                    if strategy.efficacy is None
+                    else {
+                        "evaluatedDraws": strategy.efficacy.evaluated_draws,
+                        "strategyHits": strategy.efficacy.strategy_hits,
+                        "randomHits": strategy.efficacy.random_hits,
+                        "expectedRandomHits": (
+                            strategy.efficacy.expected_random_hits
+                        ),
+                        "averageHitsPerDraw": (
+                            strategy.efficacy.average_hits_per_draw
+                        ),
+                        "randomAverageHitsPerDraw": (
+                            strategy.efficacy.random_average_hits_per_draw
+                        ),
+                        "hitDifference": strategy.efficacy.hit_difference,
+                    }
+                ),
+            }
+            for strategy in suite.strategies
+        ],
+    }
+
+
 def _suite_payload(suite: PredictionSuite) -> dict[str, Any]:
     return {
         "referenceDrawNumber": suite.reference_draw_number,
@@ -243,6 +303,32 @@ def _efficacy_record_payload(
         "actualNumbers": list(record.actual_numbers),
         "randomHits": record.random_hits,
         "strategyHits": dict(record.strategy_hits),
+    }
+
+
+def _prediction_audit_record_payload(
+    suite: PredictionSuite,
+    target_date: str | None,
+) -> dict[str, Any]:
+    """Return the strategies that correctly implied each drawn number."""
+    return {
+        "referenceDrawNumber": suite.reference_draw_number,
+        "targetDrawNumber": suite.target_draw_number,
+        "date": target_date,
+        "numbers": [
+            {
+                "number": number,
+                "strategies": [
+                    {
+                        "id": strategy.strategy_id,
+                        "name": strategy.name,
+                    }
+                    for strategy in suite.strategies
+                    if number in strategy.top_numbers
+                ],
+            }
+            for number in suite.actual_numbers
+        ],
     }
 
 
@@ -330,6 +416,17 @@ def build_analysis_payload(
     )
     history_start = max(0, len(draws) - MAX_HISTORY_WINDOW)
     prediction_suites_required = bool(
+        report_set.intersection(
+            {
+                "predictions",
+                "possible-draw",
+                "prediction-audit",
+                "draw-comparison",
+                "strategy-effectiveness",
+            }
+        )
+    )
+    display_prediction_suites_required = bool(
         report_set.intersection({"predictions", "possible-draw"})
     )
     prediction_prerequisites_required = (
@@ -349,11 +446,37 @@ def build_analysis_payload(
             )
     prediction_suites: Sequence[PredictionSuite] = ()
     efficacy_records: list[StrategyEfficacyRecord] = []
+    prediction_audit_history: list[dict[str, Any]] = []
+    draw_comparison_history: list[dict[str, Any]] = []
     if prediction_suites_required:
         _report_progress(progress, 31, "Preparing named PyLotto strategy models")
+
+        def record_evaluated_suite(suite: PredictionSuite) -> None:
+            target_index = suite.target_draw_number - 1
+            target_date = (
+                draws.draws[target_index].date
+                if 0 <= target_index < len(draws.draws)
+                else None
+            )
+            if "prediction-audit" in report_set:
+                prediction_audit_history.append(
+                    _prediction_audit_record_payload(suite, target_date)
+                )
+            if "draw-comparison" in report_set:
+                draw_comparison_history.append(
+                    _draw_comparison_payload(
+                        suite,
+                        target_date,
+                    )
+                )
+
         prediction_suites = build_prediction_suites(
             draws.draws,
-            history_start=history_start,
+            history_start=(
+                history_start
+                if display_prediction_suites_required
+                else len(draws.draws)
+            ),
             enabled_strategy_ids=strategy_ids,
             progress=_prediction_progress(
                 progress,
@@ -362,6 +485,13 @@ def build_analysis_payload(
                 f"Calculating {len(strategy_ids)} enabled prediction strategy plugins",
             ),
             efficacy_record=efficacy_records.append,
+            evaluated_suite=(
+                record_evaluated_suite
+                if report_set.intersection(
+                    {"prediction-audit", "draw-comparison"}
+                )
+                else None
+            ),
         )
     _report_progress(progress, 61, "Validating draw history and analysis options")
     statistics = DrawsStatistics(draws, trend_bins=trend_bins)
@@ -375,7 +505,9 @@ def build_analysis_payload(
     )
     _report_progress(progress, 85, "Preparing recent history for highlight views")
     history_required = bool(
-        report_set.intersection({"last-seen", "last-seen-gap"})
+        report_set.intersection(
+            {"last-seen", "last-seen-gap", "last-seen-space"}
+        )
     )
     history = (
         [
@@ -445,6 +577,17 @@ def build_analysis_payload(
             name: _table_payload(table) for name, table in tables.items()
         },
         "history": history,
+        "analysisHistory": (
+            [
+                {
+                    "date": draw.date,
+                    "numbers": [ball.value for ball in draw.balls],
+                }
+                for draw in draws.draws
+            ]
+            if report_set.intersection({"autocorrelation", "co-occurrence"})
+            else []
+        ),
         "combinedPredictions": prediction_history,
         "predictionSuites": [
             _suite_payload(suite) for suite in prediction_suites
@@ -453,6 +596,11 @@ def build_analysis_payload(
             _efficacy_record_payload(record)
             for record in efficacy_records
         ],
+        "predictionAuditHistory": prediction_audit_history,
+        "drawComparisonHistory": draw_comparison_history,
+        "latestDrawComparison": (
+            draw_comparison_history[-1] if draw_comparison_history else None
+        ),
         "possibleDraw": (
             _possible_draw_payload(draws)
             if "possible-draw" in report_set
