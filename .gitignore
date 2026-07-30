@@ -1,24 +1,111 @@
-# Python-generated files
+# -----------------------------------------------------------------------------
+# Local operating-system and editor files
+# -----------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Local environment and secrets (commit an explicit example file if needed)
+.env
+.env.*
+!.env.example
+
+# -----------------------------------------------------------------------------
+# Python dependencies, caches, coverage, and packaging output
+# -----------------------------------------------------------------------------
 __pycache__/
-*.py[oc]
+*.py[cod]
+*$py.class
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
 .coverage
+.coverage.*
 htmlcov/
+.tox/
+.nox/
+.venv/
+venv/
+env/
+.uv-cache/
 build/
 dist/
 wheels/
-*.egg-info
+*.egg-info/
+*.egg
 *.spec
 
-# Virtual environments
-.venv
-
-# Desktop application build artifacts
-web/node_modules/
+# -----------------------------------------------------------------------------
+# Node, Vite, and Electron dependencies/build output
+# -----------------------------------------------------------------------------
+**/node_modules/
 web/dist/
 web/electron-package/
-.codex_tmp/uv-cache/
-.codex_tmp/**/node_modules/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# IDE settings
-.idea/
+# -----------------------------------------------------------------------------
+# Local test runs, generated reports, exports, and application data
+# -----------------------------------------------------------------------------
+.codex_tmp/
+.streamlit/
+tmp/
+output/
+outputs/
+data/
+coverage/
+logs/
+*.log
+*.tmp
+*.temp
+*.cache
+
+# Runtime datasets and serialized model/data files
+*.pkl
+*.pickle
+*.joblib
+*.yaml
+*.yml
+
+# Generated documents, reports, spreadsheets, presentations, and archives
+doc/
+docs/
+*.pdf
+*.doc
+*.docx
+*.odt
+*.rtf
+*.xls
+*.xlsx
+*.xlsm
+*.ods
+*.ppt
+*.pptx
+*.pptm
+*.odp
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+
+# Compiled executables and platform installers
+*.exe
+*.msi
+*.msix
+*.dmg
+*.pkg
+*.deb
+*.rpm
+*.AppImage
