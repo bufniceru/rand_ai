@@ -1,68 +1,155 @@
 pipeline {
     agent any
 
-    options {
-        skipDefaultCheckout(true)
+    environment {
+        UV_INSTALL_DIR = 'C:\\ProgramData\\Jenkins\\.jenkins\\tools\\uv'
+        UV_NO_MODIFY_PATH = '1'
+        UV_PYTHON_INSTALL_DIR = 'C:\\ProgramData\\Jenkins\\.jenkins\\tools\\uv-python'
+        UV_CACHE_DIR = 'C:\\ProgramData\\Jenkins\\.jenkins\\cache\\uv'
+    }
+
+    tools {
+        nodejs 'NodeJS-26'
     }
 
     stages {
-        stage('Checkout') {
+        stage('Check Internet Access') {
             steps {
-                checkout scm
+                powershell '''
+                    $ErrorActionPreference = 'Stop'
+
+                    $addresses = [System.Net.Dns]::GetHostAddresses('astral.sh')
+                    Write-Host "DNS resolution succeeded:"
+                    $addresses | ForEach-Object { Write-Host "  $_" }
+
+                    $connection = Test-NetConnection `
+                        -ComputerName astral.sh `
+                        -Port 443 `
+                        -InformationLevel Detailed
+
+                    if (-not $connection.TcpTestSucceeded) {
+                        throw 'Cannot connect to astral.sh on TCP port 443'
+                    }
+
+                    Write-Host 'TCP connection to astral.sh:443 succeeded'
+
+                    $response = Invoke-WebRequest `
+                        -Uri 'https://astral.sh/uv/install.ps1' `
+                        -UseBasicParsing `
+                        -TimeoutSec 30
+
+                    if ($response.StatusCode -ne 200) {
+                        throw "Astral returned HTTP status $($response.StatusCode)"
+                    }
+
+                    Write-Host "Astral HTTPS request succeeded: HTTP $($response.StatusCode)"
+
+                    $githubResponse = Invoke-WebRequest `
+                        -Uri 'https://github.com' `
+                        -UseBasicParsing `
+                        -TimeoutSec 30
+
+                    Write-Host "GitHub HTTPS request succeeded: HTTP $($githubResponse.StatusCode)"
+                '''
             }
         }
-
-        stage('Display project version') {
+        stage('Install uv') {
             steps {
-                script {
-                    def projectVersion = null
-                    def insideProjectSection = false
+                powershell '''
+                    $ErrorActionPreference = 'Stop'
+                    $uvExecutable = Join-Path $env:UV_INSTALL_DIR 'uv.exe'
 
-                    for (String rawLine : readFile(file: 'pyproject.toml').readLines()) {
-                        def line = rawLine.trim()
+                    if (-not (Test-Path -LiteralPath $uvExecutable)) {
+                        Write-Host 'Downloading uv from Astral...'
 
-                        if (line == '[project]') {
-                            insideProjectSection = true
-                            continue
-                        }
+                        New-Item `
+                            -ItemType Directory `
+                            -Force `
+                            -Path $env:UV_INSTALL_DIR | Out-Null
 
-                        if (insideProjectSection && line.startsWith('[')) {
-                            break
-                        }
-
-                        def equalsIndex = line.indexOf('=')
-                        if (insideProjectSection && equalsIndex > 0) {
-                            def key = line.substring(0, equalsIndex).trim()
-                            def value = line.substring(equalsIndex + 1).trim()
-
-                            if (key == 'version' && value.length() >= 2) {
-                                def quote = value.substring(0, 1)
-                                if ((quote == '"' || quote == "'") && value.endsWith(quote)) {
-                                    projectVersion = value.substring(1, value.length() - 1)
-                                    break
-                                }
-                            }
-                        }
+                        Invoke-RestMethod https://astral.sh/uv/install.ps1 |
+                            Invoke-Expression
+                    }
+                    else {
+                        Write-Host "Using existing uv installation: $uvExecutable"
                     }
 
-                    if (!projectVersion) {
-                        error('Could not find project.version in pyproject.toml')
-                    }
-
-                    echo "Project version from pyproject.toml: ${projectVersion}"
+                    & $uvExecutable --version
+                '''
+            }
+        }
+        stage('Verify Tools') {
+            steps {
+                withEnv(["PATH+UV=${env.UV_INSTALL_DIR}"]) {
+                    bat 'whoami'
+                    bat 'where git'
+                    bat 'git --version'
+                    bat 'where uv'
+                    bat 'uv --version'
                 }
             }
         }
-
-        stage('Build portable Electron executable') {
+        // stage('Checkout') {
+        //     steps {
+        //         checkout scm
+        //     }
+        // }
+        stage('Checkout') {
             steps {
-                bat 'uv sync --frozen'
+                checkout scmGit(
+                    branches: [[name: '*/master']],
+                    userRemoteConfigs: [[
+                        credentialsId: 'github-rand-ai-ssh',
+                        url: 'git@github.com:bufniceru/rand_ai.git'
+                    ]]
+                )
+            }
+        }
+        stage('Display project version') {
+            steps {
+                withEnv(["PATH+UV=${env.UV_INSTALL_DIR}"]) {
+                    script {
+                        def projectVersion = bat(
+                            script: '@uv version --short',
+                            returnStdout: true
+                        ).trim()
 
+                        echo "Project version: ${projectVersion}"
+                    }
+                }
+            }
+        }
+        stage('Sync Python environment') {
+            steps {
+                withEnv(["PATH+UV=${env.UV_INSTALL_DIR}"]) {
+                    bat 'uv sync --locked'
+                }
+            }
+        }
+        stage('Verify Node') {
+            steps {
+                bat 'node --version'
+                bat 'npm --version'
+            }
+        }
+
+        stage('Install dependencies') {
+            steps {
                 dir('web') {
                     bat 'npm ci'
+                }
+            }
+        }
+        stage('Build portable Electron executable') {
+            steps {
+                dir('web') {
                     bat 'npm run electron:build'
                 }
 
+            }
+        }
+        stage('ArchiveArtifacts') {
+            steps {
                 archiveArtifacts(
                     artifacts: 'web/electron-package/*.exe',
                     fingerprint: true,
