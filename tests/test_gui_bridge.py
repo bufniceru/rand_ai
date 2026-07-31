@@ -509,6 +509,46 @@ def test_cli_draw_editor_reads_and_saves_yaml_first(
     assert yaml_path.stat().st_mtime_ns <= pickle_path.stat().st_mtime_ns
 
 
+def test_cli_yaml_import_generates_managed_pickle(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    yaml_path = tmp_path / "managed.yaml"
+    pickle_path = tmp_path / "managed.pkl"
+    yaml_path.write_text(
+        "lotto_results:\n"
+        "  draws:\n"
+        "  - {date: '2026-07-20', numbers: [1, 2, 3, 4, 5, 6]}\n"
+        "  - {date: '2026-07-27', numbers: [7, 8, 9, 10, 11, 12]}\n",
+        encoding="utf-8",
+    )
+
+    main(
+        [
+            "yaml-import",
+            "--input",
+            str(yaml_path),
+            "--output",
+            str(pickle_path),
+        ]
+    )
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+
+    assert result == {
+        "picklePath": str(pickle_path.resolve()),
+        "drawCount": 2,
+    }
+    assert "RAND_AI_PROGRESS" in output.err
+    assert pickle_path.is_file()
+    with pickle_path.open("rb") as pickle_file:
+        restored = Draws.load_trusted_pickle(
+            pickle_file,
+            prepare_predictions=False,
+        )
+    assert [draw.date for draw in restored] == ["2026-07-20", "2026-07-27"]
+
+
 def test_cli_draw_save_requires_exactly_six_numbers(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="exactly six"):
         main(

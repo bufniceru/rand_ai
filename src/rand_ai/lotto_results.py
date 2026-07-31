@@ -55,13 +55,14 @@ def create_lotto_results_pickle(
 def resolve_lotto_results_yaml(pickle_path: str | Path) -> Path:
     """Return the YAML source paired with a managed lottery-results pickle."""
     source = Path(pickle_path).resolve()
-    yaml_path = source.with_suffix(".yaml")
-    if not yaml_path.is_file():
-        raise FileNotFoundError(
-            f"No paired YAML file was found at {yaml_path}. "
-            "Draw editing is available for YAML-managed pickle datasets."
-        )
-    return yaml_path
+    yaml_paths = (source.with_suffix(".yaml"), source.with_suffix(".yml"))
+    for yaml_path in yaml_paths:
+        if yaml_path.is_file():
+            return yaml_path
+    raise FileNotFoundError(
+        f"No paired YAML file was found at {yaml_paths[0]} or {yaml_paths[1]}. "
+        "Draw editing is available for YAML-managed pickle datasets."
+    )
 
 
 def lotto_results_editor_payload(pickle_path: str | Path) -> dict[str, Any]:

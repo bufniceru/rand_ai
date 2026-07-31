@@ -287,15 +287,21 @@ async function chooseDataset(): Promise<void> {
   }
   try {
     const dataset = await window.randAiDesktop.openDataset();
-    if (dataset) pendingDataset.value = dataset;
+    if (dataset) stageDataset(dataset);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
   }
 }
 
 function stageDataset(dataset: DatasetSelection): void {
-  pendingDataset.value = dataset;
   errorMessage.value = "";
+  if (dataset.requiresTrust === false) {
+    pendingDataset.value = null;
+    statusMessage.value = `Opening ${dataset.name}; preparing managed pickle…`;
+    void analyzeDataset(dataset, normalizeOptions());
+    return;
+  }
+  pendingDataset.value = dataset;
 }
 
 async function analyzeDataset(
@@ -310,7 +316,10 @@ async function analyzeDataset(
   loadingDataset.value = dataset;
   loadingProgress.value = 1;
   loadingProgressTarget = 1;
-  loadingExplanation.value = "Preparing the trusted dataset for the Python engine";
+  loadingExplanation.value =
+    dataset.requiresTrust === false
+      ? "Preparing the YAML dataset and managed pickle"
+      : "Preparing the trusted dataset for the Python engine";
   errorMessage.value = "";
   exportMessage.value = "";
   statusMessage.value = `${loadingExplanation.value} · 1%`;
@@ -752,14 +761,13 @@ onBeforeUnmount(() => {
         <p class="eyebrow">Vue 3 + Electron</p>
         <h1>Explore draw history without a browser dashboard.</h1>
         <p>
-          Open a trusted Draws pickle to calculate exact frequency, space,
-          relationship, randomness, autocorrelation, and last-seen views with
-          the existing Python engine.
+          Open a Draws YAML file to generate its managed pickle and start the
+          analysis automatically. You can also open an existing trusted pickle.
         </p>
         <button class="button primary large" type="button" @click="chooseDataset">
-          Open trusted dataset
+          Open YAML or trusted pickle
         </button>
-        <small>Pickle files can execute code. A trust confirmation appears before analysis.</small>
+        <small>YAML imports start immediately. Existing pickle files require a trust confirmation.</small>
       </section>
       <section class="welcome-features">
         <article><strong>21</strong><span>Interactive statistics charts</span></article>

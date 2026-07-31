@@ -3,8 +3,8 @@
 import argparse
 import json
 import math
-from collections import Counter
 import sys
+from collections import Counter
 from collections.abc import Callable, Collection, Sequence
 from pathlib import Path
 from typing import Any, cast
@@ -14,6 +14,7 @@ import pandas as pd
 
 from rand_ai.draws import Draws
 from rand_ai.lotto_results import (
+    create_lotto_results_pickle,
     lotto_results_editor_payload,
     resolve_lotto_results_yaml,
     upsert_lotto_result,
@@ -736,6 +737,9 @@ def _argument_parser() -> argparse.ArgumentParser:
     save_parser.add_argument("--date", required=True)
     save_parser.add_argument("--numbers", required=True, type=parse_selected_numbers)
     save_parser.add_argument("--original-date")
+    yaml_import_parser = subparsers.add_parser("yaml-import")
+    yaml_import_parser.add_argument("--input", required=True, type=Path)
+    yaml_import_parser.add_argument("--output", required=True, type=Path)
     return parser
 
 
@@ -763,6 +767,19 @@ def main(arguments: Sequence[str] | None = None) -> None:
         )
         json.dump(
             lotto_results_editor_payload(options.input),
+            sys.stdout,
+            separators=(",", ":"),
+        )
+        return
+    if options.command == "yaml-import":
+        _write_progress(5, "Reading and validating the YAML draw history")
+        draws = create_lotto_results_pickle(options.input, options.output)
+        _write_progress(100, "Managed pickle generated from YAML")
+        json.dump(
+            {
+                "picklePath": str(options.output.resolve()),
+                "drawCount": len(draws),
+            },
             sys.stdout,
             separators=(",", ":"),
         )

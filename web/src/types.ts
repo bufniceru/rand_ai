@@ -93,6 +93,7 @@ export interface DatasetSelection {
   path: string;
   name: string;
   sizeBytes: number;
+  requiresTrust?: boolean;
 }
 
 export interface DatasetSummary extends DatasetSelection {

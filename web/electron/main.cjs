@@ -288,13 +288,15 @@ async function selectRecentDataset(dataset) {
       throw new Error("The recent dataset is no longer a file.");
     }
     if (stats.size > maximumUploadBytes) {
-      throw new Error("Pickle file must not exceed 100 MiB.");
+      throw new Error("Dataset file must not exceed 100 MiB.");
     }
+    const extension = path.extname(dataset.path).toLowerCase();
     sendMenuAction("datasetSelected", {
       dataset: {
         path: dataset.path,
         name: path.basename(dataset.path),
         sizeBytes: stats.size,
+        requiresTrust: ![".yaml", ".yml"].includes(extension),
       },
     });
   } catch (error) {
@@ -433,9 +435,11 @@ function loadRenderer(window, query = {}) {
 
 async function chooseDataset() {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: "Open trusted Draws dataset",
+    title: "Open Draws YAML or trusted pickle",
     properties: ["openFile"],
     filters: [
+      { name: "Draws YAML or pickle", extensions: ["yaml", "yml", "pkl", "pickle"] },
+      { name: "Draws YAML", extensions: ["yaml", "yml"] },
       { name: "Draws pickle", extensions: ["pkl", "pickle"] },
       { name: "All files", extensions: ["*"] },
     ],
@@ -444,14 +448,19 @@ async function chooseDataset() {
     return null;
   }
   const filePath = result.filePaths[0];
+  const extension = path.extname(filePath).toLowerCase();
+  if (![".yaml", ".yml", ".pkl", ".pickle"].includes(extension)) {
+    throw new Error("Select a .yaml, .yml, .pkl, or .pickle Draws dataset.");
+  }
   const stats = await fs.promises.stat(filePath);
   if (stats.size > maximumUploadBytes) {
-    throw new Error("Pickle file must not exceed 100 MiB.");
+    throw new Error("Dataset file must not exceed 100 MiB.");
   }
   return {
     path: filePath,
     name: path.basename(filePath),
     sizeBytes: stats.size,
+    requiresTrust: ![".yaml", ".yml"].includes(extension),
   };
 }
 
@@ -497,7 +506,7 @@ function buildApplicationMenu() {
       label: "File",
       submenu: [
         {
-          label: "Open Dataset...",
+          label: "Open YAML or Dataset...",
           accelerator: "CmdOrCtrl+O",
           click: async () => {
             try {
@@ -698,25 +707,60 @@ ipcMain.handle("dataset:analyze", async (event, request) => {
       event.sender.send("dataset:analysis-progress", progress);
     }
   };
+  const mapProgress = (start, end) => (progress) => {
+    const bridgePercent = Math.min(
+      Math.max(Number(progress?.percent) || 0, 0),
+      100,
+    );
+    sendProgress({
+      percent: Math.round(start + ((end - start) * bridgePercent) / 100),
+      message: progress.message,
+    });
+  };
   sendProgress({ percent: 2, message: "Checking the selected file and its size" });
-  const filePath = path.resolve(String(request?.path ?? ""));
-  const extension = path.extname(filePath).toLowerCase();
-  if (![".pkl", ".pickle"].includes(extension)) {
-    throw new Error("Select a .pkl or .pickle Draws dataset.");
+  const selectedPath = path.resolve(String(request?.path ?? ""));
+  const extension = path.extname(selectedPath).toLowerCase();
+  if (![".yaml", ".yml", ".pkl", ".pickle"].includes(extension)) {
+    throw new Error("Select a .yaml, .yml, .pkl, or .pickle Draws dataset.");
   }
-  const stats = await fs.promises.stat(filePath);
-  if (stats.size > maximumUploadBytes) {
-    throw new Error("Pickle file must not exceed 100 MiB.");
+  const selectedStats = await fs.promises.stat(selectedPath);
+  if (selectedStats.size > maximumUploadBytes) {
+    throw new Error("Dataset file must not exceed 100 MiB.");
   }
-  sendProgress({ percent: 3, message: "Starting the Python analysis engine" });
+
+  const isYaml = [".yaml", ".yml"].includes(extension);
+  let analysisPath = selectedPath;
+  if (isYaml) {
+    analysisPath = path.join(
+      path.dirname(selectedPath),
+      `${path.basename(selectedPath, extension)}.pkl`,
+    );
+    sendProgress({ percent: 3, message: "Opening the YAML draw history" });
+    await runBridge(
+      ["yaml-import", "--input", selectedPath, "--output", analysisPath],
+      true,
+      mapProgress(3, 10),
+    );
+    const pickleStats = await fs.promises.stat(analysisPath);
+    if (pickleStats.size > maximumUploadBytes) {
+      throw new Error("Generated pickle file must not exceed 100 MiB.");
+    }
+    sendProgress({
+      percent: 11,
+      message: "Managed pickle created; starting the Python analysis engine",
+    });
+  } else {
+    sendProgress({ percent: 3, message: "Starting the Python analysis engine" });
+  }
+
   const payload = await runBridge(
-    ["analyze", "--input", filePath, ...optionArguments(request?.options)],
+    ["analyze", "--input", analysisPath, ...optionArguments(request?.options)],
     true,
-    sendProgress,
+    isYaml ? mapProgress(11, 97) : sendProgress,
   );
   sendProgress({ percent: 98, message: "Updating the tabbed workspace and application menus" });
-  activeDatasetPath = filePath;
-  addRecentDataset(filePath, stats.size);
+  activeDatasetPath = analysisPath;
+  addRecentDataset(selectedPath, selectedStats.size);
   buildApplicationMenu();
   sendProgress({ percent: 100, message: "Analysis ready" });
   return payload;

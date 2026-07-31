@@ -145,6 +145,14 @@ def test_yaml_editor_rejects_missing_or_conflicting_sources(
         )
 
 
+def test_resolves_paired_yml_source(tmp_path: Path) -> None:
+    pickle_path = tmp_path / "managed.pkl"
+    yml_path = tmp_path / "managed.yml"
+    yml_path.write_text("lotto_results:\n  draws: []\n", encoding="utf-8")
+
+    assert resolve_lotto_results_yaml(pickle_path) == yml_path.resolve()
+
+
 @pytest.mark.parametrize("content", ("[]\n", "other: value\n"))
 def test_yaml_editor_rejects_invalid_documents(
     tmp_path: Path,

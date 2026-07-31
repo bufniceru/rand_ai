@@ -36,6 +36,18 @@ The Electron shell invokes `rand-ai-gui-bridge` with the project virtual
 environment. Set `RAND_AI_PYTHON` to a different Python executable when
 needed.
 
+### Opening a dataset
+
+From the welcome screen or **File > Open YAML or Dataset**, select either:
+
+- A `.yaml` or `.yml` Draws file. Rand AI generates a same-name `.pkl` beside
+  the YAML source and starts analysis immediately.
+- An existing `.pkl` or `.pickle` dataset. Rand AI asks for explicit trust
+  confirmation before loading it.
+
+The generated pickle remains paired with its YAML source for the Draw History
+editor.
+
 ### Portable Windows build
 
 ```powershell
@@ -58,6 +70,7 @@ change while an existing package build is still running.
 
 ### Security
 
-The desktop app accepts `.pkl` and `.pickle` datasets only after an explicit
-trust confirmation. Python pickle loading can execute code; never analyze an
-unknown or untrusted file.
+YAML imports use the safe YAML loader and Rand AI trusts only the pickle it
+generates from that selected source. Existing `.pkl` and `.pickle` datasets
+still require explicit trust confirmation because Python pickle loading can
+execute code; never analyze an unknown or untrusted pickle file.
