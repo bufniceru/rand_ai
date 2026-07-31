@@ -53,5 +53,22 @@ pipeline {
                 }
             }
         }
+
+        stage('Build portable Electron executable') {
+            steps {
+                bat 'uv sync --frozen'
+
+                dir('web') {
+                    bat 'npm ci'
+                    bat 'npm run electron:build'
+                }
+
+                archiveArtifacts(
+                    artifacts: 'web/electron-package/*.exe',
+                    fingerprint: true,
+                    onlyIfSuccessful: true
+                )
+            }
+        }
     }
 }
