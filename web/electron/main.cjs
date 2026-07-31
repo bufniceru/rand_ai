@@ -1,7 +1,13 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain } = require("electron");
 const { spawn } = require("node:child_process");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
+const { promisify } = require("node:util");
+const zlib = require("node:zlib");
+
+const gzip = promisify(zlib.gzip);
+const gunzip = promisify(zlib.gunzip);
 
 const devServerUrl = process.env.VITE_DEV_SERVER_URL || "";
 const maximumUploadBytes = 100 * 1024 * 1024;
@@ -26,6 +32,7 @@ const reportPlugins = [
   { id: "last-seen-gap", label: "Last Seen Gap Highlight" },
   { id: "last-seen-space", label: "Last Seen Space Highlight" },
   { id: "predictions", label: "Predictions" },
+  { id: "draw-portfolio", label: "Draw Portfolio" },
   { id: "possible-draw", label: "Possible Draw" },
 ];
 const legacyReportPluginIds = reportPlugins
@@ -37,7 +44,8 @@ const legacyReportPluginIds = reportPlugins
       reportId !== "prediction-audit" &&
       reportId !== "draw-comparison" &&
       reportId !== "strategy-effectiveness" &&
-      reportId !== "last-seen-space",
+      reportId !== "last-seen-space" &&
+      reportId !== "draw-portfolio",
   );
 let enabledReportIds = new Set(reportPlugins.map((plugin) => plugin.id));
 const legacyStrategyPluginIds = [
@@ -117,6 +125,52 @@ function strategyPreferencesPath() {
 
 function analysisCachePath() {
   return path.join(app.getPath("userData"), "analysis-cache");
+}
+
+function portfolioBacktestCachePath() {
+  return path.join(app.getPath("userData"), "portfolio-backtests");
+}
+
+function validatedPortfolioCacheKey(value) {
+  const key = String(value ?? "");
+  if (!/^[a-f0-9]{64}-v\d+-p(?:[1-9]|[1-9]\d|100)$/.test(key)) {
+    throw new Error("Invalid portfolio backtest cache key.");
+  }
+  return key;
+}
+
+function validPortfolioBacktestResult(value) {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    Number.isInteger(value.algorithmVersion) &&
+    Number.isInteger(value.portfolioSize) &&
+    value.portfolioSize >= 1 &&
+    value.portfolioSize <= 100 &&
+    Number.isInteger(value.evaluatedTargets) &&
+    Array.isArray(value.buckets) &&
+    value.buckets.length === 7 &&
+    Array.isArray(value.audit) &&
+    value.audit.length === value.evaluatedTargets
+  );
+}
+
+async function prunePortfolioBacktestCache() {
+  const cachePath = portfolioBacktestCachePath();
+  const entries = await fs.promises.readdir(cachePath, { withFileTypes: true });
+  const files = await Promise.all(
+    entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".json.gz"))
+      .map(async (entry) => {
+        const filePath = path.join(cachePath, entry.name);
+        const stats = await fs.promises.stat(filePath);
+        return { filePath, modified: stats.mtimeMs };
+      }),
+  );
+  files.sort((left, right) => right.modified - left.modified);
+  await Promise.all(
+    files.slice(20).map((entry) => fs.promises.unlink(entry.filePath)),
+  );
 }
 
 function enabledReportsList() {
@@ -607,6 +661,13 @@ function buildApplicationMenu() {
             sendMenuAction("openWorkspaceTab", { tab: "possible-draw" }),
         },
         {
+          label: "Draw Portfolio",
+          enabled:
+            activeDatasetPath !== null && enabledReportIds.has("draw-portfolio"),
+          click: () =>
+            sendMenuAction("openWorkspaceTab", { tab: "draw-portfolio" }),
+        },
+        {
           label: "Draw History Editor",
           accelerator: "CmdOrCtrl+Shift+H",
           enabled: activeDatasetPath !== null,
@@ -784,6 +845,77 @@ ipcMain.handle("dataset:analyze", async (event, request) => {
   buildApplicationMenu();
   sendProgress({ percent: 100, message: "Analysis ready" });
   return payload;
+});
+
+ipcMain.handle("portfolio-backtest:data", async (event, request) => {
+  if (!activeDatasetPath) {
+    throw new Error("Analyze a dataset before running a portfolio simulation.");
+  }
+  const requested = new Set(
+    Array.isArray(request?.strategyIds) ? request.strategyIds : [],
+  );
+  const strategyIds = strategyPlugins
+    .map((plugin) => plugin.id)
+    .filter((strategyId) => requested.has(strategyId));
+  return runBridge(
+    [
+      "portfolio-backtest-data",
+      "--input",
+      activeDatasetPath,
+      "--strategies",
+      strategyIds.join(","),
+      "--cache-dir",
+      analysisCachePath(),
+    ],
+    true,
+    (progress) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send("portfolio-backtest:progress", progress);
+      }
+    },
+  );
+});
+
+ipcMain.handle("portfolio-backtest:cache-load", async (_event, requestedKey) => {
+  const key = validatedPortfolioCacheKey(requestedKey);
+  const filePath = path.join(portfolioBacktestCachePath(), `${key}.json.gz`);
+  try {
+    const compressed = await fs.promises.readFile(filePath);
+    const decoded = JSON.parse((await gunzip(compressed)).toString("utf8"));
+    if (!validPortfolioBacktestResult(decoded)) {
+      throw new Error("Portfolio backtest cache has an invalid structure.");
+    }
+    await fs.promises.utimes(filePath, new Date(), new Date());
+    return decoded;
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      await fs.promises.unlink(filePath).catch(() => undefined);
+      console.warn("Discarded invalid portfolio backtest cache:", error);
+    }
+    return null;
+  }
+});
+
+ipcMain.handle("portfolio-backtest:cache-save", async (_event, request) => {
+  const key = validatedPortfolioCacheKey(request?.key);
+  const result = request?.result;
+  if (!validPortfolioBacktestResult(result)) {
+    throw new Error("Portfolio backtest result is invalid.");
+  }
+  const cachePath = portfolioBacktestCachePath();
+  await fs.promises.mkdir(cachePath, { recursive: true });
+  const filePath = path.join(cachePath, `${key}.json.gz`);
+  const temporaryPath = `${filePath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  try {
+    await fs.promises.writeFile(
+      temporaryPath,
+      await gzip(Buffer.from(JSON.stringify(result), "utf8")),
+    );
+    await fs.promises.rename(temporaryPath, filePath);
+  } finally {
+    await fs.promises.unlink(temporaryPath).catch(() => undefined);
+  }
+  await prunePortfolioBacktestCache();
 });
 
 ipcMain.handle("possible-draw:for-sure-limit-error", (event, requestedNumber) => {

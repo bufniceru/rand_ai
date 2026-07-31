@@ -49,6 +49,7 @@ REPORT_IDS = (
     "last-seen-gap",
     "last-seen-space",
     "predictions",
+    "draw-portfolio",
     "possible-draw",
 )
 DEFAULT_REPORT_IDS = REPORT_IDS
@@ -56,7 +57,7 @@ DEFAULT_STRATEGY_IDS = tuple(
     strategy_id for strategy_id in STRATEGY_IDS if strategy_id != "mkrd"
 )
 MAX_HISTORY_WINDOW = 250
-STRATEGY_CACHE_SCHEMA_VERSION = 2
+STRATEGY_CACHE_SCHEMA_VERSION = 3
 STRATEGY_CACHE_MAX_ENTRIES = 20
 STRATEGY_CACHE_MAX_BYTES = 1024 * 1024 * 1024
 PROGRESS_PREFIX = "RAND_AI_PROGRESS "
@@ -108,6 +109,7 @@ def _valid_strategy_artifacts(value: object) -> bool:
         "strategyEfficacyHistory",
         "predictionAuditHistory",
         "drawComparisonHistory",
+        "portfolioBacktestHistory",
     )
     return isinstance(value, dict) and all(
         isinstance(value.get(name), list) for name in required
@@ -494,6 +496,7 @@ def _build_strategy_analysis(
     efficacy_records: list[StrategyEfficacyRecord] = []
     prediction_audit_history: list[dict[str, Any]] = []
     draw_comparison_history: list[dict[str, Any]] = []
+    portfolio_backtest_history: list[dict[str, Any]] = []
 
     def record_evaluated_suite(suite: PredictionSuite) -> None:
         target_index = suite.target_draw_number - 1
@@ -507,6 +510,21 @@ def _build_strategy_analysis(
         )
         draw_comparison_history.append(
             _draw_comparison_payload(suite, target_date)
+        )
+        portfolio_backtest_history.append(
+            {
+                "referenceDrawNumber": suite.reference_draw_number,
+                "targetDrawNumber": suite.target_draw_number,
+                "date": target_date,
+                "actualNumbers": list(suite.actual_numbers),
+                "strategies": [
+                    {
+                        "id": strategy.strategy_id,
+                        "ranking": [item.number for item in strategy.numbers],
+                    }
+                    for strategy in suite.strategies
+                ],
+            }
         )
 
     prediction_suites = build_prediction_suites(
@@ -531,6 +549,7 @@ def _build_strategy_analysis(
         ],
         "predictionAuditHistory": prediction_audit_history,
         "drawComparisonHistory": draw_comparison_history,
+        "portfolioBacktestHistory": portfolio_backtest_history,
     }
 
 
@@ -659,6 +678,7 @@ def build_analysis_payload(
         report_set.intersection(
             {
                 "predictions",
+                "draw-portfolio",
                 "possible-draw",
                 "prediction-audit",
                 "draw-comparison",
@@ -667,7 +687,7 @@ def build_analysis_payload(
         )
     )
     display_prediction_suites_required = bool(
-        report_set.intersection({"predictions", "possible-draw"})
+        report_set.intersection({"predictions", "draw-portfolio", "possible-draw"})
     )
     prediction_prerequisites_required = (
         "predictions" in report_set
@@ -822,7 +842,7 @@ def build_analysis_payload(
         ),
         "possibleDraw": (
             _possible_draw_payload(draws)
-            if "possible-draw" in report_set
+            if report_set.intersection({"draw-portfolio", "possible-draw"})
             else {
                 "lastDrawNumbers": [],
                 "lastSeenRows": [],
@@ -873,6 +893,64 @@ def analyze_file(
         strategy_cache_dir=strategy_cache_dir,
         refresh_strategy_cache=refresh_strategy_cache,
     )
+
+
+def portfolio_backtest_data(
+    source_path: Path,
+    *,
+    enabled_strategies: Collection[str] = DEFAULT_STRATEGY_IDS,
+    progress: ProgressCallback | None = None,
+    strategy_cache_dir: Path | None = None,
+) -> dict[str, Any]:
+    """Return compact full-history rankings for an on-demand portfolio backtest."""
+    _report_progress(progress, 4, "Opening the trusted portfolio history dataset")
+    draws = load_trusted_draws(source_path, prepare_predictions=False)
+    strategy_ids = tuple(
+        strategy_id
+        for strategy_id in STRATEGY_IDS
+        if strategy_id in enabled_strategies
+    )
+    identity = _strategy_cache_identity(draws, strategy_ids)
+    cached = (
+        _read_strategy_cache(strategy_cache_dir, identity)
+        if strategy_cache_dir is not None and strategy_ids
+        else None
+    )
+    if cached is None:
+        _report_progress(progress, 8, "Preparing full-history prediction prerequisites")
+        if draws.draws and draws.draws[-1].prediction is None:
+            draws.prepare_predictions(
+                _prediction_progress(
+                    progress,
+                    8,
+                    30,
+                    "Calculating portfolio prediction prerequisites",
+                )
+            )
+        cached = _strategy_analysis(
+            draws,
+            strategy_ids,
+            max(0, len(draws) - MAX_HISTORY_WINDOW),
+            progress,
+            strategy_cache_dir,
+            False,
+        )
+    else:
+        _report_progress(progress, 60, "Loaded compact full-history strategy rankings")
+    cache_name = _strategy_cache_path(Path("."), identity).name
+    _report_progress(progress, 92, "Serializing full-history portfolio inputs")
+    return {
+        "cacheKey": cache_name.removesuffix(".json.gz"),
+        "strategyIds": list(strategy_ids),
+        "draws": [
+            {
+                "date": draw.date,
+                "numbers": [ball.value for ball in draw.balls],
+            }
+            for draw in draws.draws
+        ],
+        "records": cached["portfolioBacktestHistory"],
+    }
 
 
 def write_export_archive(
@@ -968,6 +1046,14 @@ def _argument_parser() -> argparse.ArgumentParser:
     yaml_import_parser = subparsers.add_parser("yaml-import")
     yaml_import_parser.add_argument("--input", required=True, type=Path)
     yaml_import_parser.add_argument("--output", required=True, type=Path)
+    portfolio_parser = subparsers.add_parser("portfolio-backtest-data")
+    portfolio_parser.add_argument("--input", required=True, type=Path)
+    portfolio_parser.add_argument(
+        "--strategies",
+        default=",".join(DEFAULT_STRATEGY_IDS),
+        type=parse_strategy_ids,
+    )
+    portfolio_parser.add_argument("--cache-dir", required=True, type=Path)
     return parser
 
 
@@ -1011,6 +1097,16 @@ def main(arguments: Sequence[str] | None = None) -> None:
             sys.stdout,
             separators=(",", ":"),
         )
+        return
+    if options.command == "portfolio-backtest-data":
+        payload = portfolio_backtest_data(
+            options.input,
+            enabled_strategies=cast(tuple[str, ...], options.strategies),
+            progress=_write_progress,
+            strategy_cache_dir=options.cache_dir,
+        )
+        _write_progress(97, "Transferring full-history portfolio inputs")
+        json.dump(payload, sys.stdout, separators=(",", ":"))
         return
     selected_numbers = cast(tuple[int, ...], options.selected_numbers)
     correlation_method = cast(CorrelationMethod, options.correlation_method)

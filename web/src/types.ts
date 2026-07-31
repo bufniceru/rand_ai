@@ -15,6 +15,7 @@ export type ReportId =
   | "last-seen-gap"
   | "last-seen-space"
   | "predictions"
+  | "draw-portfolio"
   | "possible-draw";
 export type StrategyId =
   | "proximity"
@@ -58,6 +59,7 @@ export type WorkspaceTabId =
   | "last-seen-gap"
   | "last-seen-space"
   | "predictions"
+  | "draw-portfolio"
   | "possible-draw"
   | "draw-history";
 
@@ -395,6 +397,61 @@ export interface PredictionSuite {
   strategies: StrategyPrediction[];
 }
 
+export interface PortfolioBacktestStrategy {
+  id: StrategyId;
+  ranking: number[];
+}
+
+export interface PortfolioBacktestRecord {
+  referenceDrawNumber: number;
+  targetDrawNumber: number;
+  date: string | null;
+  actualNumbers: number[];
+  strategies: PortfolioBacktestStrategy[];
+}
+
+export interface PortfolioBacktestData {
+  cacheKey: string;
+  strategyIds: StrategyId[];
+  draws: AnalysisHistoryDraw[];
+  records: PortfolioBacktestRecord[];
+}
+
+export interface PortfolioBacktestAuditRow {
+  referenceDrawNumber: number;
+  targetDrawNumber: number;
+  date: string | null;
+  actualNumbers: number[];
+  bestTicket: number[];
+  bestHits: number;
+  tiedBestCount: number;
+}
+
+export interface PortfolioBacktestHitBucket {
+  hits: number;
+  exactCount: number;
+  exactRate: number;
+  atLeastCount: number;
+  atLeastRate: number;
+}
+
+export interface PortfolioBacktestResult {
+  algorithmVersion: number;
+  sourceCacheKey: string;
+  portfolioSize: number;
+  evaluatedTargets: number;
+  durationMs: number;
+  buckets: PortfolioBacktestHitBucket[];
+  audit: PortfolioBacktestAuditRow[];
+}
+
+export interface PortfolioBacktestProgress {
+  percent: number;
+  message: string;
+  processed?: number;
+  total?: number;
+}
+
 export interface AnalysisProgress {
   percent: number;
   message: string;
@@ -462,6 +519,17 @@ export interface DesktopApi {
   }): Promise<AnalysisPayload>;
   onAnalysisProgress(
     callback: (progress: AnalysisProgress) => void,
+  ): () => void;
+  getPortfolioBacktestData(request: {
+    strategyIds: StrategyId[];
+  }): Promise<PortfolioBacktestData>;
+  loadPortfolioBacktest(key: string): Promise<PortfolioBacktestResult | null>;
+  savePortfolioBacktest(request: {
+    key: string;
+    result: PortfolioBacktestResult;
+  }): Promise<void>;
+  onPortfolioBacktestProgress(
+    callback: (progress: PortfolioBacktestProgress) => void,
   ): () => void;
   exportAnalysis(request: {
     options: AnalysisOptions;

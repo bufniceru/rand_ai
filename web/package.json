@@ -10,6 +10,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vue-tsc --noEmit && vite build",
     "build:electron": "vue-tsc --noEmit && vite build --mode electron",
+    "test": "vitest run",
     "electron": "npm run build:electron && electron .",
     "bridge:build": "cd .. && .venv\\Scripts\\pyinstaller.exe --noconfirm --clean --onefile --collect-submodules dateutil --name rand-ai-bridge src/rand_ai/gui_bridge.py",
     "electron:build": "npm run bridge:build && npm run build:electron && electron-builder --win portable",
@@ -25,6 +26,7 @@
     "electron-builder": "^26.0.12",
     "typescript": "^5.9.3",
     "vite": "^7.2.0",
+    "vitest": "^4.1.10",
     "vue-tsc": "^3.1.2"
   },
   "build": {

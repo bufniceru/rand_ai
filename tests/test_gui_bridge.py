@@ -20,6 +20,7 @@ from rand_ai.gui_bridge import (
     parse_report_ids,
     parse_selected_numbers,
     parse_strategy_ids,
+    portfolio_backtest_data,
     write_export_archive,
 )
 
@@ -54,6 +55,10 @@ def test_rejects_invalid_selected_numbers(value: str) -> None:
 
 def test_parses_report_plugin_selection_in_stable_order() -> None:
     assert parse_report_ids("randomness,overview") == ("overview", "randomness")
+    assert parse_report_ids("draw-portfolio,predictions") == (
+        "predictions",
+        "draw-portfolio",
+    )
     assert parse_report_ids("") == ()
     with pytest.raises(argparse.ArgumentTypeError, match="unknown report"):
         parse_report_ids("overview,unknown")
@@ -311,6 +316,25 @@ def test_possible_draw_prepares_its_prediction_dependency(
     assert payload["possibleDraw"]["relationshipEdges"]
 
 
+def test_draw_portfolio_prepares_predictions_and_relationships(
+    tmp_path: Path,
+) -> None:
+    source_path = _pickle_path(tmp_path)
+    draws = _draws()
+    assert draws.draws[-1].prediction is None
+
+    payload = build_analysis_payload(
+        draws,
+        source_path,
+        enabled_reports=("draw-portfolio",),
+    )
+
+    assert payload["options"]["enabledReports"] == ["draw-portfolio"]
+    assert payload["combinedPredictions"] == []
+    assert payload["predictionSuites"]
+    assert payload["possibleDraw"]["relationshipEdges"]
+
+
 def test_analysis_emits_only_enabled_strategy_plugins(tmp_path: Path) -> None:
     source_path = _pickle_path(tmp_path)
     payload = build_analysis_payload(
@@ -462,6 +486,42 @@ def test_strategy_cache_reuses_report_independent_analysis(
         "historyLimit": gui_bridge.MAX_HISTORY_WINDOW,
     }
     assert cached["createdAt"].endswith("+00:00")
+    assert len(cached["analysis"]["portfolioBacktestHistory"]) == 2
+    compact = cached["analysis"]["portfolioBacktestHistory"][0]
+    assert compact["targetDrawNumber"] == 2
+    assert compact["strategies"][0]["id"] == "freshness"
+    assert len(compact["strategies"][0]["ranking"]) == 49
+
+
+def test_portfolio_backtest_data_builds_and_reuses_compact_history(
+    tmp_path: Path,
+) -> None:
+    source_path = _pickle_path(tmp_path)
+    cache_dir = tmp_path / "analysis-cache"
+    first_progress: list[tuple[int, str]] = []
+    first = portfolio_backtest_data(
+        source_path,
+        enabled_strategies=("freshness", "entropy"),
+        strategy_cache_dir=cache_dir,
+        progress=lambda percent, message: first_progress.append((percent, message)),
+    )
+    second_progress: list[tuple[int, str]] = []
+    second = portfolio_backtest_data(
+        source_path,
+        enabled_strategies=("freshness", "entropy"),
+        strategy_cache_dir=cache_dir,
+        progress=lambda percent, message: second_progress.append((percent, message)),
+    )
+
+    assert len(first["cacheKey"]) == 64
+    assert first["strategyIds"] == ["freshness", "entropy"]
+    assert len(first["draws"]) == 3
+    assert len(first["records"]) == 2
+    assert first["records"][0]["actualNumbers"] == [1, 10, 20, 30, 40, 49]
+    assert len(first["records"][0]["strategies"][0]["ranking"]) == 49
+    assert second == first
+    assert any("Preparing full-history" in message for _, message in first_progress)
+    assert (60, "Loaded compact full-history strategy rankings") in second_progress
 
 
 def test_strategy_cache_refresh_and_inputs_invalidate_entries(
@@ -701,6 +761,31 @@ def test_cli_analyze_and_export_commands(
     assert payload["dataset"]["drawCount"] == 3
     assert "RAND_AI_PROGRESS" in analyze_output.err
     assert output_path.is_file()
+
+
+def test_cli_returns_portfolio_backtest_data(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source_path = _pickle_path(tmp_path)
+    main(
+        [
+            "portfolio-backtest-data",
+            "--input",
+            str(source_path),
+            "--strategies",
+            "freshness,entropy",
+            "--cache-dir",
+            str(tmp_path / "analysis-cache"),
+        ]
+    )
+
+    output = capsys.readouterr()
+    payload = json.loads(output.out)
+    assert len(payload["cacheKey"]) == 64
+    assert payload["strategyIds"] == ["freshness", "entropy"]
+    assert len(payload["records"]) == 2
+    assert "RAND_AI_PROGRESS" in output.err
 
 
 def test_cli_draw_editor_reads_and_saves_yaml_first(
