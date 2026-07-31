@@ -307,6 +307,7 @@ function stageDataset(dataset: DatasetSelection): void {
 async function analyzeDataset(
   dataset: DatasetSelection,
   requestedOptions: AnalysisOptions,
+  forceReanalysis = false,
 ): Promise<void> {
   if (!window.randAiDesktop) {
     errorMessage.value = "The Python bridge is only available inside Electron.";
@@ -337,6 +338,7 @@ async function analyzeDataset(
     const payload = await window.randAiDesktop.analyzeDataset({
       path: dataset.path,
       options: requestedOptions,
+      forceReanalysis,
     });
     const datasetChanged = activeDataset.value?.path !== dataset.path;
     activeDataset.value = dataset;
@@ -394,10 +396,14 @@ function handleAnalysisProgress(progress: AnalysisProgress): void {
   statusMessage.value = `${progress.message} · ${loadingProgress.value}%`;
 }
 
-async function applyOptions(): Promise<void> {
+async function applyOptions(forceReanalysis = false): Promise<void> {
   if (!activeDataset.value) return;
   try {
-    await analyzeDataset(activeDataset.value, normalizeOptions());
+    await analyzeDataset(
+      activeDataset.value,
+      normalizeOptions(),
+      forceReanalysis,
+    );
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
   }
@@ -472,7 +478,7 @@ function handleMenuAction(message: MenuAction): void {
     return;
   }
   if (message.action === "reanalyze") {
-    if (activeDataset.value && !loading.value) void applyOptions();
+    if (activeDataset.value && !loading.value) void applyOptions(true);
     return;
   }
   if (message.action === "reportPluginsChanged") {
@@ -611,7 +617,7 @@ onBeforeUnmount(() => {
             </label>
           </div>
         </fieldset>
-        <button class="button primary apply-button" :disabled="loading" type="button" @click="applyOptions">
+        <button class="button primary apply-button" :disabled="loading" type="button" @click="applyOptions()">
           Apply controls
         </button>
         <dl class="dataset-facts">

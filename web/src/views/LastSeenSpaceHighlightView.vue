@@ -84,6 +84,27 @@ const yTicks = computed(() => {
       label: model.value.drawCount - drawIndex,
     }));
 });
+const drawSpaceLines = computed(() => {
+  const referenceDrawIndex = model.value.referenceDrawIndex;
+  if (referenceDrawIndex === null) return [];
+  const ranges = new Map<number, { first: number; last: number }>();
+  for (const point of model.value.points) {
+    if (point.drawIndex > referenceDrawIndex) continue;
+    const range = ranges.get(point.drawIndex);
+    if (range) {
+      range.first = Math.min(range.first, point.space);
+      range.last = Math.max(range.last, point.space);
+    } else {
+      ranges.set(point.drawIndex, {
+        first: point.space,
+        last: point.space,
+      });
+    }
+  }
+  return [...ranges.entries()]
+    .filter(([_drawIndex, range]) => range.first < range.last)
+    .map(([drawIndex, range]) => ({ drawIndex, ...range }));
+});
 
 function xForSpace(space: number): number {
   if (horizontalAxisMax.value <= 0) return chartLeft + plotWidth / 2;
@@ -186,6 +207,7 @@ onBeforeUnmount(clearLongPressTimer);
     <div class="highlight-legend">
       <span><i class="legend-red" /> Last seen space</span>
       <span><i class="legend-blue" /> Earlier occurrence</span>
+      <span><i class="legend-path-line" /> First-to-last path</span>
       <span><i class="legend-gray" /> Newer than reference</span>
       <span class="gap-help">Long-press a point to inspect its Rand AI space</span>
     </div>
@@ -258,6 +280,16 @@ onBeforeUnmount(clearLongPressTimer);
           :y="chartTop + plotHeight + 28"
           class="tick-label x-tick"
         >{{ space }}</text>
+
+        <line
+          v-for="line in drawSpaceLines"
+          :key="`draw-space-line-${line.drawIndex}`"
+          :x1="xForSpace(line.first)"
+          :x2="xForSpace(line.last)"
+          :y1="yForDraw(line.drawIndex)"
+          :y2="yForDraw(line.drawIndex)"
+          class="space-occurrence-line"
+        />
 
         <g
           v-for="(point, index) in model.points"

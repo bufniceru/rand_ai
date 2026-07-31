@@ -457,6 +457,7 @@ export interface DesktopApi {
   analyzeDataset(request: {
     path: string;
     options: AnalysisOptions;
+    forceReanalysis?: boolean;
   }): Promise<AnalysisPayload>;
   onAnalysisProgress(
     callback: (progress: AnalysisProgress) => void,

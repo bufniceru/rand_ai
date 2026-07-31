@@ -3542,6 +3542,12 @@ tbody tr:nth-child(even) {
 .legend-gray { background: rgba(128, 128, 128, 0.55); }
 .legend-orange { background: rgba(255, 190, 106, 0.9); }
 .legend-green { background: rgba(99, 196, 120, 0.9); }
+.highlight-legend i.legend-path-line {
+  width: 18px;
+  height: 2px;
+  border-radius: 1px;
+  background: rgba(211, 211, 211, 0.2);
+}
 
 .highlight-chart-scroll {
   width: 100%;
@@ -3649,6 +3655,12 @@ tbody tr:nth-child(even) {
 .horizontal-guide.major {
   stroke: rgba(78, 92, 118, 0.58);
   stroke-width: 2.4;
+}
+
+.space-occurrence-line {
+  stroke: rgba(211, 211, 211, 0.2);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
 }
 
 .point-default {

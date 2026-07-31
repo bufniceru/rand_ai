@@ -111,6 +111,10 @@ function strategyPreferencesPath() {
   return path.join(app.getPath("userData"), "strategy-plugins.json");
 }
 
+function analysisCachePath() {
+  return path.join(app.getPath("userData"), "analysis-cache");
+}
+
 function enabledReportsList() {
   return reportPlugins
     .map((plugin) => plugin.id)
@@ -754,8 +758,19 @@ ipcMain.handle("dataset:analyze", async (event, request) => {
     sendProgress({ percent: 3, message: "Starting the Python analysis engine" });
   }
 
+  const analysisArguments = [
+    "analyze",
+    "--input",
+    analysisPath,
+    ...optionArguments(request?.options),
+    "--cache-dir",
+    analysisCachePath(),
+  ];
+  if (request?.forceReanalysis === true) {
+    analysisArguments.push("--refresh-cache");
+  }
   const payload = await runBridge(
-    ["analyze", "--input", analysisPath, ...optionArguments(request?.options)],
+    analysisArguments,
     true,
     isYaml ? mapProgress(11, 97) : sendProgress,
   );
