@@ -5,6 +5,13 @@ import type { DrawEditorData, DrawEditorEntry } from "./types";
 type EditorMode = "view" | "add" | "edit";
 type DrawVisualization = "grid" | "circle";
 
+interface CircularSpace {
+  from: number;
+  to: number;
+  value: number;
+  wraparound: boolean;
+}
+
 defineProps<{ embedded?: boolean }>();
 const emit = defineEmits<{ saved: [] }>();
 
@@ -28,6 +35,27 @@ const displayedNumbers = computed(() =>
   mode.value === "view" ? currentDraw.value?.numbers ?? [] : editNumbers.value,
 );
 const displayedSet = computed(() => new Set(displayedNumbers.value));
+const displayedSpaces = computed<CircularSpace[]>(() => {
+  if (displayedNumbers.value.length !== 6) return [];
+  const ordered = [...displayedNumbers.value].sort((left, right) => left - right);
+  const first = ordered[0]!;
+  const last = ordered.at(-1)!;
+  return [
+    {
+      from: last,
+      to: first,
+      value: (first - 1) + (49 - last),
+      wraparound: true,
+    },
+    ...ordered.slice(0, -1).map((from, index) => {
+      const to = ordered[index + 1]!;
+      return { from, to, value: to - from - 1, wraparound: false };
+    }),
+  ];
+});
+const displayedSpaceTotal = computed(() =>
+  displayedSpaces.value.reduce((total, space) => total + space.value, 0),
+);
 const canSave = computed(
   () => /^\d{4}-\d{2}-\d{2}$/.test(editDate.value) && editNumbers.value.length === 6,
 );
@@ -247,6 +275,30 @@ onMounted(async () => {
           </div>
           <p v-if="mode !== 'view'">Select exactly six numbers, set the date, then save.</p>
           <p v-else>Use the navigation controls to browse the complete YAML draw history.</p>
+          <section
+            v-if="visualization === 'circle'"
+            class="draw-editor-space-report"
+            aria-label="Six circular spaces"
+          >
+            <header>
+              <span>Circular spaces</span>
+              <strong v-if="displayedSpaces.length">
+                Total {{ displayedSpaceTotal }} / 43
+              </strong>
+            </header>
+            <ol v-if="displayedSpaces.length">
+              <li
+                v-for="space in displayedSpaces"
+                :key="`${space.from}-${space.to}`"
+                :class="{ wraparound: space.wraparound }"
+              >
+                <span>{{ space.from }} → {{ space.to }}</span>
+                <strong>{{ space.value }}</strong>
+                <small>{{ space.wraparound ? "wraparound" : "between" }}</small>
+              </li>
+            </ol>
+            <p v-else>Select six numbers to calculate all circular spaces.</p>
+          </section>
         </div>
       </section>
 

@@ -177,10 +177,10 @@ onBeforeUnmount(clearLongPressTimer);
     </section>
 
     <aside class="space-conversion-note">
-      <strong>PyLotto terminology conversion:</strong>
-      Rand AI internal space = PyLotto difference − 1. This view converts the
-      five adjacent-number differences; Rand AI’s sixth circular space has no
-      PyLotto difference counterpart.
+      <strong>Complete circular spaces:</strong>
+      Rand AI internal space counts the unselected numbers between neighboring
+      balls. All six spaces are shown, including the wraparound from the largest
+      number through 49 and 1 to the smallest number.
     </aside>
 
     <div class="highlight-legend">

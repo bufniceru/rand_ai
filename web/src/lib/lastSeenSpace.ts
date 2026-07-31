@@ -16,12 +16,16 @@ export interface LastSeenSpaceModel {
   referenceDrawNumber: number | null;
 }
 
-export function internalSpacesForDraw(draw: HistoryDraw): number[] {
+export function circularSpacesForDraw(draw: HistoryDraw): number[] {
   const sorted = draw.numbers
     .slice()
     .sort((left, right) => left.value - right.value);
-  return sorted.slice(0, -1).map((number) => number.rightSpace);
+  return sorted.map((number) => number.rightSpace);
 }
+
+// Preserve the existing exported name for callers while returning the complete
+// six-space circle, including the largest-number-to-smallest-number wraparound.
+export const internalSpacesForDraw = circularSpacesForDraw;
 
 export function buildLastSeenSpaceModel(
   history: HistoryDraw[],
@@ -45,7 +49,7 @@ export function buildLastSeenSpaceModel(
     };
   }
 
-  const spacesByDraw = draws.map(internalSpacesForDraw);
+  const spacesByDraw = draws.map(circularSpacesForDraw);
   const maxSpace = Math.max(...spacesByDraw.flat(), 0);
   const maxReferenceOffset = draws.length - 1;
   const referenceOffset = Math.min(
