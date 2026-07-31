@@ -52,6 +52,11 @@ _MKSP_RECENCY_HALF_LIFE = 800
 _MKSP_SIMILARITY_SHARPNESS = 10.0
 _MKSP_BEAM_WIDTH = 8
 _MKNP_POSITION_COUNT = _NUMBERS_PER_DRAW - 1
+_MKRD_SHAPE_WEIGHT = 0.50
+_MKRD_COVERAGE_WEIGHT = 0.20
+_MKRD_UNIFORMITY_WEIGHT = 0.10
+_MKRD_ENTROPY_WEIGHT = 0.10
+_MKRD_CENTER_WEIGHT = 0.10
 _RANDOM_SEED = 20260626
 _FRESH_RANDOM_SEED_OFFSET = 7919
 _FRESH_RANDOM_INFLUENCE = 0.35
@@ -97,6 +102,7 @@ _BASE_STRATEGY_IDS = (
     "mkfr",
     "mksp",
     "mknp",
+    "mkrd",
     "bayesian",
     "predictive_grid",
     "co_occurrence",
@@ -159,7 +165,7 @@ _STRATEGY_DEPENDENCIES = {
         "svc",
         "tbl",
     },
-    "residual_coverage": set(_BASE_STRATEGY_IDS).difference({"mknp"}),
+    "residual_coverage": set(_BASE_STRATEGY_IDS).difference({"mknp", "mkrd"}),
     "chained": set(_CHAIN_EXPERT_IDS),
 }
 
@@ -444,6 +450,68 @@ def _normalized_positions_for_numbers(
     return tuple(number - first + 1 for number in ordered)
 
 
+@dataclass(frozen=True, slots=True)
+class _RelativeDispersionProfile:
+    """Describe a draw's scale-independent shape and dispersion summaries."""
+
+    span: int
+    coverage: float
+    relative_positions: tuple[float, ...]
+    gap_shares: tuple[float, ...]
+    uniformity: float
+    entropy: float
+    center_balance: float
+
+
+def _relative_dispersion_profile(
+    numbers: Collection[int],
+) -> _RelativeDispersionProfile:
+    """Return the fixed Markov Relative Dispersion feature profile."""
+    ordered = sorted(numbers)
+    if len(ordered) != _NUMBERS_PER_DRAW:
+        raise ValueError("Relative dispersion states require exactly six numbers")
+    if any(left >= right for left, right in zip(ordered, ordered[1:])):
+        raise ValueError("Relative dispersion states must be strictly increasing")
+    if ordered[0] < 1 or ordered[-1] > _NUMBER_COUNT:
+        raise ValueError("Relative dispersion states must be within 1–49")
+
+    extent = ordered[-1] - ordered[0]
+    span = extent + 1
+    relative_positions = tuple(
+        (number - ordered[0]) / extent for number in ordered
+    )
+    gap_shares = tuple(
+        (right - left) / extent
+        for left, right in zip(ordered, ordered[1:])
+    )
+    ideal_share = 1 / (_NUMBERS_PER_DRAW - 1)
+    gap_share_std = math.sqrt(
+        sum((share - ideal_share) ** 2 for share in gap_shares)
+        / len(gap_shares)
+    )
+    # The maximum population standard deviation for five shares is 0.4.
+    uniformity = _clamp(gap_share_std / 0.4, 0.0, 1.0)
+    entropy = -sum(
+        share * math.log(share) for share in gap_shares if share > 0
+    ) / math.log(len(gap_shares))
+    relative_mean = sum(relative_positions) / len(relative_positions)
+    # Strictly ordered points bound the mean offset from 0.5 by one third.
+    center_balance = _clamp(
+        0.5 + 1.5 * (relative_mean - 0.5),
+        0.0,
+        1.0,
+    )
+    return _RelativeDispersionProfile(
+        span=span,
+        coverage=span / _NUMBER_COUNT,
+        relative_positions=relative_positions,
+        gap_shares=gap_shares,
+        uniformity=uniformity,
+        entropy=entropy,
+        center_balance=center_balance,
+    )
+
+
 class _StrategyState:
     """Maintain incremental state for the enabled prediction strategy plugins."""
 
@@ -594,6 +662,34 @@ class _StrategyState:
             else []
         )
         self.mknp_observations: list[tuple[tuple[int, ...], int]] = []
+        self.mkrd_histories: list[deque[int]] = (
+            [deque(maxlen=_MKSP_MAX_ORDER) for _ in range(_MKNP_POSITION_COUNT)]
+            if "mkrd" in self.enabled_strategy_ids
+            else []
+        )
+        self.mkrd_transitions: list[
+            list[dict[tuple[int, ...], dict[int, int]]]
+        ] = (
+            [
+                [{} for _ in range(_MKSP_MAX_ORDER)]
+                for _ in range(_MKNP_POSITION_COUNT)
+            ]
+            if "mkrd" in self.enabled_strategy_ids
+            else []
+        )
+        self.mkrd_value_counts: list[list[int]] = (
+            [[0] * (_NUMBER_COUNT + 1) for _ in range(_MKNP_POSITION_COUNT)]
+            if "mkrd" in self.enabled_strategy_ids
+            else []
+        )
+        self.mkrd_anchor_counts: list[int] = (
+            [0] * _MKSP_VALUE_COUNT
+            if "mkrd" in self.enabled_strategy_ids
+            else []
+        )
+        self.mkrd_observations: list[
+            tuple[tuple[int, ...], int, _RelativeDispersionProfile]
+        ] = []
         self.svc_weights = [0.0] * 11
         self.tbl_weights = [0.0] * 14
         self.cis_weights = [0.0] * (22 + len(_CIS_EXPERTS) * 4)
@@ -1114,6 +1210,20 @@ class _StrategyState:
                     ].setdefault(context, {})
                     counts[target] = counts.get(target, 0) + 1
 
+        if "mkrd" in self.enabled_strategy_ids:
+            normalized = _normalized_positions_for_numbers(drawn)[1:]
+            for position, target in enumerate(normalized):
+                history_values = tuple(self.mkrd_histories[position])
+                for order in range(
+                    1,
+                    min(len(history_values), _MKSP_MAX_ORDER) + 1,
+                ):
+                    context = history_values[-order:]
+                    counts = self.mkrd_transitions[position][
+                        order - 1
+                    ].setdefault(context, {})
+                    counts[target] = counts.get(target, 0) + 1
+
         gap_models_enabled = bool(
             self.enabled_strategy_ids.intersection({"markov100", "bayesian"})
         )
@@ -1269,6 +1379,16 @@ class _StrategyState:
             anchor = min(drawn) - 1
             self.mknp_anchor_counts[anchor] += 1
             self.mknp_observations.append((normalized, anchor))
+        if "mkrd" in self.enabled_strategy_ids:
+            normalized = _normalized_positions_for_numbers(drawn)
+            for position, value in enumerate(normalized[1:]):
+                self.mkrd_histories[position].append(value)
+                self.mkrd_value_counts[position][value] += 1
+            anchor = min(drawn) - 1
+            self.mkrd_anchor_counts[anchor] += 1
+            self.mkrd_observations.append(
+                (normalized, anchor, _relative_dispersion_profile(drawn))
+            )
         self.draw_count += 1
 
     @staticmethod
@@ -2137,6 +2257,299 @@ class _StrategyState:
                     f"{','.join(str(value) for value in best_positions)}"
                 ),
                 f"Spread {spread}; wraparound space {_NUMBER_COUNT - spread}",
+                f"First-number anchor {best_draw[0]}",
+                (
+                    f"Analogue support {effective_support:.1f} effective "
+                    f"/ {analogue_count} candidates"
+                ),
+                (
+                    f"Exact orders /{_MKSP_MAX_ORDER}: "
+                    f"{','.join(str(order) for order in selected_orders)}; "
+                    f"support {min(selected_supports)}–{max(selected_supports)}"
+                ),
+                f"Valid-shape beam width {_MKSP_BEAM_WIDTH}",
+            )
+        return _scale_scores(marginals), details
+
+    def _mkrd_baseline_probability(self, position: int, value: int) -> float:
+        valid_values = self._mknp_valid_values(position)
+        if value not in valid_values:
+            return 0.0
+        return (
+            self.mkrd_value_counts[position][value]
+            + _MKSP_PRIOR_STRENGTH / len(valid_values)
+        ) / (self.draw_count + _MKSP_PRIOR_STRENGTH)
+
+    def _mkrd_probability(
+        self,
+        position: int,
+        value: int,
+    ) -> tuple[float, int, int]:
+        history_values = tuple(self.mkrd_histories[position])
+        active_orders = min(len(history_values), _MKSP_MAX_ORDER)
+        probability = self._mkrd_baseline_probability(position, value)
+        selected_support = 0
+        selected_order = 0
+        for order in range(1, active_orders + 1):
+            context = history_values[-order:]
+            counts = self.mkrd_transitions[position][order - 1].get(
+                context,
+                {},
+            )
+            opportunities = sum(counts.values())
+            if opportunities < _MKSP_MIN_CONTEXT_SUPPORT:
+                continue
+            probability = (
+                counts.get(value, 0) + _MKSP_PRIOR_STRENGTH * probability
+            ) / (opportunities + _MKSP_PRIOR_STRENGTH)
+            selected_support = opportunities
+            selected_order = order
+        return probability, selected_support, selected_order
+
+    @staticmethod
+    def _mkrd_profile_distance(
+        left: _RelativeDispersionProfile,
+        right: _RelativeDispersionProfile,
+    ) -> float:
+        shape_distance = sum(
+            abs(left_value - right_value)
+            for left_value, right_value in zip(
+                left.relative_positions[1:-1],
+                right.relative_positions[1:-1],
+            )
+        ) / (_NUMBERS_PER_DRAW - 2)
+        return (
+            _MKRD_SHAPE_WEIGHT * shape_distance
+            + _MKRD_COVERAGE_WEIGHT * abs(left.coverage - right.coverage)
+            + _MKRD_UNIFORMITY_WEIGHT
+            * abs(left.uniformity - right.uniformity)
+            + _MKRD_ENTROPY_WEIGHT * abs(left.entropy - right.entropy)
+            + _MKRD_CENTER_WEIGHT
+            * abs(left.center_balance - right.center_balance)
+        )
+
+    def _mkrd_analogue_weights(
+        self,
+    ) -> list[
+        tuple[tuple[int, ...], int, _RelativeDispersionProfile, float]
+    ]:
+        observation_count = len(self.mkrd_observations)
+        if observation_count < 2:
+            return []
+
+        weighted_analogues = []
+        first_target = max(1, observation_count - _MKSP_ANALOGUE_LIMIT)
+        for target_index in range(first_target, observation_count):
+            order = min(_MKSP_MAX_ORDER, target_index)
+            weighted_distance = 0.0
+            context_weight = 0.0
+            for lag in range(1, order + 1):
+                lag_weight = _MKSP_CONTEXT_DECAY ** (lag - 1)
+                current_profile = self.mkrd_observations[-lag][2]
+                historical_profile = self.mkrd_observations[
+                    target_index - lag
+                ][2]
+                weighted_distance += lag_weight * self._mkrd_profile_distance(
+                    current_profile,
+                    historical_profile,
+                )
+                context_weight += lag_weight
+
+            normalized_distance = weighted_distance / context_weight
+            similarity = math.exp(
+                -_MKSP_SIMILARITY_SHARPNESS * normalized_distance
+            )
+            age = observation_count - target_index
+            recency = 0.5 ** (age / _MKSP_RECENCY_HALF_LIFE)
+            length_confidence = 0.35 + 0.65 * order / _MKSP_MAX_ORDER
+            positions, anchor, profile = self.mkrd_observations[target_index]
+            weighted_analogues.append(
+                (
+                    positions,
+                    anchor,
+                    profile,
+                    similarity * recency * length_confidence,
+                )
+            )
+        return weighted_analogues
+
+    def _mkrd_distributions(
+        self,
+    ) -> tuple[
+        tuple[tuple[float, ...], ...],
+        tuple[float, ...],
+        float,
+        int,
+        tuple[int, ...],
+        tuple[int, ...],
+    ]:
+        analogues = self._mkrd_analogue_weights()
+        analogue_weight = sum(
+            weight for _positions, _anchor, _profile, weight in analogues
+        )
+        squared_weight = sum(
+            weight * weight
+            for _positions, _anchor, _profile, weight in analogues
+        )
+        effective_support = (
+            analogue_weight * analogue_weight / squared_weight
+            if squared_weight > 0
+            else 0.0
+        )
+
+        weighted_position_counts = [
+            [0.0] * (_NUMBER_COUNT + 1)
+            for _position in range(_MKNP_POSITION_COUNT)
+        ]
+        weighted_anchor_counts = [0.0] * _MKSP_VALUE_COUNT
+        for positions, anchor, _profile, weight in analogues:
+            for position, value in enumerate(positions[1:]):
+                weighted_position_counts[position][value] += weight
+            weighted_anchor_counts[anchor] += weight
+
+        position_distributions = []
+        selected_orders = []
+        selected_supports = []
+        for position in range(_MKNP_POSITION_COUNT):
+            baseline = self._mksp_normalize(
+                tuple(
+                    self._mkrd_baseline_probability(position, value)
+                    for value in range(_NUMBER_COUNT + 1)
+                )
+            )
+            analogue_distribution = self._mksp_normalize(
+                tuple(
+                    weighted_position_counts[position][value]
+                    + _MKSP_ANALOGUE_PRIOR_STRENGTH * baseline[value]
+                    for value in range(_NUMBER_COUNT + 1)
+                )
+            )
+            exact_distribution = self._mksp_normalize(
+                tuple(
+                    self._mkrd_probability(position, value)[0]
+                    for value in range(_NUMBER_COUNT + 1)
+                )
+            )
+            distribution = self._mksp_normalize(
+                tuple(
+                    _MKSP_ANALOGUE_BLEND * analogue_distribution[value]
+                    + (1 - _MKSP_ANALOGUE_BLEND) * exact_distribution[value]
+                    for value in range(_NUMBER_COUNT + 1)
+                )
+            )
+            selected_value = max(
+                self._mknp_valid_values(position),
+                key=distribution.__getitem__,
+            )
+            _probability, support, order = self._mkrd_probability(
+                position,
+                selected_value,
+            )
+            position_distributions.append(distribution)
+            selected_orders.append(order)
+            selected_supports.append(support)
+
+        anchor_total = sum(self.mkrd_anchor_counts)
+        anchor_baseline = tuple(
+            (
+                self.mkrd_anchor_counts[value]
+                + _MKSP_ANALOGUE_PRIOR_STRENGTH / _MKSP_VALUE_COUNT
+            )
+            / (anchor_total + _MKSP_ANALOGUE_PRIOR_STRENGTH)
+            for value in range(_MKSP_VALUE_COUNT)
+        )
+        anchor_distribution = self._mksp_normalize(
+            tuple(
+                weighted_anchor_counts[value]
+                + _MKSP_ANALOGUE_PRIOR_STRENGTH * anchor_baseline[value]
+                for value in range(_MKSP_VALUE_COUNT)
+            )
+        )
+        return (
+            tuple(position_distributions),
+            anchor_distribution,
+            effective_support,
+            len(analogues),
+            tuple(selected_orders),
+            tuple(selected_supports),
+        )
+
+    def _mkrd_scores(
+        self,
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        (
+            distributions,
+            anchor_distribution,
+            effective_support,
+            analogue_count,
+            selected_orders,
+            selected_supports,
+        ) = self._mkrd_distributions()
+        shape_beam = self._mknp_shape_beam(distributions)
+        generated: list[tuple[float, tuple[int, ...], tuple[int, ...]]] = []
+        for spread, paths in shape_beam.items():
+            maximum_anchor = _NUMBER_COUNT - spread
+            for shape_log_probability, positions in paths:
+                for anchor in range(maximum_anchor + 1):
+                    numbers = tuple(anchor + position for position in positions)
+                    generated.append(
+                        (
+                            shape_log_probability
+                            + math.log(anchor_distribution[anchor]),
+                            numbers,
+                            positions,
+                        )
+                    )
+
+        maximum_log_probability = max(
+            log_probability for log_probability, _numbers, _positions in generated
+        )
+        weighted_generated = [
+            (
+                math.exp(log_probability - maximum_log_probability),
+                numbers,
+                positions,
+            )
+            for log_probability, numbers, positions in generated
+        ]
+        total_weight = sum(
+            weight for weight, _numbers, _positions in weighted_generated
+        )
+        marginals = {number: 0.0 for number in range(1, _NUMBER_COUNT + 1)}
+        best_contribution: dict[
+            int,
+            tuple[float, tuple[int, ...], tuple[int, ...]],
+        ] = {}
+        for weight, numbers, positions in weighted_generated:
+            for number in numbers:
+                marginals[number] += weight
+                previous_best = best_contribution.get(number)
+                if previous_best is None or weight > previous_best[0]:
+                    best_contribution[number] = (weight, numbers, positions)
+
+        details: dict[int, tuple[str, ...]] = {}
+        for number in range(1, _NUMBER_COUNT + 1):
+            marginal = marginals[number] / total_weight
+            _weight, best_draw, _best_positions = best_contribution[number]
+            profile = _relative_dispersion_profile(best_draw)
+            details[number] = (
+                f"Marginal probability {marginal:.2%}",
+                f"Random baseline {_BASE_PROBABILITY:.2%}",
+                f"Best generated draw {','.join(str(value) for value in best_draw)}",
+                (
+                    "Relative positions "
+                    + ",".join(
+                        f"{value:.3f}" for value in profile.relative_positions
+                    )
+                ),
+                f"Span {profile.span}; coverage {profile.coverage:.2%}",
+                (
+                    "Gap shares "
+                    + ",".join(f"{value:.3f}" for value in profile.gap_shares)
+                ),
+                f"Uniformity deviation {profile.uniformity:.3f}",
+                f"Internal-gap entropy {profile.entropy:.3f}",
+                f"Center balance {profile.center_balance:.3f}",
                 f"First-number anchor {best_draw[0]}",
                 (
                     f"Analogue support {effective_support:.1f} effective "
@@ -3236,6 +3649,25 @@ class _StrategyState:
                     mknp_details,
                 )
 
+        if "mkrd" in enabled:
+            mkrd_scores, mkrd_details = self._mkrd_scores()
+            rankings["mkrd"] = _ranking_from_scores(
+                mkrd_scores,
+                gaps,
+            )
+            if "mkrd" in requested:
+                built["mkrd"] = _strategy(
+                    "mkrd",
+                    "MKRD",
+                    (
+                        "Order-20 relative-shape and dispersion analogues "
+                        "decoded into valid translated draws."
+                    ),
+                    mkrd_scores,
+                    gaps,
+                    mkrd_details,
+                )
+
         if "bayesian" in enabled:
             bayesian_scores, bayesian_details = self._gap_model_scores(
                 gaps, weighted=False
@@ -3490,7 +3922,7 @@ class _StrategyState:
                     else ranking
                 )
                 for strategy_id, ranking in rankings.items()
-                if strategy_id != "mknp"
+                if strategy_id not in {"mknp", "mkrd"}
             }
             residual_scores, residual_details = self._residual_coverage_scores(
                 displayed_rankings,
