@@ -1,44 +1,37 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 import { buildLastSeenGapModel } from "../lib/lastSeenGap";
 import type { HistoryDraw } from "../types";
 
 const props = defineProps<{
   history: HistoryDraw[];
+  drawCount: number;
+  referenceDrawOffset: number;
 }>();
 
 const svgWidth = 1680;
 const chartLeft = 70;
-const chartTop = 90;
+const chartTop = 30;
 const chartBottom = 45;
 const chartRight = 30;
 const rowHeight = 30;
 const pointRadius = 13.5;
-const gapHighlightRibbonWidth = 9;
-const topGapRibbonY = chartTop - 48;
+const occurrenceStripWidth = (pointRadius * 2) / 3;
+const topGapRibbonY = 6;
 const topGapRibbonHeight = 30;
 const topGapRibbonMatchWidth = 18;
 const plotWidth = svgWidth - chartLeft - chartRight;
 
-const drawCount = ref(Math.min(50, props.history.length));
-const referenceDrawOffset = ref(0);
 const selectedGap = ref<number | null>(null);
 const gapNumbersPopup = ref<{ gap: number; numbers: number[] } | null>(null);
 let longPressTimer: ReturnType<typeof setTimeout> | null = null;
 
-watch(
-  () => props.history,
-  (history) => {
-    drawCount.value = Math.min(Math.max(drawCount.value, 1), history.length);
-    referenceDrawOffset.value = Math.min(
-      referenceDrawOffset.value,
-      Math.max(0, drawCount.value - 1),
-    );
-  },
-);
-
 const model = computed(() =>
-  buildLastSeenGapModel(props.history, drawCount.value, referenceDrawOffset.value),
+  buildLastSeenGapModel(
+    props.history,
+    props.drawCount,
+    props.referenceDrawOffset,
+  ),
 );
 const chartHeight = computed(() =>
   Math.max(320, chartTop + model.value.drawCount * rowHeight + chartBottom),
@@ -49,11 +42,6 @@ const rowDrawIndices = computed(() =>
     { length: model.value.drawCount },
     (_value, index) => model.value.drawCount - 1 - index,
   ),
-);
-const referenceDisplayIndex = computed(() =>
-  model.value.referenceDrawIndex === null
-    ? 0
-    : model.value.drawCount - model.value.referenceDrawIndex,
 );
 const referenceDrawGaps = computed(() => new Set(model.value.referenceGaps));
 const gapUnits = computed(() =>
@@ -72,11 +60,82 @@ const yTicks = computed(() => {
       label: model.value.drawCount - drawIndex,
     }));
 });
-const highlightRibbons = computed(() =>
-  model.value.points.filter(
-    (point) => point.highlighted && referenceDrawGaps.value.has(point.gap),
-  ),
-);
+const drawGapBands = computed(() => {
+  const ranges = new Map<number, { first: number; last: number }>();
+  for (const point of model.value.points) {
+    const range = ranges.get(point.drawIndex);
+    if (range) {
+      range.first = Math.min(range.first, point.gap);
+      range.last = Math.max(range.last, point.gap);
+    } else {
+      ranges.set(point.drawIndex, {
+        first: point.gap,
+        last: point.gap,
+      });
+    }
+  }
+  return [...ranges.entries()]
+    .filter(([_drawIndex, range]) => range.first < range.last)
+    .map(([drawIndex, range]) => ({ drawIndex, ...range }));
+});
+const occurrenceStrips = computed(() => {
+  const referenceIndex = model.value.referenceDrawIndex;
+  if (referenceIndex === null) return [];
+
+  // A draw can contain the same gap more than once. Keep one strip per gap so
+  // overlapping SVG rectangles cannot produce inconsistent opacity.
+  const strips = new Map<
+    number,
+    { gap: number; x: number; y: number; height: number }
+  >();
+  for (const point of model.value.points) {
+    if (!point.highlighted || point.drawIndex >= referenceIndex) continue;
+    const topY = yForDraw(referenceIndex) + pointRadius;
+    const bottomY = yForDraw(point.drawIndex) - pointRadius;
+    const height = Math.max(0, bottomY - topY);
+    if (height > 0) {
+      strips.set(point.gap, {
+        gap: point.gap,
+        x: xForGap(point.gap) - occurrenceStripWidth / 2,
+        y: topY,
+        height,
+      });
+    }
+  }
+  return [...strips.values()];
+});
+const referencePrecedentStrips = computed(() => {
+  const referenceIndex = model.value.referenceDrawIndex;
+  if (referenceIndex === null) return [];
+  const referenceGaps = new Set(
+    model.value.points
+      .filter((point) => point.drawIndex === referenceIndex)
+      .map((point) => point.gap),
+  );
+  return [...referenceGaps]
+    .map((gap) => {
+      const precedent = model.value.points
+        .filter((point) => point.gap === gap && point.drawIndex < referenceIndex)
+        .sort((left, right) => right.drawIndex - left.drawIndex)[0];
+      if (!precedent) return null;
+      const topY = yForDraw(referenceIndex) + pointRadius;
+      const bottomY = yForDraw(precedent.drawIndex) - pointRadius;
+      return {
+        gap,
+        x: xForGap(gap) - occurrenceStripWidth / 2,
+        y: topY,
+        height: Math.max(0, bottomY - topY),
+      };
+    })
+    .filter(
+      (strip): strip is {
+        gap: number;
+        x: number;
+        y: number;
+        height: number;
+      } => strip !== null && strip.height > 0,
+    );
+});
 
 function xForGap(gap: number): number {
   if (model.value.maxGap <= 0) return chartLeft + plotWidth / 2;
@@ -95,12 +154,6 @@ function pointClass(drawIndex: number, highlighted: boolean): string {
     return "point-reference-range";
   }
   return highlighted ? "point-highlighted" : "point-default";
-}
-
-function setDrawCount(event: Event): void {
-  const value = Number((event.target as HTMLInputElement).value);
-  drawCount.value = Math.min(Math.max(Math.trunc(value || 1), 1), props.history.length);
-  referenceDrawOffset.value = Math.min(referenceDrawOffset.value, drawCount.value - 1);
 }
 
 function clearLongPressTimer(): void {
@@ -134,64 +187,8 @@ onBeforeUnmount(clearLongPressTimer);
 
 <template>
   <section class="workspace-view last-seen-view gap-highlight-view">
-    <section class="reference-toolbar">
-      <label>
-        <span>Draw count</span>
-        <input
-          :max="history.length"
-          min="1"
-          :value="drawCount"
-          type="number"
-          @change="setDrawCount"
-        >
-      </label>
-      <div class="reference-buttons">
-        <button
-          :disabled="referenceDrawOffset === model.maxReferenceOffset"
-          type="button"
-          @click="referenceDrawOffset = model.maxReferenceOffset"
-        >|&lt; First</button>
-        <button
-          :disabled="referenceDrawOffset === model.maxReferenceOffset"
-          type="button"
-          @click="referenceDrawOffset += 1"
-        >&lt; Previous</button>
-        <button
-          :disabled="referenceDrawOffset === 0"
-          type="button"
-          @click="referenceDrawOffset -= 1"
-        >Next &gt;</button>
-        <button
-          :disabled="referenceDrawOffset === 0"
-          type="button"
-          @click="referenceDrawOffset = 0"
-        >Latest &gt;|</button>
-      </div>
-      <div class="reference-summary">
-        <span>Reference history draw</span>
-        <strong>{{ model.referenceDrawNumber?.toLocaleString() ?? "—" }}</strong>
-        <small>Display index {{ referenceDisplayIndex }}</small>
-      </div>
-    </section>
-
-    <div class="highlight-legend">
-      <span><i class="legend-red" /> Last seen gap</span>
-      <span><i class="legend-blue" /> Earlier occurrence</span>
-      <span><i class="legend-gray" /> Newer than reference</span>
-      <span><i class="legend-orange" /> Current-gap match</span>
-      <span class="gap-help">Long-press a point for its gap · Ctrl+Click a green top value for numbers</span>
-    </div>
-
     <div class="highlight-chart-scroll">
-      <svg :height="chartHeight" :width="svgWidth" class="highlight-chart" role="img">
-        <text class="axis-label" :x="svgWidth / 2" :y="chartHeight - 10">Gap</text>
-        <text
-          class="axis-label"
-          :x="18"
-          :y="chartHeight / 2"
-          transform="rotate(-90, 18, 240)"
-        >Draw Index</text>
-
+      <svg :width="svgWidth" height="42" class="highlight-chart-header" role="presentation">
         <rect
           :x="chartLeft - 15"
           :y="topGapRibbonY"
@@ -211,27 +208,7 @@ onBeforeUnmount(clearLongPressTimer);
           :y1="topGapRibbonY + 3"
           :y2="topGapRibbonY + topGapRibbonHeight - 3"
         />
-        <line
-          v-for="gap in gapUnits"
-          :key="`vertical-${gap}`"
-          :class="{ major: gap % 5 === 0 }"
-          class="vertical-guide gap-unit-guide"
-          :x1="xForGap(gap)"
-          :x2="xForGap(gap)"
-          :y1="chartTop - 10"
-          :y2="chartTop + plotHeight + 10"
-        />
-
-        <rect
-          v-if="model.referenceDrawIndex !== null"
-          :x="chartLeft - 11"
-          :y="yForDraw(model.referenceDrawIndex) - 14"
-          :width="plotWidth + 22"
-          height="28"
-          class="current-reference-ribbon"
-        />
-
-        <g v-for="gap in gapUnits" :key="`top-gap-${gap}`">
+        <g v-for="gap in gapUnits" :key="`header-gap-${gap}`">
           <rect
             v-if="referenceDrawGaps.has(gap)"
             :x="xForGap(gap) - topGapRibbonMatchWidth / 2"
@@ -253,6 +230,35 @@ onBeforeUnmount(clearLongPressTimer);
             <title>Ctrl+Click to show numbers with gap {{ gap }}</title>
           </text>
         </g>
+      </svg>
+      <svg :height="chartHeight" :width="svgWidth" class="highlight-chart" role="img">
+        <text class="axis-label" :x="svgWidth / 2" :y="chartHeight - 10">Gap</text>
+        <text
+          class="axis-label"
+          :x="18"
+          :y="chartHeight / 2"
+          transform="rotate(-90, 18, 240)"
+        >Draw Index</text>
+
+        <line
+          v-for="gap in gapUnits"
+          :key="`vertical-${gap}`"
+          :class="{ major: gap % 5 === 0 }"
+          class="vertical-guide gap-unit-guide"
+          :x1="xForGap(gap)"
+          :x2="xForGap(gap)"
+          :y1="chartTop - 10"
+          :y2="chartTop + plotHeight + 10"
+        />
+
+        <rect
+          v-if="model.referenceDrawIndex !== null"
+          :x="chartLeft - 11"
+          :y="yForDraw(model.referenceDrawIndex) - 14"
+          :width="plotWidth + 22"
+          height="28"
+          class="current-reference-ribbon"
+        />
 
         <g v-for="drawIndex in rowDrawIndices" :key="`horizontal-${drawIndex}`">
           <line
@@ -281,13 +287,34 @@ onBeforeUnmount(clearLongPressTimer);
         >{{ gap }}</text>
 
         <rect
-          v-for="(point, index) in highlightRibbons"
-          :key="`match-${point.drawIndex}-${point.gap}-${index}`"
-          :x="xForGap(point.gap) - gapHighlightRibbonWidth / 2"
-          :y="topGapRibbonY + topGapRibbonHeight"
-          :width="gapHighlightRibbonWidth"
-          :height="Math.max(0, yForDraw(point.drawIndex) - pointRadius - (topGapRibbonY + topGapRibbonHeight))"
-          class="gap-highlight-ribbon"
+          v-for="band in drawGapBands"
+          :key="`draw-gap-band-${band.drawIndex}`"
+          :x="xForGap(band.first) - pointRadius"
+          :y="yForDraw(band.drawIndex) - pointRadius"
+          :width="xForGap(band.last) - xForGap(band.first) + pointRadius * 2"
+          :height="pointRadius * 2"
+          :rx="pointRadius"
+          class="draw-occurrence-band"
+        />
+
+        <rect
+          v-for="strip in occurrenceStrips"
+          :key="`gap-interval-${strip.gap}`"
+          :x="strip.x"
+          :y="strip.y"
+          :width="occurrenceStripWidth"
+          :height="strip.height"
+          class="occurrence-interval-strip"
+          rx="4.5"
+        />
+        <rect
+          v-for="strip in referencePrecedentStrips"
+          :key="`gap-precedent-${strip.gap}`"
+          :x="strip.x"
+          :y="strip.y"
+          :width="occurrenceStripWidth"
+          :height="strip.height"
+          class="reference-precedent-strip"
           rx="4.5"
         />
 

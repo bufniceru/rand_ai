@@ -5,18 +5,21 @@ import type { StrategyId, StrategyPlugin } from "../types";
 const props = defineProps<{
   plugins: StrategyPlugin[];
   enabledStrategyIds: StrategyId[];
+  lastSeenDrawCount: number;
+  maxLastSeenDrawCount: number;
   saving: boolean;
 }>();
 
 const emit = defineEmits<{
   cancel: [];
-  save: [strategyIds: StrategyId[]];
+  save: [strategyIds: StrategyId[], lastSeenDrawCount: number];
 }>();
 
 const dialog = ref<HTMLElement | null>(null);
 const selectedStrategyIds = ref<Set<StrategyId>>(
   new Set(props.enabledStrategyIds),
 );
+const selectedLastSeenDrawCount = ref(props.lastSeenDrawCount);
 
 const strategyDescriptions: Record<StrategyId, string> = {
   proximity: "Nearest-neighbor spacing profile.",
@@ -69,6 +72,13 @@ function disableAll(): void {
   selectedStrategyIds.value = new Set();
 }
 
+function normalizedLastSeenDrawCount(): number {
+  return Math.min(
+    Math.max(Math.trunc(selectedLastSeenDrawCount.value || 1), 1),
+    props.maxLastSeenDrawCount,
+  );
+}
+
 onMounted(() => dialog.value?.focus());
 </script>
 
@@ -90,14 +100,32 @@ onMounted(() => dialog.value?.focus());
       <header class="settings-dialog-heading">
         <div>
           <p class="eyebrow">Application settings</p>
-          <h2 id="settings-title">Prediction strategies</h2>
+          <h2 id="settings-title">Settings</h2>
           <p>
-            Choose which strategy models are calculated when a dataset is
-            analyzed.
+            Configure the Last Seen displays and choose which prediction
+            strategies are calculated.
           </p>
         </div>
         <strong>{{ selectedCount }} of {{ plugins.length }} enabled</strong>
       </header>
+
+      <section class="settings-display-section">
+        <div>
+          <strong>Last Seen views</strong>
+          <small>One draw-window size is shared by Numbers, Gaps, and Spaces.</small>
+        </div>
+        <label class="settings-number-field">
+          <span>Draw count</span>
+          <input
+            v-model.number="selectedLastSeenDrawCount"
+            :max="maxLastSeenDrawCount"
+            min="1"
+            type="number"
+            :disabled="saving"
+            @change="selectedLastSeenDrawCount = normalizedLastSeenDrawCount()"
+          >
+        </label>
+      </section>
 
       <div class="settings-selection-actions">
         <button
@@ -145,8 +173,8 @@ onMounted(() => dialog.value?.focus());
       </div>
 
       <p class="settings-dialog-note">
-        Saving changes reanalyzes the active dataset so prediction windows use
-        the new strategy selection.
+        Draw-count changes apply immediately. Strategy changes reanalyze the
+        active dataset so prediction windows use the new selection.
       </p>
 
       <footer class="dialog-actions">
@@ -162,7 +190,7 @@ onMounted(() => dialog.value?.focus());
           class="button primary"
           type="button"
           :disabled="saving"
-          @click="emit('save', selectedIdsInPluginOrder)"
+          @click="emit('save', selectedIdsInPluginOrder, normalizedLastSeenDrawCount())"
         >
           {{ saving ? "Saving…" : "Save settings" }}
         </button>

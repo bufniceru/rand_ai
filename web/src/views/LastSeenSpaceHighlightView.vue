@@ -1,48 +1,40 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 import { buildLastSeenGapModel } from "../lib/lastSeenGap";
 import { buildLastSeenSpaceModel } from "../lib/lastSeenSpace";
 import type { HistoryDraw } from "../types";
 
-const props = defineProps<{ history: HistoryDraw[] }>();
+const props = defineProps<{
+  history: HistoryDraw[];
+  drawCount: number;
+  referenceDrawOffset: number;
+}>();
 
 const svgWidth = 1680;
 const chartLeft = 70;
-const chartTop = 90;
+const chartTop = 30;
 const chartBottom = 45;
 const chartRight = 30;
 const rowHeight = 30;
 const pointRadius = 13.5;
+const occurrenceStripWidth = (pointRadius * 2) / 3;
 const plotWidth = svgWidth - chartLeft - chartRight;
 
-const drawCount = ref(Math.min(50, props.history.length));
-const referenceDrawOffset = ref(0);
 const selectedSpace = ref<number | null>(null);
 let longPressTimer: ReturnType<typeof setTimeout> | null = null;
-
-watch(
-  () => props.history,
-  (history) => {
-    drawCount.value = Math.min(Math.max(drawCount.value, 1), history.length);
-    referenceDrawOffset.value = Math.min(
-      referenceDrawOffset.value,
-      Math.max(0, drawCount.value - 1),
-    );
-  },
-);
 
 const model = computed(() =>
   buildLastSeenSpaceModel(
     props.history,
-    drawCount.value,
-    referenceDrawOffset.value,
+    props.drawCount,
+    props.referenceDrawOffset,
   ),
 );
 const gapScaleModel = computed(() =>
   buildLastSeenGapModel(
     props.history,
-    drawCount.value,
-    referenceDrawOffset.value,
+    props.drawCount,
+    props.referenceDrawOffset,
   ),
 );
 const horizontalAxisMax = computed(() =>
@@ -59,11 +51,6 @@ const rowDrawIndices = computed(() =>
     { length: model.value.drawCount },
     (_value, index) => model.value.drawCount - 1 - index,
   ),
-);
-const referenceDisplayIndex = computed(() =>
-  model.value.referenceDrawIndex === null
-    ? 0
-    : model.value.drawCount - model.value.referenceDrawIndex,
 );
 const spaceUnits = computed(() =>
   Array.from(
@@ -102,6 +89,66 @@ const drawSpaceBands = computed(() => {
     .filter(([_drawIndex, range]) => range.first < range.last)
     .map(([drawIndex, range]) => ({ drawIndex, ...range }));
 });
+const occurrenceStrips = computed(() => {
+  const referenceIndex = model.value.referenceDrawIndex;
+  if (referenceIndex === null) return [];
+
+  // Repeated equal spaces in one draw share one strip, keeping the opacity
+  // uniform across every space column.
+  const strips = new Map<
+    number,
+    { space: number; x: number; y: number; height: number }
+  >();
+  for (const point of model.value.points) {
+    if (!point.highlighted || point.drawIndex >= referenceIndex) continue;
+    const topY = yForDraw(referenceIndex) + pointRadius;
+    const bottomY = yForDraw(point.drawIndex) - pointRadius;
+    const height = Math.max(0, bottomY - topY);
+    if (height > 0) {
+      strips.set(point.space, {
+        space: point.space,
+        x: xForSpace(point.space) - occurrenceStripWidth / 2,
+        y: topY,
+        height,
+      });
+    }
+  }
+  return [...strips.values()];
+});
+const referencePrecedentStrips = computed(() => {
+  const referenceIndex = model.value.referenceDrawIndex;
+  if (referenceIndex === null) return [];
+  const referenceSpaces = new Set(
+    model.value.points
+      .filter((point) => point.drawIndex === referenceIndex)
+      .map((point) => point.space),
+  );
+  return [...referenceSpaces]
+    .map((space) => {
+      const precedent = model.value.points
+        .filter(
+          (point) => point.space === space && point.drawIndex < referenceIndex,
+        )
+        .sort((left, right) => right.drawIndex - left.drawIndex)[0];
+      if (!precedent) return null;
+      const topY = yForDraw(referenceIndex) + pointRadius;
+      const bottomY = yForDraw(precedent.drawIndex) - pointRadius;
+      return {
+        space,
+        x: xForSpace(space) - occurrenceStripWidth / 2,
+        y: topY,
+        height: Math.max(0, bottomY - topY),
+      };
+    })
+    .filter(
+      (strip): strip is {
+        space: number;
+        x: number;
+        y: number;
+        height: number;
+      } => strip !== null && strip.height > 0,
+    );
+});
 
 function xForSpace(space: number): number {
   if (horizontalAxisMax.value <= 0) return chartLeft + plotWidth / 2;
@@ -120,18 +167,6 @@ function pointClass(drawIndex: number, highlighted: boolean): string {
     return "point-reference-range";
   }
   return highlighted ? "point-highlighted" : "point-default";
-}
-
-function setDrawCount(event: Event): void {
-  const value = Number((event.target as HTMLInputElement).value);
-  drawCount.value = Math.min(
-    Math.max(Math.trunc(value || 1), 1),
-    props.history.length,
-  );
-  referenceDrawOffset.value = Math.min(
-    referenceDrawOffset.value,
-    drawCount.value - 1,
-  );
 }
 
 function clearLongPressTimer(): void {
@@ -154,62 +189,24 @@ onBeforeUnmount(clearLongPressTimer);
 
 <template>
   <section class="workspace-view last-seen-view space-highlight-view">
-    <section class="reference-toolbar">
-      <label>
-        <span>Draw count</span>
-        <input
-          :max="history.length"
-          min="1"
-          :value="drawCount"
-          type="number"
-          @change="setDrawCount"
-        >
-      </label>
-      <div class="reference-buttons">
-        <button
-          :disabled="referenceDrawOffset === model.maxReferenceOffset"
-          type="button"
-          @click="referenceDrawOffset = model.maxReferenceOffset"
-        >|&lt; First</button>
-        <button
-          :disabled="referenceDrawOffset === model.maxReferenceOffset"
-          type="button"
-          @click="referenceDrawOffset += 1"
-        >&lt; Previous</button>
-        <button
-          :disabled="referenceDrawOffset === 0"
-          type="button"
-          @click="referenceDrawOffset -= 1"
-        >Next &gt;</button>
-        <button
-          :disabled="referenceDrawOffset === 0"
-          type="button"
-          @click="referenceDrawOffset = 0"
-        >Latest &gt;|</button>
-      </div>
-      <div class="reference-summary">
-        <span>Reference history draw</span>
-        <strong>{{ model.referenceDrawNumber?.toLocaleString() ?? "—" }}</strong>
-        <small>Display index {{ referenceDisplayIndex }}</small>
-      </div>
-    </section>
-
-    <aside class="space-conversion-note">
-      <strong>Complete circular spaces:</strong>
-      Rand AI internal space counts the unselected numbers between neighboring
-      balls. All six spaces are shown, including the wraparound from the largest
-      number through 49 and 1 to the smallest number.
-    </aside>
-
-    <div class="highlight-legend">
-      <span><i class="legend-red" /> Last seen space</span>
-      <span><i class="legend-blue" /> Earlier occurrence</span>
-      <span><i class="legend-path-line" /> First-to-last draw band</span>
-      <span><i class="legend-gray" /> Newer than reference</span>
-      <span class="gap-help">Long-press a point to inspect its Rand AI space</span>
-    </div>
-
     <div class="highlight-chart-scroll">
+      <svg :width="svgWidth" height="42" class="highlight-chart-header" role="presentation">
+        <rect
+          :x="xForSpace(0) - 15"
+          y="6"
+          :width="plotWidth + 30"
+          height="30"
+          class="top-number-strip"
+          rx="8"
+        />
+        <text
+          v-for="space in spaceUnits"
+          :key="`header-space-${space}`"
+          :x="xForSpace(space)"
+          y="27"
+          class="tick-label top-x-tick"
+        >{{ space }}</text>
+      </svg>
       <svg
         :height="chartHeight"
         :width="svgWidth"
@@ -244,14 +241,6 @@ onBeforeUnmount(clearLongPressTimer);
           height="28"
           class="current-reference-ribbon"
         />
-        <text
-          v-for="space in spaceTicks.filter((value) => value % 5 === 0)"
-          :key="`top-${space}`"
-          :x="xForSpace(space)"
-          :y="chartTop - 18"
-          class="tick-label top-x-tick"
-        >{{ space }}</text>
-
         <g v-for="drawIndex in rowDrawIndices" :key="`row-${drawIndex}`">
           <line
             :class="{ major: (model.drawCount - drawIndex) % 5 === 0 }"
@@ -286,7 +275,28 @@ onBeforeUnmount(clearLongPressTimer);
           :width="xForSpace(band.last) - xForSpace(band.first) + pointRadius * 2"
           :height="pointRadius * 2"
           :rx="pointRadius"
-          class="space-occurrence-band"
+          class="draw-occurrence-band"
+        />
+
+        <rect
+          v-for="strip in occurrenceStrips"
+          :key="`space-interval-${strip.space}`"
+          :x="strip.x"
+          :y="strip.y"
+          :width="occurrenceStripWidth"
+          :height="strip.height"
+          class="occurrence-interval-strip"
+          rx="4.5"
+        />
+        <rect
+          v-for="strip in referencePrecedentStrips"
+          :key="`space-precedent-${strip.space}`"
+          :x="strip.x"
+          :y="strip.y"
+          :width="occurrenceStripWidth"
+          :height="strip.height"
+          class="reference-precedent-strip"
+          rx="4.5"
         />
 
         <g

@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { buildLastSeenModel } from "../lib/lastSeen";
 import type { HistoryDraw } from "../types";
 
 const props = defineProps<{
   history: HistoryDraw[];
+  drawCount: number;
+  referenceDrawOffset: number;
 }>();
 
 const svgWidth = 1680;
 const chartLeft = 70;
-const chartTop = 60;
+const chartTop = 30;
 const chartBottom = 36;
 const chartRight = 30;
 const rowHeight = 30;
@@ -17,8 +19,6 @@ const pointRadius = 13.5;
 const undrawnStripWidth = (pointRadius * 2) / 3;
 const plotWidth = svgWidth - chartLeft - chartRight;
 
-const drawCount = ref(Math.min(50, props.history.length));
-const referenceDrawOffset = ref(0);
 const selectedPoint = ref<{
   number: number;
   gapUntilReference: number;
@@ -26,19 +26,12 @@ const selectedPoint = ref<{
   rightSpace: number;
 } | null>(null);
 
-watch(
-  () => props.history,
-  (history) => {
-    drawCount.value = Math.min(Math.max(drawCount.value, 1), history.length);
-    referenceDrawOffset.value = Math.min(
-      referenceDrawOffset.value,
-      Math.max(0, drawCount.value - 1),
-    );
-  },
-);
-
 const model = computed(() =>
-  buildLastSeenModel(props.history, drawCount.value, referenceDrawOffset.value),
+  buildLastSeenModel(
+    props.history,
+    props.drawCount,
+    props.referenceDrawOffset,
+  ),
 );
 const chartHeight = computed(() =>
   Math.max(320, chartTop + model.value.drawCount * rowHeight + chartBottom),
@@ -50,11 +43,6 @@ const rowDrawIndices = computed(() =>
     (_value, index) => model.value.drawCount - 1 - index,
   ),
 );
-const referenceDisplayIndex = computed(() =>
-  model.value.referenceDrawIndex === null
-    ? 0
-    : model.value.drawCount - model.value.referenceDrawIndex,
-);
 const yTicks = computed(() => {
   const step = Math.max(1, Math.floor(model.value.drawCount / 30));
   return rowDrawIndices.value
@@ -63,6 +51,24 @@ const yTicks = computed(() => {
       drawIndex,
       label: model.value.drawCount - drawIndex,
     }));
+});
+const drawNumberBands = computed(() => {
+  const ranges = new Map<number, { first: number; last: number }>();
+  for (const point of model.value.points) {
+    const range = ranges.get(point.drawIndex);
+    if (range) {
+      range.first = Math.min(range.first, point.number);
+      range.last = Math.max(range.last, point.number);
+    } else {
+      ranges.set(point.drawIndex, {
+        first: point.number,
+        last: point.number,
+      });
+    }
+  }
+  return [...ranges.entries()]
+    .filter(([_drawIndex, range]) => range.first < range.last)
+    .map(([drawIndex, range]) => ({ drawIndex, ...range }));
 });
 const undrawnStrips = computed(() => {
   const referenceIndex = model.value.referenceDrawIndex;
@@ -128,12 +134,6 @@ function pointClass(drawIndex: number, highlighted: boolean): string {
   return highlighted ? "point-highlighted" : "point-default";
 }
 
-function setDrawCount(value: Event): void {
-  const next = Number((value.target as HTMLInputElement).value);
-  drawCount.value = Math.min(Math.max(Math.trunc(next || 1), 1), props.history.length);
-  referenceDrawOffset.value = Math.min(referenceDrawOffset.value, drawCount.value - 1);
-}
-
 function showPoint(
   number: number,
   drawIndex: number,
@@ -152,56 +152,24 @@ function showPoint(
 
 <template>
   <section class="workspace-view last-seen-view last-seen-number-view">
-    <section class="reference-toolbar">
-      <label>
-        <span>Draw count</span>
-        <input
-          :max="history.length"
-          min="1"
-          :value="drawCount"
-          type="number"
-          @change="setDrawCount"
-        >
-      </label>
-      <div class="reference-buttons">
-        <button
-          :disabled="referenceDrawOffset === model.maxReferenceOffset"
-          type="button"
-          @click="referenceDrawOffset = model.maxReferenceOffset"
-        >|&lt; First</button>
-        <button
-          :disabled="referenceDrawOffset === model.maxReferenceOffset"
-          type="button"
-          @click="referenceDrawOffset += 1"
-        >&lt; Previous</button>
-        <button
-          :disabled="referenceDrawOffset === 0"
-          type="button"
-          @click="referenceDrawOffset -= 1"
-        >Next &gt;</button>
-        <button
-          :disabled="referenceDrawOffset === 0"
-          type="button"
-          @click="referenceDrawOffset = 0"
-        >Latest &gt;|</button>
-      </div>
-      <div class="reference-summary">
-        <span>Reference history draw</span>
-        <strong>{{ model.referenceDrawNumber?.toLocaleString() ?? "—" }}</strong>
-        <small>Display index {{ referenceDisplayIndex }}</small>
-      </div>
-    </section>
-
-    <div class="highlight-legend">
-      <span><i class="legend-red" /> Last seen</span>
-      <span><i class="legend-blue" /> Earlier occurrence</span>
-      <span><i class="legend-gray" /> Newer than reference</span>
-      <span><i class="legend-orange" /> Undrawn interval</span>
-      <span><i class="legend-green" /> Reference precedent</span>
-      <span class="gap-help">Hover a point to reveal its left and right spaces</span>
-    </div>
-
     <div class="highlight-chart-scroll">
+      <svg :width="svgWidth" height="42" class="highlight-chart-header" role="presentation">
+        <rect
+          :x="xForNumber(1) - 15"
+          y="6"
+          :width="plotWidth + 30"
+          height="30"
+          class="top-number-strip"
+          rx="8"
+        />
+        <text
+          v-for="number in 49"
+          :key="`header-${number}`"
+          :x="xForNumber(number)"
+          y="27"
+          class="tick-label top-x-tick"
+        >{{ number }}</text>
+      </svg>
       <svg :height="chartHeight" :width="svgWidth" class="highlight-chart" role="img">
         <text class="axis-label" :x="svgWidth / 2" :y="chartHeight - 10">Number</text>
         <text
@@ -222,14 +190,6 @@ function showPoint(
           :y2="chartTop + plotHeight + 10"
         />
         <rect
-          :x="xForNumber(1) - 15"
-          :y="chartTop - 42"
-          :width="plotWidth + 30"
-          height="24"
-          class="top-number-strip"
-          rx="8"
-        />
-        <rect
           v-if="model.referenceDrawIndex !== null"
           :x="xForNumber(1) - 11"
           :y="yForDraw(model.referenceDrawIndex) - 14"
@@ -237,14 +197,6 @@ function showPoint(
           height="28"
           class="current-reference-ribbon"
         />
-        <text
-          v-for="number in 49"
-          :key="`top-${number}`"
-          :x="xForNumber(number)"
-          :y="chartTop - 25"
-          class="tick-label top-x-tick"
-        >{{ number }}</text>
-
         <g v-for="drawIndex in rowDrawIndices" :key="`h-${drawIndex}`">
           <line
             :class="{ major: (model.drawCount - drawIndex) % 5 === 0 }"
@@ -272,13 +224,24 @@ function showPoint(
         >{{ number }}</text>
 
         <rect
+          v-for="band in drawNumberBands"
+          :key="`draw-number-band-${band.drawIndex}`"
+          :x="xForNumber(band.first) - pointRadius"
+          :y="yForDraw(band.drawIndex) - pointRadius"
+          :width="xForNumber(band.last) - xForNumber(band.first) + pointRadius * 2"
+          :height="pointRadius * 2"
+          :rx="pointRadius"
+          class="draw-occurrence-band"
+        />
+
+        <rect
           v-for="strip in undrawnStrips"
           :key="`undrawn-${strip.key}`"
           :height="strip.height"
           :width="undrawnStripWidth"
           :x="strip.x"
           :y="strip.y"
-          class="undrawn-strip"
+          class="occurrence-interval-strip"
           rx="4.5"
         />
         <rect
