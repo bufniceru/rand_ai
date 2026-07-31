@@ -8,6 +8,7 @@ import PossibleDrawDialogApp from "./PossibleDrawDialogApp.vue";
 import AutocorrelationView from "./views/AutocorrelationView.vue";
 import CoOccurrenceView from "./views/CoOccurrenceView.vue";
 import CombinedPredictionGridView from "./views/CombinedPredictionGridView.vue";
+import DrawPortfolioView from "./views/DrawPortfolioView.vue";
 import ExportView from "./views/ExportView.vue";
 import GapsView from "./views/GapsView.vue";
 import LastSeenGapHighlightView from "./views/LastSeenGapHighlightView.vue";
@@ -91,6 +92,11 @@ const workspaceTabs: {
     reportId: "last-seen-space",
   },
   { id: "predictions", label: "Predictions", reportId: "predictions" },
+  {
+    id: "draw-portfolio",
+    label: "Draw Portfolio",
+    reportId: "draw-portfolio",
+  },
   {
     id: "possible-draw",
     label: "Possible Draw",
@@ -511,6 +517,7 @@ function handleWorkspaceShortcut(event: KeyboardEvent): void {
     Digit1: "predictions",
     Digit2: "possible-draw",
     Digit3: "draw-history",
+    Digit4: "draw-portfolio",
   }[event.code] as WorkspaceTabId | undefined;
   if (!tabId) return;
   event.preventDefault();
@@ -803,6 +810,19 @@ onBeforeUnmount(() => {
         @send-number="handlePossibleDrawNumberRequest"
       />
     </main>
+
+    <section
+      v-if="analysis && visitedWorkspaceTabs.has('draw-portfolio')"
+      v-show="activeWorkspaceTab === 'draw-portfolio'"
+      class="workspace-tab-panel embedded-workspace-panel"
+      role="tabpanel"
+      aria-label="Draw Portfolio"
+    >
+      <DrawPortfolioView
+        :prediction-suites="analysis.predictionSuites"
+        :relationship-edges="analysis.possibleDraw.relationshipEdges"
+      />
+    </section>
 
     <section
       v-if="combinedPredictionData && visitedWorkspaceTabs.has('possible-draw')"

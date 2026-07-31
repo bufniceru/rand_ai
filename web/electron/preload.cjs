@@ -12,6 +12,17 @@ contextBridge.exposeInMainWorld("randAiDesktop", {
     ipcRenderer.on("dataset:analysis-progress", listener);
     return () => ipcRenderer.removeListener("dataset:analysis-progress", listener);
   },
+  getPortfolioBacktestData: (request) =>
+    ipcRenderer.invoke("portfolio-backtest:data", request),
+  loadPortfolioBacktest: (key) =>
+    ipcRenderer.invoke("portfolio-backtest:cache-load", key),
+  savePortfolioBacktest: (request) =>
+    ipcRenderer.invoke("portfolio-backtest:cache-save", request),
+  onPortfolioBacktestProgress: (callback) => {
+    const listener = (_event, progress) => callback(progress);
+    ipcRenderer.on("portfolio-backtest:progress", listener);
+    return () => ipcRenderer.removeListener("portfolio-backtest:progress", listener);
+  },
   exportAnalysis: (request) => ipcRenderer.invoke("analysis:export", request),
   saveDrawComparisonPdf: (request) =>
     ipcRenderer.invoke("draw-comparison:save-pdf", request),
