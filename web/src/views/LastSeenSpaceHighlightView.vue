@@ -84,12 +84,9 @@ const yTicks = computed(() => {
       label: model.value.drawCount - drawIndex,
     }));
 });
-const drawSpaceLines = computed(() => {
-  const referenceDrawIndex = model.value.referenceDrawIndex;
-  if (referenceDrawIndex === null) return [];
+const drawSpaceBands = computed(() => {
   const ranges = new Map<number, { first: number; last: number }>();
   for (const point of model.value.points) {
-    if (point.drawIndex > referenceDrawIndex) continue;
     const range = ranges.get(point.drawIndex);
     if (range) {
       range.first = Math.min(range.first, point.space);
@@ -207,7 +204,7 @@ onBeforeUnmount(clearLongPressTimer);
     <div class="highlight-legend">
       <span><i class="legend-red" /> Last seen space</span>
       <span><i class="legend-blue" /> Earlier occurrence</span>
-      <span><i class="legend-path-line" /> First-to-last path</span>
+      <span><i class="legend-path-line" /> First-to-last draw band</span>
       <span><i class="legend-gray" /> Newer than reference</span>
       <span class="gap-help">Long-press a point to inspect its Rand AI space</span>
     </div>
@@ -281,14 +278,15 @@ onBeforeUnmount(clearLongPressTimer);
           class="tick-label x-tick"
         >{{ space }}</text>
 
-        <line
-          v-for="line in drawSpaceLines"
-          :key="`draw-space-line-${line.drawIndex}`"
-          :x1="xForSpace(line.first)"
-          :x2="xForSpace(line.last)"
-          :y1="yForDraw(line.drawIndex)"
-          :y2="yForDraw(line.drawIndex)"
-          class="space-occurrence-line"
+        <rect
+          v-for="band in drawSpaceBands"
+          :key="`draw-space-band-${band.drawIndex}`"
+          :x="xForSpace(band.first) - pointRadius"
+          :y="yForDraw(band.drawIndex) - pointRadius"
+          :width="xForSpace(band.last) - xForSpace(band.first) + pointRadius * 2"
+          :height="pointRadius * 2"
+          :rx="pointRadius"
+          class="space-occurrence-band"
         />
 
         <g
