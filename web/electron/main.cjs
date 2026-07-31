@@ -63,6 +63,7 @@ const strategyPlugins = [
   { id: "markov100", label: "Mark" },
   { id: "mkfr", label: "MKFR" },
   { id: "mksp", label: "MKSP" },
+  { id: "mknp", label: "MKNP" },
   { id: "bayesian", label: "Baye" },
   { id: "predictive_grid", label: "Grid" },
   { id: "co_occurrence", label: "CoOc" },

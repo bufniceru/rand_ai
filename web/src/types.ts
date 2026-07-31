@@ -27,6 +27,7 @@ export type StrategyId =
   | "markov100"
   | "mkfr"
   | "mksp"
+  | "mknp"
   | "bayesian"
   | "predictive_grid"
   | "co_occurrence"

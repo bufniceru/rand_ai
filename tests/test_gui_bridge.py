@@ -58,6 +58,7 @@ def test_parses_report_plugin_selection_in_stable_order() -> None:
 
 def test_parses_strategy_plugin_selection_in_stable_order() -> None:
     assert parse_strategy_ids("entropy,proximity") == ("proximity", "entropy")
+    assert parse_strategy_ids("mknp,mksp") == ("mksp", "mknp")
     assert parse_strategy_ids("") == ()
     with pytest.raises(argparse.ArgumentTypeError, match="unknown prediction strategy"):
         parse_strategy_ids("freshness,unknown")
@@ -127,6 +128,7 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
         "Mark",
         "MKFR",
         "MKSP",
+        "MKNP",
         "Baye",
         "Grid",
         "CoOc",

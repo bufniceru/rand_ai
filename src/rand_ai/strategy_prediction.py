@@ -51,6 +51,7 @@ _MKSP_CONTEXT_DECAY = 0.86
 _MKSP_RECENCY_HALF_LIFE = 800
 _MKSP_SIMILARITY_SHARPNESS = 10.0
 _MKSP_BEAM_WIDTH = 8
+_MKNP_POSITION_COUNT = _NUMBERS_PER_DRAW - 1
 _RANDOM_SEED = 20260626
 _FRESH_RANDOM_SEED_OFFSET = 7919
 _FRESH_RANDOM_INFLUENCE = 0.35
@@ -95,6 +96,7 @@ _BASE_STRATEGY_IDS = (
     "markov100",
     "mkfr",
     "mksp",
+    "mknp",
     "bayesian",
     "predictive_grid",
     "co_occurrence",
@@ -157,7 +159,7 @@ _STRATEGY_DEPENDENCIES = {
         "svc",
         "tbl",
     },
-    "residual_coverage": set(_BASE_STRATEGY_IDS),
+    "residual_coverage": set(_BASE_STRATEGY_IDS).difference({"mknp"}),
     "chained": set(_CHAIN_EXPERT_IDS),
 }
 
@@ -431,6 +433,17 @@ def _spaces_for_numbers(numbers: Collection[int]) -> tuple[int, ...]:
     )
 
 
+def _normalized_positions_for_numbers(
+    numbers: Collection[int],
+) -> tuple[int, ...]:
+    """Translate a six-number draw so its first number occupies position one."""
+    ordered = sorted(numbers)
+    if len(ordered) != _NUMBERS_PER_DRAW:
+        raise ValueError("Normalized position states require exactly six numbers")
+    first = ordered[0]
+    return tuple(number - first + 1 for number in ordered)
+
+
 class _StrategyState:
     """Maintain incremental state for the enabled prediction strategy plugins."""
 
@@ -555,6 +568,32 @@ class _StrategyState:
             else []
         )
         self.mksp_observations: list[tuple[tuple[int, ...], int]] = []
+        self.mknp_histories: list[deque[int]] = (
+            [deque(maxlen=_MKSP_MAX_ORDER) for _ in range(_MKNP_POSITION_COUNT)]
+            if "mknp" in self.enabled_strategy_ids
+            else []
+        )
+        self.mknp_transitions: list[
+            list[dict[tuple[int, ...], dict[int, int]]]
+        ] = (
+            [
+                [{} for _ in range(_MKSP_MAX_ORDER)]
+                for _ in range(_MKNP_POSITION_COUNT)
+            ]
+            if "mknp" in self.enabled_strategy_ids
+            else []
+        )
+        self.mknp_value_counts: list[list[int]] = (
+            [[0] * (_NUMBER_COUNT + 1) for _ in range(_MKNP_POSITION_COUNT)]
+            if "mknp" in self.enabled_strategy_ids
+            else []
+        )
+        self.mknp_anchor_counts: list[int] = (
+            [0] * _MKSP_VALUE_COUNT
+            if "mknp" in self.enabled_strategy_ids
+            else []
+        )
+        self.mknp_observations: list[tuple[tuple[int, ...], int]] = []
         self.svc_weights = [0.0] * 11
         self.tbl_weights = [0.0] * 14
         self.cis_weights = [0.0] * (22 + len(_CIS_EXPERTS) * 4)
@@ -1061,6 +1100,20 @@ class _StrategyState:
                     ].setdefault(context, {})
                     counts[target] = counts.get(target, 0) + 1
 
+        if "mknp" in self.enabled_strategy_ids:
+            normalized = _normalized_positions_for_numbers(drawn)[1:]
+            for position, target in enumerate(normalized):
+                history_values = tuple(self.mknp_histories[position])
+                for order in range(
+                    1,
+                    min(len(history_values), _MKSP_MAX_ORDER) + 1,
+                ):
+                    context = history_values[-order:]
+                    counts = self.mknp_transitions[position][
+                        order - 1
+                    ].setdefault(context, {})
+                    counts[target] = counts.get(target, 0) + 1
+
         gap_models_enabled = bool(
             self.enabled_strategy_ids.intersection({"markov100", "bayesian"})
         )
@@ -1208,6 +1261,14 @@ class _StrategyState:
             anchor = min(drawn) - 1
             self.mksp_anchor_counts[anchor] += 1
             self.mksp_observations.append((spaces, anchor))
+        if "mknp" in self.enabled_strategy_ids:
+            normalized = _normalized_positions_for_numbers(drawn)
+            for position, value in enumerate(normalized[1:]):
+                self.mknp_histories[position].append(value)
+                self.mknp_value_counts[position][value] += 1
+            anchor = min(drawn) - 1
+            self.mknp_anchor_counts[anchor] += 1
+            self.mknp_observations.append((normalized, anchor))
         self.draw_count += 1
 
     @staticmethod
@@ -1790,6 +1851,303 @@ class _StrategyState:
                     f"support {min(selected_supports)}–{max(selected_supports)}"
                 ),
                 f"Valid-draw beam width {_MKSP_BEAM_WIDTH}",
+            )
+        return _scale_scores(marginals), details
+
+    @staticmethod
+    def _mknp_valid_values(position: int) -> range:
+        """Return valid normalized values for one of positions two through six."""
+        ordinal = position + 2
+        remaining_positions = _NUMBERS_PER_DRAW - ordinal
+        return range(ordinal, _NUMBER_COUNT - remaining_positions + 1)
+
+    def _mknp_baseline_probability(self, position: int, value: int) -> float:
+        valid_values = self._mknp_valid_values(position)
+        if value not in valid_values:
+            return 0.0
+        return (
+            self.mknp_value_counts[position][value]
+            + _MKSP_PRIOR_STRENGTH / len(valid_values)
+        ) / (self.draw_count + _MKSP_PRIOR_STRENGTH)
+
+    def _mknp_probability(
+        self,
+        position: int,
+        value: int,
+    ) -> tuple[float, int, int]:
+        history_values = tuple(self.mknp_histories[position])
+        active_orders = min(len(history_values), _MKSP_MAX_ORDER)
+        probability = self._mknp_baseline_probability(position, value)
+        selected_support = 0
+        selected_order = 0
+        for order in range(1, active_orders + 1):
+            context = history_values[-order:]
+            counts = self.mknp_transitions[position][order - 1].get(
+                context,
+                {},
+            )
+            opportunities = sum(counts.values())
+            if opportunities < _MKSP_MIN_CONTEXT_SUPPORT:
+                continue
+            probability = (
+                counts.get(value, 0) + _MKSP_PRIOR_STRENGTH * probability
+            ) / (opportunities + _MKSP_PRIOR_STRENGTH)
+            selected_support = opportunities
+            selected_order = order
+        return probability, selected_support, selected_order
+
+    def _mknp_analogue_weights(
+        self,
+    ) -> list[tuple[tuple[int, ...], int, float]]:
+        observation_count = len(self.mknp_observations)
+        if observation_count < 2:
+            return []
+
+        weighted_analogues = []
+        first_target = max(1, observation_count - _MKSP_ANALOGUE_LIMIT)
+        maximum_position_distance = (
+            _MKNP_POSITION_COUNT * (_NUMBER_COUNT - 1)
+        )
+        for target_index in range(first_target, observation_count):
+            order = min(_MKSP_MAX_ORDER, target_index)
+            weighted_distance = 0.0
+            context_weight = 0.0
+            for lag in range(1, order + 1):
+                lag_weight = _MKSP_CONTEXT_DECAY ** (lag - 1)
+                current_positions = self.mknp_observations[-lag][0]
+                historical_positions = self.mknp_observations[
+                    target_index - lag
+                ][0]
+                lag_distance = sum(
+                    abs(current - historical)
+                    for current, historical in zip(
+                        current_positions[1:],
+                        historical_positions[1:],
+                    )
+                ) / maximum_position_distance
+                weighted_distance += lag_weight * lag_distance
+                context_weight += lag_weight
+
+            normalized_distance = weighted_distance / context_weight
+            similarity = math.exp(
+                -_MKSP_SIMILARITY_SHARPNESS * normalized_distance
+            )
+            age = observation_count - target_index
+            recency = 0.5 ** (age / _MKSP_RECENCY_HALF_LIFE)
+            length_confidence = 0.35 + 0.65 * order / _MKSP_MAX_ORDER
+            positions, anchor = self.mknp_observations[target_index]
+            weighted_analogues.append(
+                (positions, anchor, similarity * recency * length_confidence)
+            )
+        return weighted_analogues
+
+    def _mknp_distributions(
+        self,
+    ) -> tuple[
+        tuple[tuple[float, ...], ...],
+        tuple[float, ...],
+        float,
+        int,
+        tuple[int, ...],
+        tuple[int, ...],
+    ]:
+        analogues = self._mknp_analogue_weights()
+        analogue_weight = sum(weight for _positions, _anchor, weight in analogues)
+        squared_weight = sum(
+            weight * weight for _positions, _anchor, weight in analogues
+        )
+        effective_support = (
+            analogue_weight * analogue_weight / squared_weight
+            if squared_weight > 0
+            else 0.0
+        )
+
+        weighted_position_counts = [
+            [0.0] * (_NUMBER_COUNT + 1)
+            for _position in range(_MKNP_POSITION_COUNT)
+        ]
+        weighted_anchor_counts = [0.0] * _MKSP_VALUE_COUNT
+        for positions, anchor, weight in analogues:
+            for position, value in enumerate(positions[1:]):
+                weighted_position_counts[position][value] += weight
+            weighted_anchor_counts[anchor] += weight
+
+        position_distributions = []
+        selected_orders = []
+        selected_supports = []
+        for position in range(_MKNP_POSITION_COUNT):
+            baseline = self._mksp_normalize(
+                tuple(
+                    self._mknp_baseline_probability(position, value)
+                    for value in range(_NUMBER_COUNT + 1)
+                )
+            )
+            analogue_distribution = self._mksp_normalize(
+                tuple(
+                    weighted_position_counts[position][value]
+                    + _MKSP_ANALOGUE_PRIOR_STRENGTH * baseline[value]
+                    for value in range(_NUMBER_COUNT + 1)
+                )
+            )
+            exact_distribution = self._mksp_normalize(
+                tuple(
+                    self._mknp_probability(position, value)[0]
+                    for value in range(_NUMBER_COUNT + 1)
+                )
+            )
+            distribution = self._mksp_normalize(
+                tuple(
+                    _MKSP_ANALOGUE_BLEND * analogue_distribution[value]
+                    + (1 - _MKSP_ANALOGUE_BLEND) * exact_distribution[value]
+                    for value in range(_NUMBER_COUNT + 1)
+                )
+            )
+            selected_value = max(
+                self._mknp_valid_values(position),
+                key=distribution.__getitem__,
+            )
+            _probability, support, order = self._mknp_probability(
+                position,
+                selected_value,
+            )
+            position_distributions.append(distribution)
+            selected_orders.append(order)
+            selected_supports.append(support)
+
+        anchor_total = sum(self.mknp_anchor_counts)
+        anchor_baseline = tuple(
+            (
+                self.mknp_anchor_counts[value]
+                + _MKSP_ANALOGUE_PRIOR_STRENGTH / _MKSP_VALUE_COUNT
+            )
+            / (anchor_total + _MKSP_ANALOGUE_PRIOR_STRENGTH)
+            for value in range(_MKSP_VALUE_COUNT)
+        )
+        anchor_distribution = self._mksp_normalize(
+            tuple(
+                weighted_anchor_counts[value]
+                + _MKSP_ANALOGUE_PRIOR_STRENGTH * anchor_baseline[value]
+                for value in range(_MKSP_VALUE_COUNT)
+            )
+        )
+        return (
+            tuple(position_distributions),
+            anchor_distribution,
+            effective_support,
+            len(analogues),
+            tuple(selected_orders),
+            tuple(selected_supports),
+        )
+
+    @classmethod
+    def _mknp_shape_beam(
+        cls,
+        distributions: Sequence[Sequence[float]],
+    ) -> dict[int, list[tuple[float, tuple[int, ...]]]]:
+        states: dict[int, list[tuple[float, tuple[int, ...]]]] = {
+            1: [(0.0, (1,))]
+        }
+        for position, distribution in enumerate(distributions):
+            candidates: dict[int, list[tuple[float, tuple[int, ...]]]] = {}
+            for previous_value, paths in states.items():
+                for log_probability, prefix in paths:
+                    for value in cls._mknp_valid_values(position):
+                        if value <= previous_value:
+                            continue
+                        candidates.setdefault(value, []).append(
+                            (
+                                log_probability + math.log(distribution[value]),
+                                (*prefix, value),
+                            )
+                        )
+            states = {
+                value: nlargest(
+                    _MKSP_BEAM_WIDTH,
+                    paths,
+                    key=lambda path: (path[0], path[1]),
+                )
+                for value, paths in candidates.items()
+            }
+        return states
+
+    def _mknp_scores(
+        self,
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        (
+            distributions,
+            anchor_distribution,
+            effective_support,
+            analogue_count,
+            selected_orders,
+            selected_supports,
+        ) = self._mknp_distributions()
+        shape_beam = self._mknp_shape_beam(distributions)
+        generated: list[tuple[float, tuple[int, ...], tuple[int, ...]]] = []
+        for spread, paths in shape_beam.items():
+            maximum_anchor = _NUMBER_COUNT - spread
+            for shape_log_probability, positions in paths:
+                for anchor in range(maximum_anchor + 1):
+                    numbers = tuple(anchor + position for position in positions)
+                    generated.append(
+                        (
+                            shape_log_probability
+                            + math.log(anchor_distribution[anchor]),
+                            numbers,
+                            positions,
+                        )
+                    )
+
+        maximum_log_probability = max(
+            log_probability for log_probability, _numbers, _positions in generated
+        )
+        weighted_generated = [
+            (
+                math.exp(log_probability - maximum_log_probability),
+                numbers,
+                positions,
+            )
+            for log_probability, numbers, positions in generated
+        ]
+        total_weight = sum(
+            weight for weight, _numbers, _positions in weighted_generated
+        )
+        marginals = {number: 0.0 for number in range(1, _NUMBER_COUNT + 1)}
+        best_contribution: dict[
+            int,
+            tuple[float, tuple[int, ...], tuple[int, ...]],
+        ] = {}
+        for weight, numbers, positions in weighted_generated:
+            for number in numbers:
+                marginals[number] += weight
+                previous_best = best_contribution.get(number)
+                if previous_best is None or weight > previous_best[0]:
+                    best_contribution[number] = (weight, numbers, positions)
+
+        details: dict[int, tuple[str, ...]] = {}
+        for number in range(1, _NUMBER_COUNT + 1):
+            marginal = marginals[number] / total_weight
+            _weight, best_draw, best_positions = best_contribution[number]
+            spread = best_positions[-1]
+            details[number] = (
+                f"Marginal probability {marginal:.2%}",
+                f"Random baseline {_BASE_PROBABILITY:.2%}",
+                f"Best generated draw {','.join(str(value) for value in best_draw)}",
+                (
+                    "Best normalized positions "
+                    f"{','.join(str(value) for value in best_positions)}"
+                ),
+                f"Spread {spread}; wraparound space {_NUMBER_COUNT - spread}",
+                f"First-number anchor {best_draw[0]}",
+                (
+                    f"Analogue support {effective_support:.1f} effective "
+                    f"/ {analogue_count} candidates"
+                ),
+                (
+                    f"Exact orders /{_MKSP_MAX_ORDER}: "
+                    f"{','.join(str(order) for order in selected_orders)}; "
+                    f"support {min(selected_supports)}–{max(selected_supports)}"
+                ),
+                f"Valid-shape beam width {_MKSP_BEAM_WIDTH}",
             )
         return _scale_scores(marginals), details
 
@@ -2859,6 +3217,25 @@ class _StrategyState:
                     mksp_details,
                 )
 
+        if "mknp" in enabled:
+            mknp_scores, mknp_details = self._mknp_scores()
+            rankings["mknp"] = _ranking_from_scores(
+                mknp_scores,
+                gaps,
+            )
+            if "mknp" in requested:
+                built["mknp"] = _strategy(
+                    "mknp",
+                    "MKNP",
+                    (
+                        "Order-20 normalized-position analogues decoded into "
+                        "valid translated draws."
+                    ),
+                    mknp_scores,
+                    gaps,
+                    mknp_details,
+                )
+
         if "bayesian" in enabled:
             bayesian_scores, bayesian_details = self._gap_model_scores(
                 gaps, weighted=False
@@ -3113,6 +3490,7 @@ class _StrategyState:
                     else ranking
                 )
                 for strategy_id, ranking in rankings.items()
+                if strategy_id != "mknp"
             }
             residual_scores, residual_details = self._residual_coverage_scores(
                 displayed_rankings,
