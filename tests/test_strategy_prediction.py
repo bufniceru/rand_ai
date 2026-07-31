@@ -28,13 +28,15 @@ from rand_ai.strategy_prediction import (
     _proximity_bucket,
     _rank_strength,
     _ranking_from_scores,
+    _normalized_positions_for_numbers,
+    _relative_dispersion_profile,
     _spaces_for_numbers,
     _variance,
     build_prediction_suites,
 )
 
 
-def test_builds_twenty_named_rankings_and_reports_progress() -> None:
+def test_builds_twenty_two_named_rankings_and_reports_progress() -> None:
     draws = Draws()
     draws.add(Draw(1, 2, 8, 17, 31, 49))
     draws.add(Draw(3, 6, 12, 22, 36, 47))
@@ -62,6 +64,8 @@ def test_builds_twenty_named_rankings_and_reports_progress() -> None:
         "Mark",
         "MKFR",
         "MKSP",
+        "MKNP",
+        "MKRD",
         "Baye",
         "Grid",
         "CoOc",
@@ -89,7 +93,8 @@ def test_builds_twenty_named_rankings_and_reports_progress() -> None:
         *(
             set(strategy.top_numbers)
             for strategy in suites[-1].strategies
-            if strategy.strategy_id not in {"residual_coverage", "chained"}
+            if strategy.strategy_id
+            not in {"mknp", "mkrd", "residual_coverage", "chained"}
         )
     )
     assert not set(residual.top_numbers).intersection(base_top_numbers)
@@ -139,11 +144,26 @@ def test_builds_only_selected_strategy_plugins(
     ]
 
 
-def test_builds_only_selected_composite_and_association_plugins() -> None:
+def test_builds_only_selected_composite_and_association_plugins(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     draws = Draws()
     draws.add(Draw(1, 2, 8, 17, 31, 49))
     draws.add(Draw(3, 6, 12, 22, 36, 47))
     draws.prepare_predictions()
+
+    def unexpected_mknp(
+        _state: _StrategyState,
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        raise AssertionError("standalone MKNP was calculated by an ensemble")
+
+    def unexpected_mkrd(
+        _state: _StrategyState,
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        raise AssertionError("standalone MKRD was calculated by an ensemble")
+
+    monkeypatch.setattr(_StrategyState, "_mknp_scores", unexpected_mknp)
+    monkeypatch.setattr(_StrategyState, "_mkrd_scores", unexpected_mkrd)
 
     suites = build_prediction_suites(
         draws.draws,
@@ -902,6 +922,344 @@ def test_mksp_keeps_twenty_states_and_does_not_learn_from_future_draws() -> None
     future_strategy = build_prediction_suites(
         with_future.draws,
         enabled_strategy_ids=("mksp",),
+    )[-2].strategies[0]
+
+    assert prefix_strategy.top_numbers == future_strategy.top_numbers
+    assert prefix_strategy.numbers == future_strategy.numbers
+
+
+@pytest.mark.parametrize(
+    "numbers",
+    (
+        {2, 13, 16, 18, 19, 22},
+        {1, 2, 3, 4, 5, 6},
+        {1, 10, 20, 30, 40, 49},
+    ),
+)
+def test_mknp_normalizes_positions_and_preserves_spread(
+    numbers: set[int],
+) -> None:
+    positions = _normalized_positions_for_numbers(numbers)
+    spaces = _spaces_for_numbers(numbers)
+
+    assert positions[0] == 1
+    assert all(left < right for left, right in zip(positions, positions[1:]))
+    assert positions[-1] == 6 + sum(spaces[1:])
+    assert positions[-1] == 49 - spaces[0]
+
+
+def test_mknp_observes_normalized_positions_and_context_orders() -> None:
+    state = _StrategyState(("mknp",))
+    draws = (
+        {1, 10, 20, 30, 40, 49},
+        {2, 11, 21, 31, 41, 48},
+        {1, 2, 3, 4, 5, 6},
+    )
+    for drawn in draws:
+        state.train(drawn)
+        state.remember(drawn)
+
+    assert _normalized_positions_for_numbers(
+        {2, 13, 16, 18, 19, 22}
+    ) == (1, 12, 15, 17, 18, 21)
+    assert [list(history) for history in state.mknp_histories] == [
+        [10, 10, 2],
+        [20, 20, 3],
+        [30, 30, 4],
+        [40, 40, 5],
+        [49, 47, 6],
+    ]
+    assert state.mknp_transitions[0][0][(10,)][10] == 1
+    assert state.mknp_transitions[0][0][(10,)][2] == 1
+    assert state.mknp_transitions[0][1][(10, 10)][2] == 1
+    assert sum(sum(counts) for counts in state.mknp_value_counts) == 15
+    with pytest.raises(ValueError, match="exactly six"):
+        _normalized_positions_for_numbers({1, 2, 3})
+
+
+def test_mknp_backs_off_and_uses_categorical_bayesian_smoothing() -> None:
+    state = _StrategyState(("mknp",))
+    state.draw_count = 100
+    state.mknp_value_counts[0][5] = 20
+    state.mknp_histories[0].extend((3, 4))
+    state.mknp_transitions[0][0][(4,)] = {5: 2, 6: 8}
+    state.mknp_transitions[0][1][(3, 4)] = {
+        5: 1,
+        6: _MKSP_MIN_CONTEXT_SUPPORT - 2,
+    }
+    valid_count = len(state._mknp_valid_values(0))
+    baseline = (
+        20 + _MKSP_PRIOR_STRENGTH / valid_count
+    ) / (100 + _MKSP_PRIOR_STRENGTH)
+    expected_order_one = (2 + _MKSP_PRIOR_STRENGTH * baseline) / (
+        10 + _MKSP_PRIOR_STRENGTH
+    )
+
+    probability, support, selected_order = state._mknp_probability(0, 5)
+
+    assert probability == pytest.approx(expected_order_one)
+    assert support == 10
+    assert selected_order == 1
+
+
+def test_mknp_builds_valid_shapes_and_scores_translated_draws() -> None:
+    state = _StrategyState(("mknp",))
+    repeating_draws = (
+        {1, 10, 20, 30, 40, 49},
+        {2, 11, 21, 31, 41, 48},
+        {3, 12, 22, 32, 42, 47},
+    )
+    for index in range(30):
+        drawn = repeating_draws[index % len(repeating_draws)]
+        state.train(drawn)
+        state.remember(drawn)
+
+    (
+        distributions,
+        anchor_distribution,
+        effective_support,
+        analogue_count,
+        selected_orders,
+        selected_supports,
+    ) = state._mknp_distributions()
+    beam = state._mknp_shape_beam(distributions)
+    scores, details = state._mknp_scores()
+
+    assert len(distributions) == 5
+    assert all(len(distribution) == 50 for distribution in distributions)
+    assert all(sum(distribution) == pytest.approx(1) for distribution in distributions)
+    assert sum(anchor_distribution) == pytest.approx(1)
+    assert effective_support > 0
+    assert analogue_count == 29
+    assert len(selected_orders) == len(selected_supports) == 5
+    assert set(beam) == set(range(6, 50))
+    assert all(
+        len(positions) == 6
+        and positions[0] == 1
+        and positions[-1] == spread
+        and all(left < right for left, right in zip(positions, positions[1:]))
+        for spread, paths in beam.items()
+        for _log_probability, positions in paths
+    )
+    assert set(scores) == set(range(1, 50))
+    assert details[1][0].startswith("Marginal probability ")
+    assert details[1][3].startswith("Best normalized positions 1,")
+    assert details[1][4].startswith("Spread ")
+    assert details[49][5].startswith("First-number anchor ")
+    assert details[7][8].startswith("Valid-shape beam width ")
+
+
+def test_mknp_keeps_twenty_states_and_does_not_learn_from_future_draws() -> None:
+    state = _StrategyState(("mknp",))
+    for index in range(25):
+        drawn = (
+            {1, 10, 20, 30, 40, 49}
+            if index % 2 == 0
+            else {2, 11, 21, 31, 41, 48}
+        )
+        state.train(drawn)
+        state.remember(drawn)
+    assert all(len(history) == _MKSP_MAX_ORDER for history in state.mknp_histories)
+
+    prefix = (
+        Draw(1, 2, 8, 17, 31, 49),
+        Draw(3, 6, 12, 22, 36, 47),
+        Draw(1, 9, 18, 27, 38, 45),
+    )
+    without_future = Draws()
+    with_future = Draws()
+    for draw in prefix:
+        without_future.add(draw)
+        with_future.add(Draw(*(ball.value for ball in draw.balls)))
+    with_future.add(Draw(4, 11, 20, 29, 37, 48))
+    without_future.prepare_predictions()
+    with_future.prepare_predictions()
+
+    prefix_strategy = build_prediction_suites(
+        without_future.draws,
+        enabled_strategy_ids=("mknp",),
+    )[-1].strategies[0]
+    future_strategy = build_prediction_suites(
+        with_future.draws,
+        enabled_strategy_ids=("mknp",),
+    )[-2].strategies[0]
+
+    assert prefix_strategy.top_numbers == future_strategy.top_numbers
+    assert prefix_strategy.numbers == future_strategy.numbers
+
+
+def test_mkrd_profiles_translation_scale_and_dispersion() -> None:
+    compact = _relative_dispersion_profile({2, 4, 6, 8, 10, 12})
+    translated = _relative_dispersion_profile({12, 14, 16, 18, 20, 22})
+    wide = _relative_dispersion_profile({2, 6, 10, 14, 18, 22})
+
+    assert compact.relative_positions == pytest.approx(
+        (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)
+    )
+    assert compact.relative_positions == pytest.approx(
+        translated.relative_positions
+    )
+    assert compact.relative_positions == pytest.approx(wide.relative_positions)
+    assert compact.gap_shares == pytest.approx((0.2,) * 5)
+    assert compact.uniformity == pytest.approx(0)
+    assert compact.entropy == pytest.approx(1)
+    assert compact.center_balance == pytest.approx(0.5)
+    assert compact.span == translated.span == 11
+    assert wide.span == 21
+    assert compact.coverage == pytest.approx(11 / 49)
+
+    assert _StrategyState._mkrd_profile_distance(
+        compact,
+        translated,
+    ) == pytest.approx(0)
+    assert _StrategyState._mkrd_profile_distance(
+        compact,
+        wide,
+    ) == pytest.approx(0.20 * 10 / 49)
+
+    uneven = _relative_dispersion_profile({1, 2, 3, 4, 5, 49})
+    assert 0 < uneven.uniformity <= 1
+    assert 0 <= uneven.entropy < 1
+    assert 0 <= uneven.center_balance <= 1
+    with pytest.raises(ValueError, match="exactly six"):
+        _relative_dispersion_profile({1, 2, 3})
+    with pytest.raises(ValueError, match="strictly increasing"):
+        _relative_dispersion_profile([1, 1, 2, 3, 4, 5])
+    with pytest.raises(ValueError, match="within 1–49"):
+        _relative_dispersion_profile({0, 1, 2, 3, 4, 5})
+
+
+def test_mkrd_observes_independent_position_histories_and_contexts() -> None:
+    state = _StrategyState(("mkrd",))
+    draws = (
+        {1, 10, 20, 30, 40, 49},
+        {2, 11, 21, 31, 41, 48},
+        {1, 2, 3, 4, 5, 6},
+    )
+    for drawn in draws:
+        state.train(drawn)
+        state.remember(drawn)
+
+    assert [list(history) for history in state.mkrd_histories] == [
+        [10, 10, 2],
+        [20, 20, 3],
+        [30, 30, 4],
+        [40, 40, 5],
+        [49, 47, 6],
+    ]
+    assert state.mkrd_transitions[0][0][(10,)][10] == 1
+    assert state.mkrd_transitions[0][0][(10,)][2] == 1
+    assert state.mkrd_transitions[0][1][(10, 10)][2] == 1
+    assert sum(sum(counts) for counts in state.mkrd_value_counts) == 15
+    assert len(state.mkrd_observations) == 3
+    assert not state.mknp_histories
+    assert not state.mknp_observations
+
+
+def test_mkrd_backs_off_with_bayesian_smoothing() -> None:
+    state = _StrategyState(("mkrd",))
+    state.draw_count = 100
+    state.mkrd_value_counts[0][5] = 20
+    state.mkrd_histories[0].extend((3, 4))
+    state.mkrd_transitions[0][0][(4,)] = {5: 2, 6: 8}
+    state.mkrd_transitions[0][1][(3, 4)] = {
+        5: 1,
+        6: _MKSP_MIN_CONTEXT_SUPPORT - 2,
+    }
+    valid_count = len(state._mknp_valid_values(0))
+    baseline = (
+        20 + _MKSP_PRIOR_STRENGTH / valid_count
+    ) / (100 + _MKSP_PRIOR_STRENGTH)
+    expected = (2 + _MKSP_PRIOR_STRENGTH * baseline) / (
+        10 + _MKSP_PRIOR_STRENGTH
+    )
+
+    probability, support, selected_order = state._mkrd_probability(0, 5)
+
+    assert probability == pytest.approx(expected)
+    assert support == 10
+    assert selected_order == 1
+
+
+def test_mkrd_builds_valid_shapes_and_detailed_scores() -> None:
+    state = _StrategyState(("mkrd",))
+    repeating_draws = (
+        {1, 10, 20, 30, 40, 49},
+        {2, 11, 21, 31, 41, 48},
+        {3, 12, 22, 32, 42, 47},
+    )
+    for index in range(30):
+        drawn = repeating_draws[index % len(repeating_draws)]
+        state.train(drawn)
+        state.remember(drawn)
+
+    (
+        distributions,
+        anchor_distribution,
+        effective_support,
+        analogue_count,
+        selected_orders,
+        selected_supports,
+    ) = state._mkrd_distributions()
+    beam = state._mknp_shape_beam(distributions)
+    scores, details = state._mkrd_scores()
+
+    assert len(distributions) == 5
+    assert all(sum(distribution) == pytest.approx(1) for distribution in distributions)
+    assert sum(anchor_distribution) == pytest.approx(1)
+    assert effective_support > 0
+    assert analogue_count == 29
+    assert len(selected_orders) == len(selected_supports) == 5
+    assert all(
+        len(positions) == 6
+        and positions[0] == 1
+        and all(left < right for left, right in zip(positions, positions[1:]))
+        for paths in beam.values()
+        for _log_probability, positions in paths
+    )
+    assert set(scores) == set(range(1, 50))
+    assert details[1][3].startswith("Relative positions 0.000,")
+    assert details[1][4].startswith("Span ")
+    assert details[1][5].startswith("Gap shares ")
+    assert details[1][6].startswith("Uniformity deviation ")
+    assert details[1][7].startswith("Internal-gap entropy ")
+    assert details[1][8].startswith("Center balance ")
+    assert details[7][12].startswith("Valid-shape beam width ")
+
+
+def test_mkrd_keeps_twenty_states_and_does_not_learn_from_future_draws() -> None:
+    state = _StrategyState(("mkrd",))
+    for index in range(25):
+        drawn = (
+            {1, 10, 20, 30, 40, 49}
+            if index % 2 == 0
+            else {2, 11, 21, 31, 41, 48}
+        )
+        state.train(drawn)
+        state.remember(drawn)
+    assert all(len(history) == _MKSP_MAX_ORDER for history in state.mkrd_histories)
+
+    prefix = (
+        Draw(1, 2, 8, 17, 31, 49),
+        Draw(3, 6, 12, 22, 36, 47),
+        Draw(1, 9, 18, 27, 38, 45),
+    )
+    without_future = Draws()
+    with_future = Draws()
+    for draw in prefix:
+        without_future.add(draw)
+        with_future.add(Draw(*(ball.value for ball in draw.balls)))
+    with_future.add(Draw(4, 11, 20, 29, 37, 48))
+    without_future.prepare_predictions()
+    with_future.prepare_predictions()
+
+    prefix_strategy = build_prediction_suites(
+        without_future.draws,
+        enabled_strategy_ids=("mkrd",),
+    )[-1].strategies[0]
+    future_strategy = build_prediction_suites(
+        with_future.draws,
+        enabled_strategy_ids=("mkrd",),
     )[-2].strategies[0]
 
     assert prefix_strategy.top_numbers == future_strategy.top_numbers

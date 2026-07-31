@@ -74,7 +74,7 @@ const activePlan = computed(() => plans.value.find((plan) => plan.id === activeP
 const orderedStrategies = computed(() => {
   const fallbackOrder: StrategyId[] = [
     "freshness", "proximity", "emd", "chi_square", "entropy", "markov100",
-    "mkfr", "mksp", "bayesian", "predictive_grid", "co_occurrence",
+    "mkfr", "mksp", "mknp", "mkrd", "bayesian", "predictive_grid", "co_occurrence",
     "doublet_triplet_markov", "mixed", "svc", "tbl",
     "cis", "fresh_random", "randomness",
     "residual_coverage",
@@ -490,6 +490,8 @@ function strategyFullName(strategy: StrategyPrediction): string {
     markov100: "Markov 100",
     mkfr: "Markov Frequency",
     mksp: "Markov Spatial",
+    mknp: "Markov Normalized Positions",
+    mkrd: "Markov Relative Dispersion",
     bayesian: "Bayesian",
     predictive_grid: "Predictive Grid",
     co_occurrence: "Co-occurrence",
@@ -510,6 +512,8 @@ function cardColor(id: string): string {
     freshness: "#f58a59", proximity: "#efb23e", emd: "#d9a531",
     entropy: "#c95d42", markov100: "#f3b94e", mkfr: "#1f8f75",
     mksp: "#517aa3",
+    mknp: "#2f7f9f",
+    mkrd: "#6d5aa8",
     chi_square: "#6256c7", bayesian: "#d477b8",
     predictive_grid: "#008ca8", co_occurrence: "#4f7f3f",
     doublet_triplet_markov: "#7c3aed", mixed: "#dd6b20",

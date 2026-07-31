@@ -1,12 +1,15 @@
 """Test the trusted analysis bridge consumed by the Electron application."""
 
 import argparse
+import gzip
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
 
+import rand_ai.gui_bridge as gui_bridge
 from rand_ai import Draw, Draws, create_lotto_results_pickle
 from rand_ai.gui_bridge import (
     DEFAULT_REPORT_IDS,
@@ -58,6 +61,8 @@ def test_parses_report_plugin_selection_in_stable_order() -> None:
 
 def test_parses_strategy_plugin_selection_in_stable_order() -> None:
     assert parse_strategy_ids("entropy,proximity") == ("proximity", "entropy")
+    assert parse_strategy_ids("mkrd,mknp,mksp") == ("mksp", "mknp", "mkrd")
+    assert "mkrd" not in DEFAULT_STRATEGY_IDS
     assert parse_strategy_ids("") == ()
     with pytest.raises(argparse.ArgumentTypeError, match="unknown prediction strategy"):
         parse_strategy_ids("freshness,unknown")
@@ -127,6 +132,7 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
         "Mark",
         "MKFR",
         "MKSP",
+        "MKNP",
         "Baye",
         "Grid",
         "CoOc",
@@ -397,6 +403,225 @@ def test_prediction_audit_keeps_drawn_numbers_when_all_strategies_are_disabled(
     )
 
 
+def test_strategy_cache_reuses_report_independent_analysis(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_path = _pickle_path(tmp_path)
+    cache_dir = tmp_path / "analysis-cache"
+    calls = 0
+    original = gui_bridge._build_strategy_analysis
+
+    def counted_build(
+        draws: Draws,
+        strategy_ids: Sequence[str],
+        history_start: int,
+        progress: gui_bridge.ProgressCallback | None,
+    ) -> gui_bridge.StrategyAnalysisArtifacts:
+        nonlocal calls
+        calls += 1
+        return original(draws, strategy_ids, history_start, progress)
+
+    monkeypatch.setattr(gui_bridge, "_build_strategy_analysis", counted_build)
+    first_progress: list[tuple[int, str]] = []
+    first = analyze_file(
+        source_path,
+        enabled_reports=("predictions",),
+        enabled_strategies=("freshness",),
+        strategy_cache_dir=cache_dir,
+        progress=lambda percent, message: first_progress.append((percent, message)),
+    )
+    second_progress: list[tuple[int, str]] = []
+    second = analyze_file(
+        source_path,
+        selected_numbers=(5, 12),
+        trend_bins=2,
+        correlation_method="spearman",
+        enabled_reports=("prediction-audit", "draw-comparison"),
+        enabled_strategies=("freshness",),
+        strategy_cache_dir=cache_dir,
+        progress=lambda percent, message: second_progress.append((percent, message)),
+    )
+
+    assert calls == 1
+    assert first["predictionSuites"]
+    assert second["predictionSuites"] == []
+    assert second["predictionAuditHistory"]
+    assert second["drawComparisonHistory"]
+    assert any("No compatible cache" in message for _, message in first_progress)
+    assert (31, "Loading cached strategy analysis") in second_progress
+    assert (60, "Cached strategy analysis is ready") in second_progress
+    cache_files = list(cache_dir.glob("*.json.gz"))
+    assert len(cache_files) == 1
+    with gzip.open(cache_files[0], "rt", encoding="utf-8") as cache_file:
+        cached = json.load(cache_file)
+    assert cached["identity"] == {
+        "schemaVersion": gui_bridge.STRATEGY_CACHE_SCHEMA_VERSION,
+        "datasetFingerprint": gui_bridge._dataset_fingerprint(_draws()),
+        "strategyIds": ["freshness"],
+        "historyLimit": gui_bridge.MAX_HISTORY_WINDOW,
+    }
+    assert cached["createdAt"].endswith("+00:00")
+
+
+def test_strategy_cache_refresh_and_inputs_invalidate_entries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_path = _pickle_path(tmp_path)
+    cache_dir = tmp_path / "analysis-cache"
+    calls = 0
+    original = gui_bridge._build_strategy_analysis
+
+    def counted_build(
+        draws: Draws,
+        strategy_ids: Sequence[str],
+        history_start: int,
+        progress: gui_bridge.ProgressCallback | None,
+    ) -> gui_bridge.StrategyAnalysisArtifacts:
+        nonlocal calls
+        calls += 1
+        return original(draws, strategy_ids, history_start, progress)
+
+    monkeypatch.setattr(gui_bridge, "_build_strategy_analysis", counted_build)
+
+    def analyze(*, refresh: bool = False, strategies: tuple[str, ...] = ("freshness",)) -> None:
+        analyze_file(
+            source_path,
+            enabled_reports=("predictions",),
+            enabled_strategies=strategies,
+            strategy_cache_dir=cache_dir,
+            refresh_strategy_cache=refresh,
+        )
+
+    analyze()
+    analyze(refresh=True)
+    analyze(strategies=("freshness", "entropy"))
+    changed = _draws()
+    changed.add(Draw(7, 14, 21, 28, 35, 42))
+    changed.save_pickle(source_path)
+    analyze()
+    monkeypatch.setattr(
+        gui_bridge,
+        "STRATEGY_CACHE_SCHEMA_VERSION",
+        gui_bridge.STRATEGY_CACHE_SCHEMA_VERSION + 1,
+    )
+    analyze()
+
+    assert calls == 5
+    assert len(list(cache_dir.glob("*.json.gz"))) == 4
+
+
+def test_strategy_cache_recovers_from_corrupt_and_invalid_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_path = _pickle_path(tmp_path)
+    cache_dir = tmp_path / "analysis-cache"
+    calls = 0
+    original = gui_bridge._build_strategy_analysis
+
+    def counted_build(
+        draws: Draws,
+        strategy_ids: Sequence[str],
+        history_start: int,
+        progress: gui_bridge.ProgressCallback | None,
+    ) -> gui_bridge.StrategyAnalysisArtifacts:
+        nonlocal calls
+        calls += 1
+        return original(draws, strategy_ids, history_start, progress)
+
+    monkeypatch.setattr(gui_bridge, "_build_strategy_analysis", counted_build)
+
+    def analyze() -> None:
+        analyze_file(
+            source_path,
+            enabled_reports=("predictions",),
+            enabled_strategies=("freshness",),
+            strategy_cache_dir=cache_dir,
+        )
+
+    analyze()
+    cache_path = next(cache_dir.glob("*.json.gz"))
+    cache_path.write_bytes(b"not gzip")
+    analyze()
+    with gzip.open(cache_path, "wt", encoding="utf-8") as cache_file:
+        json.dump({"identity": {}, "analysis": {}}, cache_file)
+    analyze()
+
+    assert calls == 3
+    with gzip.open(cache_path, "rt", encoding="utf-8") as cache_file:
+        assert gui_bridge._valid_strategy_artifacts(json.load(cache_file)["analysis"])
+
+
+def test_strategy_cache_write_failure_is_nonfatal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_path = _pickle_path(tmp_path)
+    unusable_cache_dir = tmp_path / "cache-file"
+    unusable_cache_dir.write_text("not a directory", encoding="utf-8")
+
+    payload = analyze_file(
+        source_path,
+        enabled_reports=("predictions",),
+        enabled_strategies=("freshness",),
+        strategy_cache_dir=unusable_cache_dir,
+    )
+
+    assert payload["predictionSuites"]
+    assert unusable_cache_dir.is_file()
+
+    writable_cache_dir = tmp_path / "writable-cache"
+    monkeypatch.setattr(
+        gui_bridge.gzip,
+        "open",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("write failed")),
+    )
+    gui_bridge._write_strategy_cache(
+        writable_cache_dir,
+        gui_bridge._strategy_cache_identity(_draws(), ("freshness",)),
+        {
+            "predictionSuites": [],
+            "strategyEfficacyHistory": [],
+            "predictionAuditHistory": [],
+            "drawComparisonHistory": [],
+        },
+    )
+    assert list(writable_cache_dir.iterdir()) == []
+
+
+def test_strategy_cache_prunes_old_entries_atomically(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cache_dir = tmp_path / "analysis-cache"
+    analysis = {
+        "predictionSuites": [],
+        "strategyEfficacyHistory": [],
+        "predictionAuditHistory": [],
+        "drawComparisonHistory": [],
+    }
+    monkeypatch.setattr(gui_bridge, "STRATEGY_CACHE_MAX_ENTRIES", 2)
+    for index in range(3):
+        gui_bridge._write_strategy_cache(
+            cache_dir,
+            {
+                "schemaVersion": 1,
+                "datasetFingerprint": str(index),
+                "strategyIds": ["freshness"],
+                "historyLimit": 250,
+            },
+            analysis,
+        )
+
+    assert len(list(cache_dir.glob("*.json.gz"))) == 2
+    assert list(cache_dir.glob("*.tmp")) == []
+    monkeypatch.setattr(gui_bridge, "STRATEGY_CACHE_MAX_BYTES", 1)
+    gui_bridge._prune_strategy_cache(cache_dir)
+    assert list(cache_dir.glob("*.json.gz")) == []
+
+
 def test_analyzes_and_exports_trusted_file(tmp_path: Path) -> None:
     """Verify direct bridge helpers load pickles and write the CSV archive."""
     source_path = _pickle_path(tmp_path)
@@ -450,6 +675,9 @@ def test_cli_analyze_and_export_commands(
             "2",
             "--correlation-method",
             "pearson",
+            "--cache-dir",
+            str(tmp_path / "analysis-cache"),
+            "--refresh-cache",
         ]
     )
     analyze_output = capsys.readouterr()

@@ -27,6 +27,8 @@ export type StrategyId =
   | "markov100"
   | "mkfr"
   | "mksp"
+  | "mknp"
+  | "mkrd"
   | "bayesian"
   | "predictive_grid"
   | "co_occurrence"
@@ -456,6 +458,7 @@ export interface DesktopApi {
   analyzeDataset(request: {
     path: string;
     options: AnalysisOptions;
+    forceReanalysis?: boolean;
   }): Promise<AnalysisPayload>;
   onAnalysisProgress(
     callback: (progress: AnalysisProgress) => void,

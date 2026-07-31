@@ -1,12 +1,16 @@
 """Provide the trusted Python analysis bridge used by the Electron desktop UI."""
 
 import argparse
+import gzip
+import hashlib
 import json
 import math
 import sys
 from collections import Counter
 from collections.abc import Callable, Collection, Sequence
+from datetime import datetime, timezone
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Any, cast
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -48,10 +52,157 @@ REPORT_IDS = (
     "possible-draw",
 )
 DEFAULT_REPORT_IDS = REPORT_IDS
-DEFAULT_STRATEGY_IDS = STRATEGY_IDS
+DEFAULT_STRATEGY_IDS = tuple(
+    strategy_id for strategy_id in STRATEGY_IDS if strategy_id != "mkrd"
+)
 MAX_HISTORY_WINDOW = 250
+STRATEGY_CACHE_SCHEMA_VERSION = 2
+STRATEGY_CACHE_MAX_ENTRIES = 20
+STRATEGY_CACHE_MAX_BYTES = 1024 * 1024 * 1024
 PROGRESS_PREFIX = "RAND_AI_PROGRESS "
 ProgressCallback = Callable[[int, str], None]
+StrategyAnalysisArtifacts = dict[str, list[dict[str, Any]]]
+
+
+def _dataset_fingerprint(draws: Draws) -> str:
+    """Return a stable digest of dates and sorted draw values."""
+    history = [
+        [draw.date, *sorted(ball.value for ball in draw.balls)]
+        for draw in draws.draws
+    ]
+    encoded = json.dumps(history, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _strategy_cache_identity(
+    draws: Draws,
+    strategy_ids: Sequence[str],
+) -> dict[str, Any]:
+    """Describe every input that changes cached walk-forward results."""
+    return {
+        "schemaVersion": STRATEGY_CACHE_SCHEMA_VERSION,
+        "datasetFingerprint": _dataset_fingerprint(draws),
+        "strategyIds": list(strategy_ids),
+        "historyLimit": MAX_HISTORY_WINDOW,
+    }
+
+
+def _strategy_cache_path(
+    cache_dir: Path,
+    identity: dict[str, Any],
+) -> Path:
+    """Return the content-addressed compressed cache path."""
+    encoded = json.dumps(
+        identity,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    key = hashlib.sha256(encoded).hexdigest()
+    return cache_dir / f"{key}.json.gz"
+
+
+def _valid_strategy_artifacts(value: object) -> bool:
+    """Return whether a decoded cache has all required artifact arrays."""
+    required = (
+        "predictionSuites",
+        "strategyEfficacyHistory",
+        "predictionAuditHistory",
+        "drawComparisonHistory",
+    )
+    return isinstance(value, dict) and all(
+        isinstance(value.get(name), list) for name in required
+    )
+
+
+def _discard_cache_file(path: Path) -> None:
+    """Remove one invalid internal cache entry on a best-effort basis."""
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:  # pragma: no cover - a concurrently locked cache is harmless
+        pass
+
+
+def _read_strategy_cache(
+    cache_dir: Path,
+    identity: dict[str, Any],
+) -> StrategyAnalysisArtifacts | None:
+    """Load one valid compressed strategy artifact and refresh its age."""
+    path = _strategy_cache_path(cache_dir, identity)
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as cache_file:
+            payload = json.load(cache_file)
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        _discard_cache_file(path)
+        return None
+    if (
+        not isinstance(payload, dict)
+        or payload.get("identity") != identity
+        or not _valid_strategy_artifacts(payload.get("analysis"))
+    ):
+        _discard_cache_file(path)
+        return None
+    try:
+        path.touch()
+    except OSError:  # pragma: no cover - cache aging is best effort
+        pass
+    return cast(StrategyAnalysisArtifacts, payload["analysis"])
+
+
+def _prune_strategy_cache(cache_dir: Path) -> None:
+    """Keep only the newest bounded set of completed cache entries."""
+    try:
+        entries = [
+            (path, path.stat()) for path in cache_dir.glob("*.json.gz")
+        ]
+    except OSError:  # pragma: no cover - pruning must not break analysis
+        return
+    entries.sort(key=lambda item: item[1].st_mtime_ns, reverse=True)
+    total_bytes = sum(stat.st_size for _path, stat in entries)
+    for index, (path, stat) in enumerate(entries):
+        if (
+            index < STRATEGY_CACHE_MAX_ENTRIES
+            and total_bytes <= STRATEGY_CACHE_MAX_BYTES
+        ):
+            continue
+        try:
+            path.unlink()
+            total_bytes -= stat.st_size
+        except OSError:  # pragma: no cover - another process may own the file
+            pass
+
+
+def _write_strategy_cache(
+    cache_dir: Path,
+    identity: dict[str, Any],
+    analysis: StrategyAnalysisArtifacts,
+) -> None:
+    """Atomically store one safe compressed JSON cache entry."""
+    temporary_path: Path | None = None
+    try:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        destination = _strategy_cache_path(cache_dir, identity)
+        with NamedTemporaryFile(
+            dir=cache_dir,
+            prefix=".strategy-analysis-",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary_file:
+            temporary_path = Path(temporary_file.name)
+        with gzip.open(temporary_path, "wt", encoding="utf-8") as cache_file:
+            json.dump(
+                {
+                    "identity": identity,
+                    "createdAt": datetime.now(timezone.utc).isoformat(),
+                    "analysis": analysis,
+                },
+                cache_file,
+                separators=(",", ":"),
+            )
+        temporary_path.replace(destination)
+        _prune_strategy_cache(cache_dir)
+    except (OSError, TypeError, ValueError):
+        if temporary_path is not None:
+            _discard_cache_file(temporary_path)
 
 
 def _report_progress(
@@ -333,6 +484,92 @@ def _prediction_audit_record_payload(
     }
 
 
+def _build_strategy_analysis(
+    draws: Draws,
+    strategy_ids: Sequence[str],
+    history_start: int,
+    progress: ProgressCallback | None,
+) -> StrategyAnalysisArtifacts:
+    """Calculate the report-independent walk-forward strategy artifacts."""
+    efficacy_records: list[StrategyEfficacyRecord] = []
+    prediction_audit_history: list[dict[str, Any]] = []
+    draw_comparison_history: list[dict[str, Any]] = []
+
+    def record_evaluated_suite(suite: PredictionSuite) -> None:
+        target_index = suite.target_draw_number - 1
+        target_date = (
+            draws.draws[target_index].date
+            if 0 <= target_index < len(draws.draws)
+            else None
+        )
+        prediction_audit_history.append(
+            _prediction_audit_record_payload(suite, target_date)
+        )
+        draw_comparison_history.append(
+            _draw_comparison_payload(suite, target_date)
+        )
+
+    prediction_suites = build_prediction_suites(
+        draws.draws,
+        history_start=history_start,
+        enabled_strategy_ids=strategy_ids,
+        progress=_prediction_progress(
+            progress,
+            31,
+            60,
+            f"Calculating {len(strategy_ids)} enabled prediction strategy plugins",
+        ),
+        efficacy_record=efficacy_records.append,
+        evaluated_suite=record_evaluated_suite,
+    )
+    return {
+        "predictionSuites": [
+            _suite_payload(suite) for suite in prediction_suites
+        ],
+        "strategyEfficacyHistory": [
+            _efficacy_record_payload(record) for record in efficacy_records
+        ],
+        "predictionAuditHistory": prediction_audit_history,
+        "drawComparisonHistory": draw_comparison_history,
+    }
+
+
+def _strategy_analysis(
+    draws: Draws,
+    strategy_ids: Sequence[str],
+    history_start: int,
+    progress: ProgressCallback | None,
+    cache_dir: Path | None,
+    refresh_cache: bool,
+) -> StrategyAnalysisArtifacts:
+    """Load cached strategy artifacts or calculate and persist them."""
+    identity = _strategy_cache_identity(draws, strategy_ids)
+    cached = (
+        None
+        if cache_dir is None or refresh_cache or not strategy_ids
+        else _read_strategy_cache(cache_dir, identity)
+    )
+    if cached is not None:
+        _report_progress(progress, 31, "Loading cached strategy analysis")
+        _report_progress(progress, 60, "Cached strategy analysis is ready")
+        return cached
+    if cache_dir is not None and strategy_ids:
+        _report_progress(
+            progress,
+            31,
+            "No compatible cache; calculating prediction strategies",
+        )
+    analysis = _build_strategy_analysis(
+        draws,
+        strategy_ids,
+        history_start,
+        progress,
+    )
+    if cache_dir is not None and strategy_ids:
+        _write_strategy_cache(cache_dir, identity, analysis)
+    return analysis
+
+
 def _possible_draw_payload(draws: Draws) -> dict[str, Any]:
     """Build the all-history state needed by the Possible Draw workspace."""
     pair_counts: Counter[tuple[int, int]] = Counter()
@@ -404,6 +641,8 @@ def build_analysis_payload(
     enabled_reports: Collection[str] = DEFAULT_REPORT_IDS,
     enabled_strategies: Collection[str] = DEFAULT_STRATEGY_IDS,
     progress: ProgressCallback | None = None,
+    strategy_cache_dir: Path | None = None,
+    refresh_strategy_cache: bool = False,
 ) -> dict[str, Any]:
     """Build the complete serializable payload consumed by the Vue dashboard."""
     report_ids = tuple(
@@ -445,54 +684,21 @@ def build_analysis_payload(
                     "Calculating prediction prerequisites draw by draw",
                 )
             )
-    prediction_suites: Sequence[PredictionSuite] = ()
-    efficacy_records: list[StrategyEfficacyRecord] = []
-    prediction_audit_history: list[dict[str, Any]] = []
-    draw_comparison_history: list[dict[str, Any]] = []
+    strategy_analysis: StrategyAnalysisArtifacts = {
+        "predictionSuites": [],
+        "strategyEfficacyHistory": [],
+        "predictionAuditHistory": [],
+        "drawComparisonHistory": [],
+    }
     if prediction_suites_required:
         _report_progress(progress, 31, "Preparing named PyLotto strategy models")
-
-        def record_evaluated_suite(suite: PredictionSuite) -> None:
-            target_index = suite.target_draw_number - 1
-            target_date = (
-                draws.draws[target_index].date
-                if 0 <= target_index < len(draws.draws)
-                else None
-            )
-            if "prediction-audit" in report_set:
-                prediction_audit_history.append(
-                    _prediction_audit_record_payload(suite, target_date)
-                )
-            if "draw-comparison" in report_set:
-                draw_comparison_history.append(
-                    _draw_comparison_payload(
-                        suite,
-                        target_date,
-                    )
-                )
-
-        prediction_suites = build_prediction_suites(
-            draws.draws,
-            history_start=(
-                history_start
-                if display_prediction_suites_required
-                else len(draws.draws)
-            ),
-            enabled_strategy_ids=strategy_ids,
-            progress=_prediction_progress(
-                progress,
-                31,
-                60,
-                f"Calculating {len(strategy_ids)} enabled prediction strategy plugins",
-            ),
-            efficacy_record=efficacy_records.append,
-            evaluated_suite=(
-                record_evaluated_suite
-                if report_set.intersection(
-                    {"prediction-audit", "draw-comparison"}
-                )
-                else None
-            ),
+        strategy_analysis = _strategy_analysis(
+            draws,
+            strategy_ids,
+            history_start,
+            progress,
+            strategy_cache_dir,
+            refresh_strategy_cache,
         )
     _report_progress(progress, 61, "Validating draw history and analysis options")
     statistics = DrawsStatistics(draws, trend_bins=trend_bins)
@@ -590,17 +796,29 @@ def build_analysis_payload(
             else []
         ),
         "combinedPredictions": prediction_history,
-        "predictionSuites": [
-            _suite_payload(suite) for suite in prediction_suites
+        "predictionSuites": (
+            strategy_analysis["predictionSuites"]
+            if display_prediction_suites_required
+            else []
+        ),
+        "strategyEfficacyHistory": strategy_analysis[
+            "strategyEfficacyHistory"
         ],
-        "strategyEfficacyHistory": [
-            _efficacy_record_payload(record)
-            for record in efficacy_records
-        ],
-        "predictionAuditHistory": prediction_audit_history,
-        "drawComparisonHistory": draw_comparison_history,
+        "predictionAuditHistory": (
+            strategy_analysis["predictionAuditHistory"]
+            if "prediction-audit" in report_set
+            else []
+        ),
+        "drawComparisonHistory": (
+            strategy_analysis["drawComparisonHistory"]
+            if "draw-comparison" in report_set
+            else []
+        ),
         "latestDrawComparison": (
-            draw_comparison_history[-1] if draw_comparison_history else None
+            strategy_analysis["drawComparisonHistory"][-1]
+            if "draw-comparison" in report_set
+            and strategy_analysis["drawComparisonHistory"]
+            else None
         ),
         "possibleDraw": (
             _possible_draw_payload(draws)
@@ -636,6 +854,8 @@ def analyze_file(
     enabled_reports: Collection[str] = DEFAULT_REPORT_IDS,
     enabled_strategies: Collection[str] = DEFAULT_STRATEGY_IDS,
     progress: ProgressCallback | None = None,
+    strategy_cache_dir: Path | None = None,
+    refresh_strategy_cache: bool = False,
 ) -> dict[str, Any]:
     """Load a trusted dataset and return its desktop-analysis payload."""
     _report_progress(progress, 4, "Opening the trusted pickle file")
@@ -650,6 +870,8 @@ def analyze_file(
         enabled_reports=enabled_reports,
         enabled_strategies=enabled_strategies,
         progress=progress,
+        strategy_cache_dir=strategy_cache_dir,
+        refresh_strategy_cache=refresh_strategy_cache,
     )
 
 
@@ -728,7 +950,13 @@ def _argument_parser() -> argparse.ArgumentParser:
             default=",".join(DEFAULT_STRATEGY_IDS),
             type=parse_strategy_ids,
         )
-        if command == "export":
+        if command == "analyze":
+            command_parser.add_argument("--cache-dir", type=Path)
+            command_parser.add_argument(
+                "--refresh-cache",
+                action="store_true",
+            )
+        else:
             command_parser.add_argument("--output", required=True, type=Path)
     editor_parser = subparsers.add_parser("draw-editor")
     editor_parser.add_argument("--input", required=True, type=Path)
@@ -797,6 +1025,8 @@ def main(arguments: Sequence[str] | None = None) -> None:
             enabled_reports=enabled_reports,
             enabled_strategies=enabled_strategies,
             progress=_write_progress,
+            strategy_cache_dir=options.cache_dir,
+            refresh_strategy_cache=options.refresh_cache,
         )
         _write_progress(97, "Transferring the completed analysis to Rand AI")
         json.dump(payload, sys.stdout, separators=(",", ":"))

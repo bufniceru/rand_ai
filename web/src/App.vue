@@ -107,6 +107,16 @@ const enabledStrategyIds = ref<StrategyId[]>([]);
 const strategyPlugins = ref<StrategyPlugin[]>([]);
 const settingsOpen = ref(false);
 const savingSettings = ref(false);
+const lastSeenDrawCountStorageKey = "rand-ai-last-seen-draw-count";
+const storedLastSeenDrawCount = Number(
+  window.localStorage.getItem(lastSeenDrawCountStorageKey) ?? "50",
+);
+const lastSeenDrawCount = ref(
+  Number.isFinite(storedLastSeenDrawCount)
+    ? Math.max(1, Math.trunc(storedLastSeenDrawCount))
+    : 50,
+);
+const lastSeenReferenceOffset = ref(0);
 const pendingDataset = ref<DatasetSelection | null>(null);
 const activeDataset = ref<DatasetSelection | null>(null);
 const analysis = ref<AnalysisPayload | null>(null);
@@ -177,6 +187,12 @@ const combinedPredictionData = computed<CombinedPredictionDialogData | null>(
         }
       : null,
 );
+const maxLastSeenDrawCount = computed(() =>
+  Math.max(1, analysis.value?.history.length ?? 250),
+);
+const visibleLastSeenDrawCount = computed(() =>
+  Math.min(lastSeenDrawCount.value, maxLastSeenDrawCount.value),
+);
 
 function isReportEnabled(reportId: ReportId): boolean {
   return enabledReportIds.value.includes(reportId);
@@ -235,22 +251,38 @@ async function openSettings(): Promise<void> {
   }
 }
 
-async function saveStrategySettings(
+async function saveSettings(
   strategyIds: StrategyId[],
+  requestedLastSeenDrawCount: number,
 ): Promise<void> {
   if (!window.randAiDesktop) return;
   savingSettings.value = true;
   errorMessage.value = "";
-  const changed =
+  const strategiesChanged =
     strategyIds.length !== enabledStrategyIds.value.length ||
     strategyIds.some(
       (strategyId, index) => strategyId !== enabledStrategyIds.value[index],
     );
   try {
-    const state = await window.randAiDesktop.setStrategyPlugins(strategyIds);
-    acceptStrategyPluginState(state);
+    const nextLastSeenDrawCount = Math.min(
+      Math.max(Math.trunc(requestedLastSeenDrawCount || 1), 1),
+      maxLastSeenDrawCount.value,
+    );
+    lastSeenDrawCount.value = nextLastSeenDrawCount;
+    lastSeenReferenceOffset.value = Math.min(
+      lastSeenReferenceOffset.value,
+      nextLastSeenDrawCount - 1,
+    );
+    window.localStorage.setItem(
+      lastSeenDrawCountStorageKey,
+      String(nextLastSeenDrawCount),
+    );
+    if (strategiesChanged) {
+      const state = await window.randAiDesktop.setStrategyPlugins(strategyIds);
+      acceptStrategyPluginState(state);
+    }
     settingsOpen.value = false;
-    if (changed && activeDataset.value) {
+    if (strategiesChanged && activeDataset.value) {
       if (loading.value) reportRefreshPending = true;
       else await analyzeDataset(activeDataset.value, normalizeOptions());
     }
@@ -307,6 +339,7 @@ function stageDataset(dataset: DatasetSelection): void {
 async function analyzeDataset(
   dataset: DatasetSelection,
   requestedOptions: AnalysisOptions,
+  forceReanalysis = false,
 ): Promise<void> {
   if (!window.randAiDesktop) {
     errorMessage.value = "The Python bridge is only available inside Electron.";
@@ -337,12 +370,16 @@ async function analyzeDataset(
     const payload = await window.randAiDesktop.analyzeDataset({
       path: dataset.path,
       options: requestedOptions,
+      forceReanalysis,
     });
     const datasetChanged = activeDataset.value?.path !== dataset.path;
     activeDataset.value = dataset;
     analysis.value = payload;
     analysisStale.value = false;
-    if (datasetChanged) selectWorkspaceTab("statistics");
+    if (datasetChanged) {
+      lastSeenReferenceOffset.value = 0;
+      selectWorkspaceTab("statistics");
+    }
     options.selectedNumbers = [...payload.options.selectedNumbers];
     options.trendBins = payload.options.trendBins;
     options.correlationMethod = payload.options.correlationMethod;
@@ -394,10 +431,14 @@ function handleAnalysisProgress(progress: AnalysisProgress): void {
   statusMessage.value = `${progress.message} · ${loadingProgress.value}%`;
 }
 
-async function applyOptions(): Promise<void> {
+async function applyOptions(forceReanalysis = false): Promise<void> {
   if (!activeDataset.value) return;
   try {
-    await analyzeDataset(activeDataset.value, normalizeOptions());
+    await analyzeDataset(
+      activeDataset.value,
+      normalizeOptions(),
+      forceReanalysis,
+    );
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
   }
@@ -442,6 +483,29 @@ function handleDrawHistorySaved(): void {
 }
 
 function handleWorkspaceShortcut(event: KeyboardEvent): void {
+  if (
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey &&
+    !settingsOpen.value &&
+    !loading.value &&
+    ["last-seen", "last-seen-gap", "last-seen-space"].includes(
+      activeWorkspaceTab.value,
+    ) &&
+    (event.key === "ArrowDown" || event.key === "ArrowUp")
+  ) {
+    const maximumOffset = Math.max(0, visibleLastSeenDrawCount.value - 1);
+    const nextOffset =
+      event.key === "ArrowDown"
+        ? Math.min(lastSeenReferenceOffset.value + 1, maximumOffset)
+        : Math.max(lastSeenReferenceOffset.value - 1, 0);
+    if (nextOffset !== lastSeenReferenceOffset.value) {
+      lastSeenReferenceOffset.value = nextOffset;
+    }
+    event.preventDefault();
+    return;
+  }
   if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
   const tabId = {
     Digit1: "predictions",
@@ -472,7 +536,7 @@ function handleMenuAction(message: MenuAction): void {
     return;
   }
   if (message.action === "reanalyze") {
-    if (activeDataset.value && !loading.value) void applyOptions();
+    if (activeDataset.value && !loading.value) void applyOptions(true);
     return;
   }
   if (message.action === "reportPluginsChanged") {
@@ -611,7 +675,7 @@ onBeforeUnmount(() => {
             </label>
           </div>
         </fieldset>
-        <button class="button primary apply-button" :disabled="loading" type="button" @click="applyOptions">
+        <button class="button primary apply-button" :disabled="loading" type="button" @click="applyOptions()">
           Apply controls
         </button>
         <dl class="dataset-facts">
@@ -690,7 +754,11 @@ onBeforeUnmount(() => {
       role="tabpanel"
       aria-label="Last seen"
     >
-      <LastSeenHighlightView :history="analysis.history" />
+      <LastSeenHighlightView
+        :history="analysis.history"
+        :draw-count="lastSeenDrawCount"
+        :reference-draw-offset="lastSeenReferenceOffset"
+      />
     </main>
 
     <main
@@ -700,7 +768,11 @@ onBeforeUnmount(() => {
       role="tabpanel"
       aria-label="Last seen gaps"
     >
-      <LastSeenGapHighlightView :history="analysis.history" />
+      <LastSeenGapHighlightView
+        :history="analysis.history"
+        :draw-count="lastSeenDrawCount"
+        :reference-draw-offset="lastSeenReferenceOffset"
+      />
     </main>
 
     <main
@@ -710,7 +782,11 @@ onBeforeUnmount(() => {
       role="tabpanel"
       aria-label="Last seen spaces"
     >
-      <LastSeenSpaceHighlightView :history="analysis.history" />
+      <LastSeenSpaceHighlightView
+        :history="analysis.history"
+        :draw-count="lastSeenDrawCount"
+        :reference-draw-offset="lastSeenReferenceOffset"
+      />
     </main>
 
     <main
@@ -816,9 +892,11 @@ onBeforeUnmount(() => {
       v-if="settingsOpen"
       :plugins="strategyPlugins"
       :enabled-strategy-ids="enabledStrategyIds"
+      :last-seen-draw-count="lastSeenDrawCount"
+      :max-last-seen-draw-count="maxLastSeenDrawCount"
       :saving="savingSettings"
       @cancel="settingsOpen = false"
-      @save="saveStrategySettings"
+      @save="saveSettings"
     />
 
     <footer class="status-bar">

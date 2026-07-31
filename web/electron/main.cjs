@@ -63,6 +63,8 @@ const strategyPlugins = [
   { id: "markov100", label: "Mark" },
   { id: "mkfr", label: "MKFR" },
   { id: "mksp", label: "MKSP" },
+  { id: "mknp", label: "MKNP" },
+  { id: "mkrd", label: "MKRD" },
   { id: "bayesian", label: "Baye" },
   { id: "predictive_grid", label: "Grid" },
   { id: "co_occurrence", label: "CoOc" },
@@ -77,7 +79,10 @@ const strategyPlugins = [
   { id: "residual_coverage", label: "Residual Coverage" },
   { id: "chained", label: "Chained Strategy" },
 ];
-let enabledStrategyIds = new Set(strategyPlugins.map((plugin) => plugin.id));
+const defaultStrategyPluginIds = strategyPlugins
+  .map((plugin) => plugin.id)
+  .filter((strategyId) => strategyId !== "mkrd");
+let enabledStrategyIds = new Set(defaultStrategyPluginIds);
 
 const dashboardViews = [
   ["overview", "Overview"],
@@ -108,6 +113,10 @@ function reportPreferencesPath() {
 
 function strategyPreferencesPath() {
   return path.join(app.getPath("userData"), "strategy-plugins.json");
+}
+
+function analysisCachePath() {
+  return path.join(app.getPath("userData"), "analysis-cache");
 }
 
 function enabledReportsList() {
@@ -183,7 +192,7 @@ function loadStrategyPreferences() {
   try {
     const parsed = JSON.parse(fs.readFileSync(strategyPreferencesPath(), "utf8"));
     if (!Array.isArray(parsed?.enabledStrategies)) {
-      return new Set(strategyPlugins.map((plugin) => plugin.id));
+      return new Set(defaultStrategyPluginIds);
     }
     const knownIds = new Set(strategyPlugins.map((plugin) => plugin.id));
     const selected = new Set(
@@ -193,14 +202,14 @@ function loadStrategyPreferences() {
       ),
     );
     if (legacyStrategyPluginIds.every((strategyId) => selected.has(strategyId))) {
-      for (const plugin of strategyPlugins) selected.add(plugin.id);
+      for (const strategyId of defaultStrategyPluginIds) selected.add(strategyId);
     }
     return selected;
   } catch (error) {
     if (error?.code !== "ENOENT") {
       console.warn("Could not load strategy plugin preferences:", error);
     }
-    return new Set(strategyPlugins.map((plugin) => plugin.id));
+    return new Set(defaultStrategyPluginIds);
   }
 }
 
@@ -753,8 +762,19 @@ ipcMain.handle("dataset:analyze", async (event, request) => {
     sendProgress({ percent: 3, message: "Starting the Python analysis engine" });
   }
 
+  const analysisArguments = [
+    "analyze",
+    "--input",
+    analysisPath,
+    ...optionArguments(request?.options),
+    "--cache-dir",
+    analysisCachePath(),
+  ];
+  if (request?.forceReanalysis === true) {
+    analysisArguments.push("--refresh-cache");
+  }
   const payload = await runBridge(
-    ["analyze", "--input", analysisPath, ...optionArguments(request?.options)],
+    analysisArguments,
     true,
     isYaml ? mapProgress(11, 97) : sendProgress,
   );
