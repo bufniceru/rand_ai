@@ -2025,6 +2025,19 @@ tbody tr:nth-child(even) {
   cursor: pointer;
 }
 
+.prediction-color-legend label.prediction-color-row {
+  grid-template-columns: 19px minmax(0, 1fr) 18px;
+}
+
+.prediction-color-swatch {
+  width: 18px;
+  height: 18px;
+  justify-self: end;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  background: var(--legend-color);
+  box-shadow: 0 0 0 1px rgba(34, 31, 34, 0.5);
+}
+
 .prediction-color-legend label:has(input:checked) {
   border-color: #86acd4;
   background: #d9ebfb;
@@ -2146,15 +2159,6 @@ tbody tr:nth-child(even) {
   box-shadow: 0 2px 7px rgba(22, 48, 75, 0.15);
   font-size: 18px;
   font-weight: 900;
-}
-
-.all-predictions-cell.is-high-consensus > strong {
-  border-color: rgba(255, 255, 255, 0.94);
-  color: #761616;
-  background: #ff9f9f;
-  box-shadow:
-    0 2px 7px rgba(22, 48, 75, 0.15),
-    inset 0 0 0 1px rgba(220, 111, 111, 0.78);
 }
 
 .prediction-strategy-sidebar {
@@ -6976,12 +6980,7 @@ select:disabled {
 .all-predictions-cell > strong {
   color: var(--monokai-fg);
   border-color: var(--monokai-border);
-  background: rgba(45, 42, 46, 0.88);
-}
-
-.all-predictions-cell.is-high-consensus > strong {
-  color: var(--monokai-deep);
-  background: var(--monokai-pink);
+  background: var(--monokai-surface);
 }
 
 .prediction-efficacy-overview thead th,

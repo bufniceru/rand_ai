@@ -679,6 +679,7 @@ onBeforeUnmount(clearNumberActionTimer);
             <label
               v-for="strategy in efficacyRanking"
               :key="strategy.id"
+              class="prediction-color-row"
               :style="{ '--legend-color': strategyColor(strategy.id) }"
             >
               <input
@@ -687,6 +688,7 @@ onBeforeUnmount(clearNumberActionTimer);
                 @change="toggleStrategyColor(strategy.id)"
               />
               <span>{{ strategyFullName(strategy) }}</span>
+              <i class="prediction-color-swatch" aria-hidden="true"></i>
             </label>
           </div>
         </div>
@@ -785,7 +787,6 @@ onBeforeUnmount(clearNumberActionTimer);
                 class="all-predictions-cell"
                 :class="{
                   'has-prediction': cell.reports.length > 0,
-                  'is-high-consensus': cell.reports.length >= 3,
                   'is-drawn': actualNumbers.has(cell.number),
                   'is-in-selected-coverage-zone':
                     selectedCoverageThreshold !== null &&
