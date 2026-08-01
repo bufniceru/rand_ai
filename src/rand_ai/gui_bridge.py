@@ -54,10 +54,12 @@ REPORT_IDS = (
 )
 DEFAULT_REPORT_IDS = REPORT_IDS
 DEFAULT_STRATEGY_IDS = tuple(
-    strategy_id for strategy_id in STRATEGY_IDS if strategy_id != "mkrd"
+    strategy_id
+    for strategy_id in STRATEGY_IDS
+    if strategy_id not in {"mkrd", "sklearn_svm"}
 )
 MAX_HISTORY_WINDOW = 250
-STRATEGY_CACHE_SCHEMA_VERSION = 3
+STRATEGY_CACHE_SCHEMA_VERSION = 4
 STRATEGY_CACHE_MAX_ENTRIES = 20
 STRATEGY_CACHE_MAX_BYTES = 1024 * 1024 * 1024
 PROGRESS_PREFIX = "RAND_AI_PROGRESS "

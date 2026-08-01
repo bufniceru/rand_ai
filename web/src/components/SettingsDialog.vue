@@ -42,6 +42,8 @@ const strategyDescriptions: Record<StrategyId, string> = {
   mixed: "Weighted consensus of four complementary strategies.",
   svc: "Online support-vector classification model.",
   tbl: "Temporal behavior learning ensemble.",
+  sklearn_svm:
+    "Scikit-learn online linear SVM with temporal, expert-rank, and prior-efficacy inputs.",
   cis: "Online learner combining ten strategy experts.",
   residual_coverage:
     "Diversity-first complement covering numbers outside every base Top-6.",

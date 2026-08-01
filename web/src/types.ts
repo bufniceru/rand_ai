@@ -37,6 +37,7 @@ export type StrategyId =
   | "mixed"
   | "svc"
   | "tbl"
+  | "sklearn_svm"
   | "cis"
   | "residual_coverage"
   | "chained";

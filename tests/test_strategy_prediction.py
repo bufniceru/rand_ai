@@ -1,5 +1,7 @@
 """Test the Python-calculated named prediction strategy suite."""
 
+from typing import Any, cast
+
 import pytest
 
 from rand_ai import (
@@ -23,6 +25,8 @@ from rand_ai.strategy_prediction import (
     _MKSP_MIN_CONTEXT_SUPPORT,
     _MKSP_PRIOR_STRENGTH,
     _MKSP_VALUE_COUNT,
+    _SKLEARN_SVM_EXPERT_IDS,
+    _SKLEARN_SVM_FEATURE_COUNT,
     _StrategyState,
     _median,
     _proximity_bucket,
@@ -36,7 +40,7 @@ from rand_ai.strategy_prediction import (
 )
 
 
-def test_builds_twenty_two_named_rankings_and_reports_progress() -> None:
+def test_builds_twenty_three_named_rankings_and_reports_progress() -> None:
     draws = Draws()
     draws.add(Draw(1, 2, 8, 17, 31, 49))
     draws.add(Draw(3, 6, 12, 22, 36, 47))
@@ -73,6 +77,7 @@ def test_builds_twenty_two_named_rankings_and_reports_progress() -> None:
         "Mix",
         "SVC",
         "TBL",
+        "Scikit Online SVM",
         "CIS",
         "RCOV",
         "Chained Strategy",
@@ -142,6 +147,118 @@ def test_builds_only_selected_strategy_plugins(
         "freshness",
         "entropy",
     ]
+
+
+def test_sklearn_svm_builds_bounded_features_and_hidden_dependencies() -> None:
+    draws = Draws()
+    draws.add(Draw(1, 2, 8, 17, 31, 49))
+    draws.prepare_predictions()
+    state = _StrategyState(("sklearn_svm",))
+    assert state.requested_strategy_ids == frozenset({"sklearn_svm"})
+    assert set(_SKLEARN_SVM_EXPERT_IDS).issubset(state.enabled_strategy_ids)
+    assert {"freshness", "proximity", "randomness"}.issubset(
+        state.enabled_strategy_ids
+    )
+    assert state._sklearn_svm_recent_residual(1, 5) == 0
+    assert state._sklearn_svm_relationship_residual(1) == 0
+    state.previous_draw = {1}
+    assert state._sklearn_svm_relationship_residual(1) == 0
+    state.previous_draw = set()
+
+    first_draw = {1, 2, 8, 17, 31, 49}
+    state.train(first_draw)
+    state.remember(first_draw)
+    combined = draws.draws[0].prediction
+    assert combined is not None
+    strategies = state.build_strategies(combined, 0)
+
+    assert [strategy.strategy_id for strategy in strategies] == ["sklearn_svm"]
+    assert state.sklearn_svm_trained_draws == 0
+    assert all(
+        len(features) == _SKLEARN_SVM_FEATURE_COUNT
+        and all(-1 <= feature <= 1 for feature in features)
+        for features in state.sklearn_svm_pending_features.values()
+    )
+    assert all(
+        item.details[0].startswith("Cold-start consensus")
+        for item in strategies[0].numbers
+    )
+
+
+def test_sklearn_svm_trains_pending_batch_with_balanced_weights() -> None:
+    class RecordingClassifier:
+        def __init__(self) -> None:
+            self.calls: list[tuple[Any, Any, Any, Any]] = []
+
+        def partial_fit(
+            self,
+            features: object,
+            labels: object,
+            *,
+            classes: object = None,
+            sample_weight: object = None,
+        ) -> None:
+            self.calls.append((features, labels, classes, sample_weight))
+
+    state = _StrategyState(("sklearn_svm",))
+    recorder = RecordingClassifier()
+    cast(Any, state).sklearn_svm = recorder
+    state.sklearn_svm_pending_features = {
+        number: (number / 49,) * _SKLEARN_SVM_FEATURE_COUNT
+        for number in range(1, 50)
+    }
+    state.sklearn_svm_pending_rankings = {
+        strategy_id: list(range(1, 50))
+        for strategy_id in _SKLEARN_SVM_EXPERT_IDS
+    }
+    drawn = {1, 2, 3, 4, 5, 6}
+
+    state._train_sklearn_svm(drawn)
+
+    assert state.sklearn_svm_fitted
+    assert state.sklearn_svm_trained_draws == 1
+    assert len(recorder.calls) == 1
+    features, labels, classes, sample_weights = recorder.calls[0]
+    assert getattr(features, "shape") == (49, _SKLEARN_SVM_FEATURE_COUNT)
+    assert list(labels) == [1] * 6 + [0] * 43
+    assert list(classes) == [0, 1]
+    assert list(sample_weights)[:6] == pytest.approx([43 / 6] * 6)
+    assert list(sample_weights)[6:] == pytest.approx([1.0] * 43)
+    assert all(
+        state.sklearn_svm_expert_evaluated_draws[strategy_id] == 1
+        and state.sklearn_svm_expert_total_hits[strategy_id] == 6
+        for strategy_id in _SKLEARN_SVM_EXPERT_IDS
+    )
+
+
+def test_sklearn_svm_is_deterministic_and_does_not_learn_from_future_draws() -> None:
+    prefix = [
+        Draw(1, 2, 8, 17, 31, 49),
+        Draw(3, 6, 12, 22, 36, 47),
+        Draw(1, 9, 18, 27, 38, 45),
+        Draw(4, 11, 20, 29, 37, 46),
+    ]
+
+    def predictions(extra: Draw) -> tuple[tuple[int, ...], tuple[int, ...]]:
+        draws = Draws()
+        for draw in (*prefix, extra):
+            draws.add(draw)
+        draws.prepare_predictions()
+        suites = build_prediction_suites(
+            draws.draws,
+            enabled_strategy_ids=("sklearn_svm",),
+        )
+        return (
+            suites[3].strategies[0].top_numbers,
+            suites[-1].strategies[0].top_numbers,
+        )
+
+    first = predictions(Draw(5, 14, 23, 32, 40, 48))
+    repeated = predictions(Draw(5, 14, 23, 32, 40, 48))
+    changed_future = predictions(Draw(7, 15, 24, 33, 41, 49))
+
+    assert first == repeated
+    assert first[0] == changed_future[0]
 
 
 def test_builds_only_selected_composite_and_association_plugins(
