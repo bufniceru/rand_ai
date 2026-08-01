@@ -78,7 +78,7 @@ function signed(value: number, digits = 3): string {
 
 function bandColor(bandId: string): string {
   return (
-    model.value.bands.find((band) => band.id === bandId)?.color ?? "#7b8798"
+    model.value.bands.find((band) => band.id === bandId)?.color ?? "#727072"
   );
 }
 

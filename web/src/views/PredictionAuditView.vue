@@ -160,12 +160,12 @@ function yForNumber(number: number): number {
 
 function implicationColor(item: PredictionAuditNumber): string {
   const count = filteredStrategies(item).length;
-  if (selectedStrategyId.value !== "all") return count > 0 ? "#138a72" : "#d8e1e8";
-  if (count === 0) return "#cbd5df";
-  if (count <= 2) return "#74a9cf";
-  if (count <= 5) return "#2b7bba";
-  if (count <= 8) return "#7651a8";
-  return "#b12f67";
+  if (selectedStrategyId.value !== "all") return count > 0 ? "#a9dc76" : "#49464a";
+  if (count === 0) return "#49464a";
+  if (count <= 2) return "#78dce8";
+  if (count <= 5) return "#a9dc76";
+  if (count <= 8) return "#ab9df2";
+  return "#ff6188";
 }
 
 function occurrenceTitle(
@@ -247,11 +247,11 @@ function percentage(value: number): string {
           <p>Click any drawn-number dot to inspect its successful strategies.</p>
         </div>
         <div class="audit-color-legend">
-          <span><i style="--audit-color: #cbd5df" />0</span>
-          <span><i style="--audit-color: #74a9cf" />1–2</span>
-          <span><i style="--audit-color: #2b7bba" />3–5</span>
-          <span><i style="--audit-color: #7651a8" />6–8</span>
-          <span><i style="--audit-color: #b12f67" />9+</span>
+          <span><i style="--audit-color: #49464a" />0</span>
+          <span><i style="--audit-color: #78dce8" />1–2</span>
+          <span><i style="--audit-color: #a9dc76" />3–5</span>
+          <span><i style="--audit-color: #ab9df2" />6–8</span>
+          <span><i style="--audit-color: #ff6188" />9+</span>
         </div>
       </header>
       <div v-if="visibleRecords.length > 0" class="prediction-audit-chart-scroll">

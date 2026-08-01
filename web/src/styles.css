@@ -6528,3 +6528,658 @@ tbody tr:nth-child(even) {
     display: flex;
   }
 }
+
+/* Monokai Pro application theme */
+:root {
+  color-scheme: dark;
+  color: #fcfcfa;
+  background: #2d2a2e;
+  --navy: #221f22;
+  --navy-2: #fcfcfa;
+  --blue: #78dce8;
+  --red: #ff6188;
+  --green: #a9dc76;
+  --amber: #ffd866;
+  --surface: #403e41;
+  --surface-muted: #353236;
+  --line: #5b595c;
+  --text-muted: #b7b5b7;
+  --monokai-bg: #2d2a2e;
+  --monokai-deep: #221f22;
+  --monokai-surface: #403e41;
+  --monokai-raised: #49464a;
+  --monokai-border: #5b595c;
+  --monokai-muted: #b7b5b7;
+  --monokai-fg: #fcfcfa;
+  --monokai-pink: #ff6188;
+  --monokai-orange: #fc9867;
+  --monokai-yellow: #ffd866;
+  --monokai-green: #a9dc76;
+  --monokai-cyan: #78dce8;
+  --monokai-purple: #ab9df2;
+}
+
+html,
+body,
+#app,
+.app-shell {
+  color: var(--monokai-fg);
+  background: var(--monokai-bg) !important;
+}
+
+body,
+button,
+input,
+select,
+textarea,
+option,
+output {
+  color: var(--monokai-fg);
+}
+
+button,
+input,
+select,
+textarea {
+  border-color: var(--monokai-border);
+  background: var(--monokai-surface);
+  accent-color: var(--monokai-yellow);
+}
+
+button:hover:not(:disabled),
+select:hover:not(:disabled),
+input:hover:not(:disabled) {
+  border-color: var(--monokai-cyan);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline-color: var(--monokai-yellow) !important;
+}
+
+button:disabled,
+input:disabled,
+select:disabled {
+  color: #8b898b;
+  opacity: 0.72;
+}
+
+::selection {
+  color: var(--monokai-deep);
+  background: var(--monokai-yellow);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--monokai-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid var(--monokai-bg);
+  background: var(--monokai-border);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--monokai-purple);
+}
+
+.app-toolbar,
+.status-bar,
+.prediction-workspace-navigation {
+  color: var(--monokai-fg);
+  border-color: var(--monokai-border);
+  background: var(--monokai-deep);
+}
+
+.brand-lockup strong,
+.app-toolbar button,
+.status-bar,
+.prediction-workspace-navigation,
+.prediction-workspace-navigation strong,
+.prediction-workspace-navigation small {
+  color: var(--monokai-fg);
+}
+
+.toolbar-workspace-tabs button:hover:not(:disabled),
+.prediction-workspace-navigation-buttons button:hover,
+.prediction-workspace-navigation-controls .reference-buttons button:hover:not(:disabled) {
+  background: var(--monokai-raised);
+}
+
+.toolbar-workspace-tabs button.active,
+.workspace-tabs button.active,
+.prediction-workspace-navigation-buttons button.active {
+  color: var(--monokai-yellow);
+  border-color: var(--monokai-yellow);
+  background: var(--monokai-surface);
+}
+
+.toolbar-workspace-tabs button.stale:not(.active) {
+  color: var(--monokai-orange);
+}
+
+.workspace-tabs,
+.control-panel,
+.workspace,
+.workspace-view,
+.workspace-tab-panel,
+.welcome-screen,
+.last-seen-dialog-shell,
+.combined-prediction-dialog-shell,
+.possible-draw-dialog-shell,
+.draw-editor-shell,
+.draw-portfolio-shell,
+.embedded-workspace-panel {
+  color: var(--monokai-fg);
+  border-color: var(--monokai-border);
+  background: var(--monokai-bg);
+}
+
+.metric-card,
+.chart-card,
+.table-card,
+.export-card,
+.welcome-card,
+.welcome-recents,
+.welcome-features,
+.welcome-features article,
+.trust-dialog,
+.settings-dialog,
+.loading-card,
+.number-popup,
+.settings-display-section,
+.settings-dialog-note,
+.strategy-setting-option,
+.prediction-control-cassette,
+.prediction-grid-section,
+.prediction-efficacy-overview,
+.prediction-coverage-report,
+.prediction-strategy-sidebar,
+.prediction-strategy-heading,
+.strategy-efficacy-card,
+.possible-draw-window,
+.guided-draw-workflow,
+.possible-number-board,
+.possible-analysis-panel,
+.prediction-meter-card,
+.related-number-card,
+.draw-editor-window,
+.autocorrelation-facts article,
+.autocorrelation-panel,
+.prediction-analysis-heading,
+.prediction-analysis-facts article,
+.prediction-history-panel,
+.prediction-number-summary,
+.strategy-timeline-panel,
+.strategy-ranking-panel,
+.draw-portfolio-target,
+.draw-portfolio-controls,
+.draw-portfolio-summary article,
+.draw-portfolio-pool,
+.draw-portfolio-results,
+.draw-portfolio-empty,
+.portfolio-backtest-panel,
+.portfolio-backtest-controls,
+.portfolio-backtest-facts article,
+.portfolio-hit-distribution,
+.portfolio-backtest-audit {
+  color: var(--monokai-fg);
+  border-color: var(--monokai-border);
+  background: var(--monokai-surface);
+}
+
+.table-tools,
+.pagination,
+.welcome-recents ul,
+.welcome-features,
+.settings-display-section,
+.settings-dialog-note,
+.analysis-progress-track,
+.efficacy-count-control,
+.efficacy-range-controls fieldset,
+.efficacy-range-controls output,
+.efficacy-retest-control,
+.prediction-reference-summary,
+.possible-draw-toolbar,
+.draw-editor-navigation,
+.draw-editor-view-tabs,
+.autocorrelation-interpretation > p,
+.autocorrelation-signature,
+.autocorrelation-bands > div,
+.autocorrelation-chart,
+.autocorrelation-extremes > div,
+.prediction-history-panel > header,
+.prediction-number-summary > header,
+.strategy-timeline-panel > header,
+.strategy-ranking-panel > header,
+.strategy-timeline-legend,
+.portfolio-hit-table-wrap thead th,
+.portfolio-audit-table-wrap thead th {
+  color: var(--monokai-fg);
+  border-color: var(--monokai-border);
+  background: var(--monokai-deep);
+}
+
+.eyebrow,
+.guided-workflow-eyebrow {
+  color: var(--monokai-yellow) !important;
+}
+
+.app-shell p,
+.app-shell small,
+.app-shell dt,
+.app-shell .muted,
+.draw-editor-shell p,
+.possible-draw-dialog-shell p {
+  color: var(--monokai-muted);
+}
+
+.app-shell h1,
+.app-shell h2,
+.app-shell h3,
+.app-shell h4,
+.app-shell strong,
+.app-shell th,
+.draw-editor-shell h1,
+.draw-editor-shell h2,
+.draw-editor-shell h3,
+.possible-draw-dialog-shell h1,
+.possible-draw-dialog-shell h2,
+.possible-draw-dialog-shell h3 {
+  color: var(--monokai-fg);
+}
+
+.button.primary,
+.draw-editor-actions button.primary,
+.draw-portfolio-controls button,
+.draw-portfolio-results header button,
+.portfolio-backtest-controls button.primary,
+.portfolio-backtest-audit footer button.primary,
+.efficacy-retest-control button {
+  color: var(--monokai-deep);
+  border-color: var(--monokai-cyan);
+  background: var(--monokai-cyan);
+}
+
+.button.primary:hover:not(:disabled),
+.draw-editor-actions button.primary:hover:not(:disabled),
+.draw-portfolio-controls button:hover:not(:disabled),
+.draw-portfolio-results header button:hover,
+.portfolio-backtest-controls button.primary:hover:not(:disabled),
+.efficacy-retest-control button:hover:not(:disabled) {
+  color: var(--monokai-deep);
+  border-color: var(--monokai-yellow);
+  background: var(--monokai-yellow);
+}
+
+.button.secondary,
+.pagination button,
+.reference-buttons button,
+.number-popup button,
+.welcome-recents li button,
+.possible-draw-toolbar button,
+.possible-plan-select,
+.possible-toggle,
+.last-seen-pill,
+.draw-editor-actions button,
+.draw-editor-navigation button,
+.draw-editor-navigation label,
+.draw-selection-count,
+.prediction-audit-selection button,
+.strategy-visibility-actions button,
+.portfolio-backtest-controls button,
+.portfolio-backtest-audit footer button {
+  color: var(--monokai-fg);
+  border-color: var(--monokai-border);
+  background: var(--monokai-raised);
+}
+
+.button.danger,
+.portfolio-backtest-controls button.cancel {
+  color: var(--monokai-deep);
+  border-color: var(--monokai-pink);
+  background: var(--monokai-pink);
+}
+
+.field-group input,
+.field-group select,
+.reference-toolbar input,
+.prediction-analysis-controls select,
+.prediction-analysis-controls input,
+.possible-plan-select select,
+.efficacy-count-control input,
+.portfolio-backtest-controls input,
+.portfolio-backtest-audit select,
+.draw-editor-navigation label input,
+.prediction-coverage-report li input,
+.prediction-color-legend input {
+  color: var(--monokai-fg);
+  border-color: var(--monokai-border);
+  background: var(--monokai-deep);
+}
+
+.number-filter span,
+.strategy-setting-check,
+.welcome-recents li button,
+.prediction-control-tablist button,
+.prediction-strategy-tabs button,
+.prediction-color-legend label,
+.prediction-coverage-report li,
+.prediction-collapsible-toggle,
+.possible-draw-toolbar,
+.possible-draw-toolbar button,
+.possible-plan-select,
+.status-pill,
+.possible-toggle,
+.last-seen-pill,
+.guided-pick-steps li > button,
+.guided-pick-steps li > div,
+.draw-editor-grid button,
+.draw-editor-circle > button,
+.draw-editor-space-report li,
+.autocorrelation-latest-numbers > div,
+.autocorrelation-number-grid > div,
+.co-occurrence-edge-cards > div,
+.prediction-audit-selection,
+.prediction-audit-selection li,
+.strategy-timeline-legend label,
+.draw-portfolio-pool li,
+.draw-portfolio-results > ol > li,
+.portfolio-backtest-facts article,
+.portfolio-audit-numbers b {
+  color: var(--monokai-fg);
+  border-color: var(--monokai-border);
+  background: var(--monokai-raised);
+}
+
+.prediction-control-tablist button:hover,
+.prediction-strategy-tabs button:hover,
+.prediction-color-legend label:hover,
+.prediction-coverage-report li:hover,
+.welcome-recents li button:hover:not(:disabled),
+.welcome-recents li button:focus-visible {
+  color: var(--monokai-fg);
+  border-color: var(--monokai-cyan);
+  background: color-mix(in srgb, var(--monokai-cyan) 14%, var(--monokai-surface));
+}
+
+.prediction-control-tablist button.active,
+.prediction-strategy-tabs button.active,
+.prediction-color-legend label:has(input:checked),
+.prediction-coverage-report li.selected,
+.strategy-setting-option.enabled,
+.strategy-timeline-legend label.selected,
+.number-filter input:checked + span {
+  color: var(--monokai-fg);
+  border-color: var(--monokai-yellow);
+  background: color-mix(in srgb, var(--monokai-yellow) 16%, var(--monokai-surface));
+}
+
+.prediction-control-tablist button.active {
+  color: var(--monokai-deep);
+  background: var(--monokai-yellow);
+}
+
+.prediction-color-legend input:checked {
+  border-color: var(--legend-color, var(--monokai-cyan));
+  background: var(--legend-color, var(--monokai-cyan));
+}
+
+.prediction-coverage-report li input:checked,
+.strategy-setting-option.enabled .strategy-setting-check {
+  border-color: var(--monokai-yellow);
+  background: var(--monokai-yellow);
+}
+
+.prediction-grid-section .all-predictions-grid,
+.all-predictions-grid,
+.prediction-control-panel,
+.prediction-strategy-sidebar .prediction-control-cassette,
+.prediction-control-panel .prediction-coverage-report {
+  background: transparent;
+}
+
+.all-predictions-cell > strong {
+  color: var(--monokai-fg);
+  border-color: var(--monokai-border);
+  background: rgba(45, 42, 46, 0.88);
+}
+
+.all-predictions-cell.is-high-consensus > strong {
+  color: var(--monokai-deep);
+  background: var(--monokai-pink);
+}
+
+.prediction-efficacy-overview thead th,
+.autocorrelation-table-wrap thead th,
+.prediction-summary-table-wrap thead th,
+th {
+  color: var(--monokai-yellow);
+  border-color: var(--monokai-border);
+  background: var(--monokai-deep);
+}
+
+td,
+.prediction-efficacy-overview tbody th,
+.hit-distribution-table td,
+.hit-distribution-table tbody th {
+  color: var(--monokai-fg);
+  border-color: var(--monokai-border);
+  background: var(--monokai-surface);
+}
+
+tbody tr:nth-child(even),
+.autocorrelation-table-wrap tbody tr:nth-child(even),
+.prediction-summary-table-wrap tbody tr:nth-child(even),
+.hit-distribution-table tbody tr:nth-child(even) td,
+.hit-distribution-table tbody tr:nth-child(even) th {
+  background: var(--monokai-raised);
+}
+
+.prediction-efficacy-overview tbody tr:nth-child(even) th,
+.prediction-efficacy-overview thead th:first-child,
+.hit-distribution-table .all-strategies-summary th,
+.hit-distribution-table .all-strategies-summary td {
+  color: var(--monokai-fg);
+  background: color-mix(in srgb, var(--monokai-purple) 20%, var(--monokai-surface));
+}
+
+.warning-banner,
+.space-conversion-note,
+.draw-portfolio-disclaimer,
+.strategy-hit-count.strong {
+  color: var(--monokai-yellow);
+  border-color: var(--monokai-yellow);
+  background: color-mix(in srgb, var(--monokai-yellow) 12%, var(--monokai-surface));
+}
+
+.error-banner,
+.draw-editor-status.error,
+.draw-portfolio-message.error {
+  color: var(--monokai-pink);
+  border-color: var(--monokai-pink);
+  background: color-mix(in srgb, var(--monokai-pink) 12%, var(--monokai-surface));
+}
+
+.draw-editor-status.success,
+.status-pill.agreement,
+.portfolio-cache-badge,
+.strategy-hit-count.positive,
+.strategy-efficacy-card.is-ahead {
+  color: var(--monokai-green);
+  border-color: var(--monokai-green);
+  background: color-mix(in srgb, var(--monokai-green) 11%, var(--monokai-surface));
+}
+
+.status-pill.entropy,
+.strategy-efficacy-card.is-tied {
+  color: var(--monokai-cyan);
+  border-color: var(--monokai-cyan);
+  background: color-mix(in srgb, var(--monokai-cyan) 11%, var(--monokai-surface));
+}
+
+.strategy-efficacy-card.is-behind {
+  color: var(--monokai-pink);
+  border-color: var(--monokai-pink);
+  background: color-mix(in srgb, var(--monokai-pink) 11%, var(--monokai-surface));
+}
+
+.strategy-efficacy-card > header b,
+.strategy-efficacy-card dl > div,
+.draw-editor-summary > div > strong,
+.draw-editor-summary > div > i,
+.prediction-summary-table-wrap tbody th > span,
+.coverage-meter,
+.effectiveness-meter,
+.portfolio-backtest-progress,
+.portfolio-hit-meter,
+.portfolio-audit-numbers b {
+  color: var(--monokai-fg);
+  background: var(--monokai-deep);
+}
+
+.analysis-progress-track span,
+.guided-workflow-progress,
+.coverage-meter i,
+.effectiveness-meter i,
+.portfolio-backtest-progress i,
+.portfolio-hit-meter i {
+  background: linear-gradient(90deg, var(--monokai-cyan), var(--monokai-green));
+}
+
+.draw-editor-grid button.selected,
+.draw-editor-circle > button.selected,
+.portfolio-audit-numbers b.matched,
+.number-popup .gap-number-ball {
+  color: var(--monokai-deep);
+  border-color: var(--monokai-green);
+  background: var(--monokai-green);
+}
+
+.draw-editor-grid button.editable.selected,
+.draw-editor-circle > button.editable.selected,
+.draw-portfolio-balls strong,
+.audit-selected-ball,
+.portfolio-audit-numbers.actual b {
+  color: var(--monokai-deep);
+  border-color: var(--monokai-cyan);
+  background: var(--monokai-cyan);
+}
+
+.highlight-chart-scroll,
+.highlight-chart-header,
+.highlight-chart,
+.prediction-audit-chart-scroll {
+  border-color: var(--monokai-border);
+  background: var(--monokai-surface);
+}
+
+svg .axis-label,
+svg .tick-label,
+svg text {
+  fill: var(--monokai-muted);
+}
+
+.legend-red {
+  background: var(--monokai-pink);
+}
+
+.legend-blue {
+  background: var(--monokai-cyan);
+}
+
+.legend-orange {
+  background: var(--monokai-orange);
+}
+
+.legend-green {
+  background: var(--monokai-green);
+}
+
+.modal-backdrop,
+.loading-backdrop,
+.number-popup-backdrop {
+  background: rgba(34, 31, 34, 0.78);
+}
+
+.welcome-card > p:not(.eyebrow),
+.welcome-card small,
+.welcome-recents > p,
+.welcome-recents li small,
+.welcome-features span,
+.welcome-recents > header > span {
+  color: var(--monokai-muted);
+}
+
+.welcome-recents h2,
+.welcome-recents li strong,
+.welcome-recents li button,
+.welcome-card h1 {
+  color: var(--monokai-fg);
+}
+
+.welcome-features strong,
+.welcome-recents li b {
+  color: var(--monokai-cyan);
+}
+
+.prediction-collapsible-header span,
+.prediction-efficacy-overview > header span,
+.prediction-efficacy-overview > header small,
+.efficacy-count-control > span,
+.efficacy-count-control small,
+.efficacy-range-controls legend,
+.efficacy-range-controls output span,
+.efficacy-retest-control small,
+.prediction-coverage-report li span,
+.prediction-color-legend label,
+.prediction-strategy-tabs button,
+.prediction-strategy-tabs button > span b,
+.prediction-reference-summary,
+.prediction-strategy-heading span,
+.strategy-efficacy-card > header span,
+.strategy-efficacy-card dt,
+.strategy-efficacy-card dd small {
+  color: var(--monokai-muted);
+}
+
+.prediction-collapsible-header strong,
+.prediction-efficacy-overview > header strong,
+.efficacy-range-controls output strong,
+.prediction-coverage-report li strong,
+.prediction-reference-summary strong,
+.prediction-strategy-heading h1,
+.strategy-efficacy-card > header strong,
+.strategy-efficacy-card dd {
+  color: var(--monokai-fg);
+}
+
+.prediction-strategy-tabs button.active,
+.prediction-color-legend label:has(input:checked),
+.prediction-coverage-report li.selected,
+.prediction-strategy-tabs button.active > span b {
+  color: var(--monokai-fg);
+}
+
+.prediction-efficacy-overview tr.is-ahead td:nth-last-child(-n + 3),
+.strategy-efficacy-card.is-ahead > header b,
+.prediction-strategy-heading > strong {
+  color: var(--monokai-green);
+}
+
+.prediction-efficacy-overview tr.is-behind td:nth-last-child(-n + 3),
+.strategy-efficacy-card.is-behind > header b {
+  color: var(--monokai-pink);
+}
+
+.prediction-efficacy-overview tr.is-tied td:nth-last-child(-n + 3),
+.prediction-efficacy-overview tr.is-pending td:nth-last-child(-n + 3) {
+  color: var(--monokai-cyan);
+}

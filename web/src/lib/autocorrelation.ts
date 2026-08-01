@@ -16,31 +16,31 @@ export const autocorrelationBands: AutocorrelationBand[] = [
     id: "strongNegative",
     label: "Strong negative",
     description: "Correlation is below -0.10.",
-    color: "#174b91",
+    color: "#78dce8",
   },
   {
     id: "mildNegative",
     label: "Mild negative",
     description: "Correlation sits between -0.10 and -0.04.",
-    color: "#2f6fb3",
+    color: "#ab9df2",
   },
   {
     id: "neutral",
     label: "Neutral",
     description: "Correlation is close to zero.",
-    color: "#3f8f68",
+    color: "#a9dc76",
   },
   {
     id: "mildPositive",
     label: "Mild positive",
     description: "Correlation sits between 0.04 and 0.10.",
-    color: "#d58a1f",
+    color: "#ffd866",
   },
   {
     id: "strongPositive",
     label: "Strong positive",
     description: "Correlation is above 0.10.",
-    color: "#c65335",
+    color: "#ff6188",
   },
 ];
 

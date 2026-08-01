@@ -366,29 +366,29 @@ function strategyFullName(strategy: StrategyPrediction): string {
 
 function strategyColor(strategyId: string): string {
   return {
-    proximity: "#efb23e",
-    freshness: "#f47f5b",
-    emd: "#55a873",
-    randomness: "#3264ad",
-    fresh_random: "#7b56c2",
-    chi_square: "#6256c7",
-    entropy: "#c95d42",
-    markov100: "#e8c238",
-    mkfr: "#1f8f75",
-    mksp: "#517aa3",
-    mknp: "#2f7f9f",
-    mkrd: "#6d5aa8",
-    bayesian: "#d477b8",
-    predictive_grid: "#008ca8",
-    co_occurrence: "#4f7f3f",
-    doublet_triplet_markov: "#7c3aed",
-    mixed: "#dd6b20",
-    svc: "#9567e8",
-    tbl: "#1695a8",
-    cis: "#b12f67",
-    residual_coverage: "#0f766e",
-    chained: "#9a3412",
-  }[strategyId] ?? "#6e8195";
+    proximity: "#ffd866",
+    freshness: "#fc9867",
+    emd: "#a9dc76",
+    randomness: "#78dce8",
+    fresh_random: "#ab9df2",
+    chi_square: "#ab9df2",
+    entropy: "#ff6188",
+    markov100: "#ffd866",
+    mkfr: "#a9dc76",
+    mksp: "#78dce8",
+    mknp: "#78dce8",
+    mkrd: "#ab9df2",
+    bayesian: "#ff6188",
+    predictive_grid: "#78dce8",
+    co_occurrence: "#a9dc76",
+    doublet_triplet_markov: "#ab9df2",
+    mixed: "#fc9867",
+    svc: "#ab9df2",
+    tbl: "#78dce8",
+    cis: "#ff6188",
+    residual_coverage: "#a9dc76",
+    chained: "#fc9867",
+  }[strategyId] ?? "#727072";
 }
 
 function strategyDisplayColor(strategyId: string): string {
@@ -741,7 +741,10 @@ onBeforeUnmount(clearNumberActionTimer);
         >
           <header class="prediction-collapsible-header">
             <div>
-              <strong>Numbers grid</strong>
+              <strong>
+                Numbers grid ·
+                {{ selectedStrategy ? strategyFullName(selectedStrategy) : "All strategies" }}
+              </strong>
             </div>
             <button
               type="button"
