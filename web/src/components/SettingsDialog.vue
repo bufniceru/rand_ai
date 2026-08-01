@@ -46,6 +46,8 @@ const strategyDescriptions: Record<StrategyId, string> = {
     "Scikit-learn online linear SVM with temporal, expert-rank, and prior-efficacy inputs.",
   lag_logistic:
     "Compact probability model combining exact three-draw lags with gap and frequency context.",
+  sparse_neural_ticket:
+    "Experimental frozen five-seed neural ticket; its historical promotion gate failed.",
   cis: "Online learner combining ten strategy experts.",
   residual_coverage:
     "Diversity-first complement covering numbers outside every base Top-6.",
