@@ -24,10 +24,16 @@ const emit = defineEmits<{
   sendNumber: [request: { number: number; state: PossibleDrawNumberState }];
 }>();
 
+const predictionControlTabs = ["strategies", "colors", "coverage"] as const;
+type PredictionControlTab = (typeof predictionControlTabs)[number];
+
 const referenceOffset = ref(0);
 const selectedStrategyId = ref("all");
+const selectedControlTab = ref<PredictionControlTab>("strategies");
 const selectedCoverageThreshold = ref<number | null>(null);
 const mutedStrategyIds = ref<Set<string>>(new Set());
+const isNumbersGridExpanded = ref(true);
+const isEfficacyExpanded = ref(true);
 const efficacyDrawCount = ref(0);
 const efficacyRangeAnchor = ref<"first" | "latest">("first");
 const efficacyRandomBenchmark = shallowRef<RandomBenchmarkSummary | null>(null);
@@ -406,6 +412,21 @@ function toggleAllStrategyColors(): void {
     : new Set();
 }
 
+function selectControlTabAndFocus(tab: PredictionControlTab): void {
+  selectedControlTab.value = tab;
+  nextTick(() => {
+    document.getElementById(`prediction-control-tab-${tab}`)?.focus();
+  });
+}
+
+function selectAdjacentControlTab(offset: number): void {
+  const currentIndex = predictionControlTabs.indexOf(selectedControlTab.value);
+  const nextIndex =
+    (currentIndex + offset + predictionControlTabs.length) %
+    predictionControlTabs.length;
+  selectControlTabAndFocus(predictionControlTabs[nextIndex]);
+}
+
 function cellTitle(
   entry: StrategyNumberPrediction,
   strategy: StrategyPrediction,
@@ -493,7 +514,7 @@ onBeforeUnmount(clearNumberActionTimer);
     <div class="prediction-workspace-layout">
       <aside
         class="prediction-strategy-sidebar"
-        aria-label="Prediction navigation and strategies"
+        aria-label="Prediction navigation and selectors"
       >
         <div class="prediction-reference-toolbar">
           <div
@@ -545,108 +566,149 @@ onBeforeUnmount(clearNumberActionTimer);
           </div>
         </div>
 
-        <div class="prediction-strategy-tabs" role="tablist" aria-label="Prediction strategy">
-          <button
-            type="button"
-            role="tab"
-            :aria-selected="selectedStrategyId === 'all'"
-            :class="{ active: selectedStrategyId === 'all' }"
-            @click="selectedStrategyId = 'all'"
-          >
-            All
-          </button>
-          <button
-            v-for="(strategy, index) in efficacyRanking"
-            :key="strategy.id"
-            type="button"
-            role="tab"
-            :aria-selected="strategy.id === selectedStrategyId"
-            :class="{ active: strategy.id === selectedStrategyId }"
-            :title="`#${index + 1} by effectiveness · ${strategyFullName(strategy)}`"
-            @click="selectedStrategyId = strategy.id"
-          >
-            <span>
-              <b>#{{ index + 1 }}</b>
-              {{ strategyFullName(strategy) }}
-            </span>
-          </button>
-        </div>
-      </aside>
-
-      <div class="prediction-workspace-content">
-        <div class="prediction-color-legend" role="group" aria-label="Prediction report colors">
-          <label>
-            <input
-              type="checkbox"
-              :checked="allStrategiesVisible"
-              @change="toggleAllStrategyColors"
-            />
-            <span>All colors</span>
-          </label>
-          <label
-            v-for="strategy in efficacyRanking"
-            :key="strategy.id"
-          >
-            <input
-              type="checkbox"
-              :checked="!mutedStrategyIds.has(strategy.id)"
-              :style="{ '--legend-color': strategyColor(strategy.id) }"
-              @change="toggleStrategyColor(strategy.id)"
-            />
-            <span>{{ strategyFullName(strategy) }}</span>
-          </label>
-        </div>
-
-        <div class="prediction-main-grid-row">
+        <section
+          class="prediction-control-cassette"
+          aria-label="Prediction controls"
+        >
           <div
-            class="all-predictions-grid"
-            role="grid"
-            :aria-label="
-              selectedStrategy
-                ? `${strategyFullName(selectedStrategy)} score order with all prediction report colors`
-                : 'All prediction reports by number from 1 through 49'
-            "
+            class="prediction-control-tablist"
+            role="tablist"
+            aria-label="Prediction control groups"
+            @keydown.left.prevent="selectAdjacentControlTab(-1)"
+            @keydown.right.prevent="selectAdjacentControlTab(1)"
+            @keydown.home.prevent="selectControlTabAndFocus('strategies')"
+            @keydown.end.prevent="selectControlTabAndFocus('coverage')"
           >
-            <article
-              v-for="cell in orderedReportCells"
-              :key="cell.number"
-              class="all-predictions-cell"
-              :class="{
-                'has-prediction': cell.reports.length > 0,
-                'is-high-consensus': cell.reports.length >= 3,
-                'is-drawn': actualNumbers.has(cell.number),
-                'is-in-selected-coverage-zone':
-                  selectedCoverageThreshold !== null &&
-                  cell.reports.length >= selectedCoverageThreshold,
-              }"
-              :style="sectorStyle(cell)"
-              :title="mainGridCellTitle(cell)"
-              role="gridcell"
-              tabindex="0"
-              @click="handlePredictionClick($event, cell.number)"
-              @dblclick="handlePredictionDoubleClick($event, cell.number)"
-              @keydown.enter.prevent="selectedPredictionNumber = cell.number"
-              @keydown.space.prevent="selectedPredictionNumber = cell.number"
+            <button
+              id="prediction-control-tab-strategies"
+              type="button"
+              role="tab"
+              :aria-selected="selectedControlTab === 'strategies'"
+              aria-controls="prediction-control-panel-strategies"
+              :tabindex="selectedControlTab === 'strategies' ? 0 : -1"
+              :class="{ active: selectedControlTab === 'strategies' }"
+              @click="selectedControlTab = 'strategies'"
             >
-              <strong>{{ cell.number }}</strong>
-            </article>
+              Strategies
+            </button>
+            <button
+              id="prediction-control-tab-colors"
+              type="button"
+              role="tab"
+              :aria-selected="selectedControlTab === 'colors'"
+              aria-controls="prediction-control-panel-colors"
+              :tabindex="selectedControlTab === 'colors' ? 0 : -1"
+              :class="{ active: selectedControlTab === 'colors' }"
+              @click="selectedControlTab = 'colors'"
+            >
+              Strategy colors
+            </button>
+            <button
+              id="prediction-control-tab-coverage"
+              type="button"
+              role="tab"
+              :aria-selected="selectedControlTab === 'coverage'"
+              aria-controls="prediction-control-panel-coverage"
+              :tabindex="selectedControlTab === 'coverage' ? 0 : -1"
+              :class="{ active: selectedControlTab === 'coverage' }"
+              @click="selectedControlTab = 'coverage'"
+            >
+              Coverage report
+            </button>
           </div>
 
-          <section class="prediction-coverage-report" aria-label="Strategy coverage report">
-            <header>
-              <div>
-                <strong>Strategy coverage report</strong>
-                <span>Cumulative coverage across all 49 numbers</span>
-              </div>
-              <button
-                type="button"
-                :disabled="selectedCoverageThreshold === null"
-                @click="selectedCoverageThreshold = null"
-              >
-                No circles
-              </button>
-            </header>
+        <div
+          v-show="selectedControlTab === 'strategies'"
+          id="prediction-control-panel-strategies"
+          class="prediction-control-panel"
+          role="tabpanel"
+          aria-labelledby="prediction-control-tab-strategies"
+        >
+          <div class="prediction-strategy-tabs" aria-label="Prediction strategy">
+            <button
+              type="button"
+              :aria-pressed="selectedStrategyId === 'all'"
+              :class="{ active: selectedStrategyId === 'all' }"
+              @click="selectedStrategyId = 'all'"
+            >
+              All
+            </button>
+            <button
+              v-for="(strategy, index) in efficacyRanking"
+              :key="strategy.id"
+              type="button"
+              :aria-pressed="strategy.id === selectedStrategyId"
+              :class="{ active: strategy.id === selectedStrategyId }"
+              :title="`#${index + 1} by effectiveness · ${strategyFullName(strategy)}`"
+              @click="selectedStrategyId = strategy.id"
+            >
+              <span>
+                <b>#{{ index + 1 }}</b>
+                {{ strategyFullName(strategy) }}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div
+          v-show="selectedControlTab === 'colors'"
+          id="prediction-control-panel-colors"
+          class="prediction-control-panel"
+          role="tabpanel"
+          aria-labelledby="prediction-control-tab-colors"
+        >
+          <div
+            class="prediction-color-legend"
+            role="group"
+            aria-label="Prediction report colors"
+          >
+            <label>
+              <input
+                type="checkbox"
+                :checked="allStrategiesVisible"
+                @change="toggleAllStrategyColors"
+              />
+              <span>All colors</span>
+            </label>
+            <label
+              v-for="strategy in efficacyRanking"
+              :key="strategy.id"
+              :style="{ '--legend-color': strategyColor(strategy.id) }"
+            >
+              <input
+                type="checkbox"
+                :checked="!mutedStrategyIds.has(strategy.id)"
+                @change="toggleStrategyColor(strategy.id)"
+              />
+              <span>{{ strategyFullName(strategy) }}</span>
+            </label>
+          </div>
+        </div>
+
+        <div
+          v-show="selectedControlTab === 'coverage'"
+          id="prediction-control-panel-coverage"
+          class="prediction-control-panel"
+          role="tabpanel"
+          aria-labelledby="prediction-control-tab-coverage"
+        >
+          <section
+            class="prediction-coverage-report"
+            aria-label="Strategy coverage report"
+          >
             <ul role="radiogroup" aria-label="Highlight a strategy coverage zone">
+              <li :class="{ selected: selectedCoverageThreshold === null }">
+                <label>
+                  <input
+                    v-model="selectedCoverageThreshold"
+                    type="radio"
+                    name="coverage-zone"
+                    :value="null"
+                  />
+                  <span>No circles</span>
+                  <strong>Off</strong>
+                </label>
+              </li>
               <li
                 v-for="entry in coverageReport"
                 :key="entry.threshold"
@@ -668,7 +730,71 @@ onBeforeUnmount(clearNumberActionTimer);
               </li>
             </ul>
           </section>
-        </div>
+          </div>
+        </section>
+      </aside>
+
+      <div class="prediction-workspace-content">
+        <section
+          class="prediction-grid-section"
+          :class="{ 'is-collapsed': !isNumbersGridExpanded }"
+        >
+          <header class="prediction-collapsible-header">
+            <div>
+              <strong>Numbers grid</strong>
+            </div>
+            <button
+              type="button"
+              class="prediction-collapsible-toggle"
+              :aria-expanded="isNumbersGridExpanded"
+              aria-controls="prediction-numbers-grid-panel"
+              :aria-label="isNumbersGridExpanded ? 'Collapse numbers grid' : 'Expand numbers grid'"
+              :title="isNumbersGridExpanded ? 'Collapse numbers grid' : 'Expand numbers grid'"
+              @click="isNumbersGridExpanded = !isNumbersGridExpanded"
+            >
+              {{ isNumbersGridExpanded ? "«" : "»" }}
+            </button>
+          </header>
+          <div
+            v-show="isNumbersGridExpanded"
+            id="prediction-numbers-grid-panel"
+            class="prediction-grid-panel"
+          >
+            <div
+              class="all-predictions-grid"
+              role="grid"
+              :aria-label="
+                selectedStrategy
+                  ? `${strategyFullName(selectedStrategy)} score order with all prediction report colors`
+                  : 'All prediction reports by number from 1 through 49'
+              "
+            >
+              <article
+                v-for="cell in orderedReportCells"
+                :key="cell.number"
+                class="all-predictions-cell"
+                :class="{
+                  'has-prediction': cell.reports.length > 0,
+                  'is-high-consensus': cell.reports.length >= 3,
+                  'is-drawn': actualNumbers.has(cell.number),
+                  'is-in-selected-coverage-zone':
+                    selectedCoverageThreshold !== null &&
+                    cell.reports.length >= selectedCoverageThreshold,
+                }"
+                :style="sectorStyle(cell)"
+                :title="mainGridCellTitle(cell)"
+                role="gridcell"
+                tabindex="0"
+                @click="handlePredictionClick($event, cell.number)"
+                @dblclick="handlePredictionDoubleClick($event, cell.number)"
+                @keydown.enter.prevent="selectedPredictionNumber = cell.number"
+                @keydown.space.prevent="selectedPredictionNumber = cell.number"
+              >
+                <strong>{{ cell.number }}</strong>
+              </article>
+            </div>
+          </div>
+        </section>
 
         <div v-if="selectedStrategy" class="prediction-strategy-heading">
           <div>
@@ -740,70 +866,84 @@ onBeforeUnmount(clearNumberActionTimer);
         <template v-if="selectedStrategyId === 'all'">
           <section
             class="prediction-efficacy-overview"
+            :class="{ 'is-collapsed': !isEfficacyExpanded }"
             aria-label="All strategies compared with random selections"
           >
             <header>
               <div>
                 <strong>Historical efficacy versus random</strong>
-                <span>
-                  Walk-forward Top-6 matches · Retest compares each strategy
-                  with 10,000 random datasets
-                </span>
               </div>
-              <small>Uniform expectation: 0.735 hits per draw</small>
-            </header>
-            <div class="efficacy-range-controls">
-              <label class="efficacy-count-control">
-                <span>Completed draws to compare</span>
-                <input
-                  v-model.number="efficacyDrawCount"
-                  type="number"
-                  min="1"
-                  :max="maximumEfficacyDraws"
-                  :disabled="maximumEfficacyDraws === 0"
-                  @change="normalizeEfficacyDrawCount"
-                />
-                <small>Maximum {{ maximumEfficacyDraws }}</small>
-              </label>
-              <fieldset>
-                <legend>Take records from</legend>
-                <label>
-                  <input
-                    v-model="efficacyRangeAnchor"
-                    type="radio"
-                    value="first"
-                  />
-                  <span>First N — top to bottom</span>
-                </label>
-                <label>
-                  <input
-                    v-model="efficacyRangeAnchor"
-                    type="radio"
-                    value="latest"
-                  />
-                  <span>Latest N records</span>
-                </label>
-              </fieldset>
-              <output>
-                <strong>{{ appliedEfficacyDrawCount }} tests</strong>
-                <span>{{ efficacyRangeLabel }}</span>
-              </output>
-              <div class="efficacy-retest-control">
+              <div class="prediction-collapsible-actions">
+                <small>Uniform expectation: 0.735 hits per draw</small>
                 <button
                   type="button"
-                  :disabled="
-                    selectedEfficacyHistory.length === 0 || isEfficacyRetesting
-                  "
-                  title="Run 10,000 random Top-6 datasets for the selected historical draws"
-                  @click="retestRandomDataset"
+                  class="prediction-collapsible-toggle"
+                  :aria-expanded="isEfficacyExpanded"
+                  aria-controls="prediction-efficacy-panel"
+                  :aria-label="isEfficacyExpanded ? 'Collapse historical efficacy report' : 'Expand historical efficacy report'"
+                  :title="isEfficacyExpanded ? 'Collapse historical efficacy report' : 'Expand historical efficacy report'"
+                  @click="isEfficacyExpanded = !isEfficacyExpanded"
                 >
-                  {{ isEfficacyRetesting ? "Retesting…" : "Retest" }}
+                  {{ isEfficacyExpanded ? "«" : "»" }}
                 </button>
-                <small>{{ efficacyRandomDatasetLabel }}</small>
               </div>
-            </div>
-            <div class="efficacy-table-wrap">
-              <table>
+            </header>
+            <div
+              v-show="isEfficacyExpanded"
+              id="prediction-efficacy-panel"
+            >
+              <div class="efficacy-range-controls">
+                <label class="efficacy-count-control">
+                  <span>Completed draws to compare</span>
+                  <input
+                    v-model.number="efficacyDrawCount"
+                    type="number"
+                    min="1"
+                    :max="maximumEfficacyDraws"
+                    :disabled="maximumEfficacyDraws === 0"
+                    @change="normalizeEfficacyDrawCount"
+                  />
+                  <small>Maximum {{ maximumEfficacyDraws }}</small>
+                </label>
+                <fieldset>
+                  <legend>Take records from</legend>
+                  <label>
+                    <input
+                      v-model="efficacyRangeAnchor"
+                      type="radio"
+                      value="first"
+                    />
+                    <span>First N — top to bottom</span>
+                  </label>
+                  <label>
+                    <input
+                      v-model="efficacyRangeAnchor"
+                      type="radio"
+                      value="latest"
+                    />
+                    <span>Latest N records</span>
+                  </label>
+                </fieldset>
+                <output>
+                  <strong>{{ appliedEfficacyDrawCount }} tests</strong>
+                  <span>{{ efficacyRangeLabel }}</span>
+                </output>
+                <div class="efficacy-retest-control">
+                  <button
+                    type="button"
+                    :disabled="
+                      selectedEfficacyHistory.length === 0 || isEfficacyRetesting
+                    "
+                    title="Run 10,000 random Top-6 datasets for the selected historical draws"
+                    @click="retestRandomDataset"
+                  >
+                    {{ isEfficacyRetesting ? "Retesting…" : "Retest" }}
+                  </button>
+                  <small>{{ efficacyRandomDatasetLabel }}</small>
+                </div>
+              </div>
+              <div class="efficacy-table-wrap">
+                <table>
                 <thead>
                   <tr>
                     <th>Strategy name</th>
@@ -843,7 +983,8 @@ onBeforeUnmount(clearNumberActionTimer);
                     <td>{{ efficacyVerdictFor(strategy) }}</td>
                   </tr>
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
           </section>
         </template>

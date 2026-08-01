@@ -2,6 +2,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("randAiDesktop", {
   openDataset: () => ipcRenderer.invoke("dataset:open"),
+  getRecentDatasets: () => ipcRenderer.invoke("dataset:recent-list"),
+  openRecentDataset: (path) => ipcRenderer.invoke("dataset:recent-open", path),
   getReportPlugins: () => ipcRenderer.invoke("report-plugins:get"),
   getStrategyPlugins: () => ipcRenderer.invoke("strategy-plugins:get"),
   setStrategyPlugins: (strategyIds) =>
