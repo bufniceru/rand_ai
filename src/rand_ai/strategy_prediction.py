@@ -9,6 +9,9 @@ from dataclasses import dataclass, replace
 from heapq import nlargest
 from itertools import combinations
 
+import numpy as np
+from sklearn.linear_model import SGDClassifier
+
 from rand_ai.draw import Draw
 from rand_ai.prediction import CombinedPrediction
 
@@ -69,6 +72,71 @@ _CIS_RECENT_WINDOW = 40
 _CIS_LEARNER_MAX_BLEND = 0.15
 _CIS_LEARNER_EVIDENCE_DRAWS = 24.0
 _CIS_LEARNER_MIN_ADVANTAGE = 0.10
+_SKLEARN_SVM_EXPERT_IDS = (
+    "mksp",
+    "doublet_triplet_markov",
+    "bayesian",
+    "tbl",
+    "mknp",
+    "emd",
+)
+_SKLEARN_SVM_RECENT_WINDOW = 40
+_SKLEARN_SVM_EFFECTIVENESS_PRIOR_DRAWS = 24.0
+_SKLEARN_SVM_FEATURE_NAMES = (
+    "number_value",
+    "low_high",
+    "odd_even",
+    "prime",
+    "gap_60",
+    "gap_one",
+    "gap_two_to_four",
+    "gap_at_least_twelve",
+    "overdue_ratio",
+    "lifetime_frequency_residual",
+    "recent_frequency_residual_5",
+    "recent_frequency_residual_20",
+    "recent_frequency_residual_100",
+    "recent_5_vs_20_trend",
+    "latest_draw_compatibility",
+    "mksp_strength",
+    "mksp_efficacy_interaction",
+    "doublet_triplet_markov_strength",
+    "doublet_triplet_markov_efficacy_interaction",
+    "bayesian_strength",
+    "bayesian_efficacy_interaction",
+    "tbl_strength",
+    "tbl_efficacy_interaction",
+    "mknp_strength",
+    "mknp_efficacy_interaction",
+    "emd_strength",
+    "emd_efficacy_interaction",
+    "expert_mean",
+    "expert_median",
+    "expert_top_six_support",
+    "expert_top_quarter_support",
+    "expert_rank_variance",
+)
+_SKLEARN_SVM_FEATURE_COUNT = len(_SKLEARN_SVM_FEATURE_NAMES)
+_LAG_LOGISTIC_LAG_COUNT = 3
+_LAG_LOGISTIC_FEATURE_NAMES = (
+    "lag_1",
+    "lag_2",
+    "lag_3",
+    "lag_hit_share",
+    "gap_40",
+    "gap_one",
+    "gap_two_to_four",
+    "gap_at_least_twelve",
+    "overdue_ratio",
+    "lifetime_frequency_residual",
+    "recent_frequency_residual_5",
+    "recent_frequency_residual_20",
+    "recent_frequency_residual_100",
+    "recent_5_vs_20_trend",
+)
+_LAG_LOGISTIC_FEATURE_COUNT = len(_LAG_LOGISTIC_FEATURE_NAMES)
+_LAG_LOGISTIC_MIN_TRAINING_DRAWS = 48
+_LAG_LOGISTIC_PRIOR_DRAWS = 24.0
 _PROXIMITY_BUCKETS = ("paired", "tight", "near", "balanced", "wide", "isolated")
 _EARTH_MOVER_BUCKETS = ("Overlap", "Near", "Close", "Middle", "Far", "Distant")
 _PRIMES = {
@@ -110,6 +178,8 @@ _BASE_STRATEGY_IDS = (
     "mixed",
     "svc",
     "tbl",
+    "sklearn_svm",
+    "lag_logistic",
     "cis",
 )
 _CHAIN_EXPERT_IDS = (
@@ -147,6 +217,7 @@ _CIS_EXPERTS = (
     ("tbl", "TBL", 0.05),
 )
 _STRATEGY_DEPENDENCIES = {
+    "tbl": {"freshness", "proximity", "randomness"},
     "fresh_random": {"freshness", "randomness"},
     "mixed": {"freshness", "proximity", "emd", "bayesian"},
     "predictive_grid": {"emd", "markov100"},
@@ -165,7 +236,10 @@ _STRATEGY_DEPENDENCIES = {
         "svc",
         "tbl",
     },
-    "residual_coverage": set(_BASE_STRATEGY_IDS).difference({"mknp", "mkrd"}),
+    "sklearn_svm": set(_SKLEARN_SVM_EXPERT_IDS),
+    "residual_coverage": set(_BASE_STRATEGY_IDS).difference(
+        {"mknp", "mkrd", "sklearn_svm", "lag_logistic"}
+    ),
     "chained": set(_CHAIN_EXPERT_IDS),
 }
 
@@ -522,8 +596,13 @@ class _StrategyState:
     ) -> None:
         self.requested_strategy_ids = frozenset(enabled_strategy_ids)
         active_strategy_ids = set(self.requested_strategy_ids)
-        for strategy_id in tuple(active_strategy_ids):
-            active_strategy_ids.update(_STRATEGY_DEPENDENCIES.get(strategy_id, ()))
+        unresolved_strategy_ids = list(active_strategy_ids)
+        while unresolved_strategy_ids:
+            strategy_id = unresolved_strategy_ids.pop()
+            for dependency_id in _STRATEGY_DEPENDENCIES.get(strategy_id, ()):
+                if dependency_id not in active_strategy_ids:
+                    active_strategy_ids.add(dependency_id)
+                    unresolved_strategy_ids.append(dependency_id)
         self.enabled_strategy_ids = frozenset(active_strategy_ids)
         self.total_draw_count = max(total_draw_count, 1)
         self.draw_count = 0
@@ -692,6 +771,49 @@ class _StrategyState:
         ] = []
         self.svc_weights = [0.0] * 11
         self.tbl_weights = [0.0] * 14
+        self.sklearn_svm = (
+            SGDClassifier(
+                loss="hinge",
+                penalty="l2",
+                alpha=0.0001,
+                learning_rate="optimal",
+                fit_intercept=True,
+                average=True,
+                random_state=_RANDOM_SEED,
+            )
+            if "sklearn_svm" in self.enabled_strategy_ids
+            else None
+        )
+        self.sklearn_svm_fitted = False
+        self.sklearn_svm_trained_draws = 0
+        self.sklearn_svm_pending_features: dict[int, tuple[float, ...]] = {}
+        self.sklearn_svm_pending_rankings: dict[str, list[int]] = {}
+        self.sklearn_svm_expert_total_hits = {
+            strategy_id: 0 for strategy_id in _SKLEARN_SVM_EXPERT_IDS
+        }
+        self.sklearn_svm_expert_evaluated_draws = {
+            strategy_id: 0 for strategy_id in _SKLEARN_SVM_EXPERT_IDS
+        }
+        self.sklearn_svm_expert_recent_hits = {
+            strategy_id: deque(maxlen=_SKLEARN_SVM_RECENT_WINDOW)
+            for strategy_id in _SKLEARN_SVM_EXPERT_IDS
+        }
+        self.lag_logistic = (
+            SGDClassifier(
+                loss="log_loss",
+                penalty="l2",
+                alpha=0.001,
+                learning_rate="optimal",
+                fit_intercept=True,
+                average=True,
+                random_state=_RANDOM_SEED,
+            )
+            if "lag_logistic" in self.enabled_strategy_ids
+            else None
+        )
+        self.lag_logistic_fitted = False
+        self.lag_logistic_trained_draws = 0
+        self.lag_logistic_pending_features: np.ndarray | None = None
         self.cis_weights = [0.0] * (22 + len(_CIS_EXPERTS) * 4)
         self.cis_draw_count = 0
         self.cis_total_hits = {
@@ -832,6 +954,343 @@ class _StrategyState:
             )
             / 2,
         ]
+
+    def _sklearn_svm_recent_residual(self, number: int, window: int) -> float:
+        recent = list(self.recent_draws)[-window:]
+        if not recent:
+            return 0.0
+        observed_rate = sum(number in draw for draw in recent) / len(recent)
+        return _clamp(
+            (observed_rate - _BASE_PROBABILITY) / _BASE_PROBABILITY,
+            -1,
+            1,
+        )
+
+    def _sklearn_svm_relationship_residual(self, number: int) -> float:
+        if not self.previous_draw:
+            return 0.0
+        conditional_rates = [
+            self.pair_counts.get(tuple(sorted((previous, number))), 0)
+            / max(self.appearances[previous], 1)
+            for previous in self.previous_draw
+            if previous != number
+        ]
+        if not conditional_rates:
+            return 0.0
+        return _clamp(
+            (_average(conditional_rates) - _BASE_PROBABILITY)
+            / _BASE_PROBABILITY,
+            -1,
+            1,
+        )
+
+    def _sklearn_svm_expert_weight(self, strategy_id: str) -> float:
+        evaluated = self.sklearn_svm_expert_evaluated_draws[strategy_id]
+        prior_draws = _SKLEARN_SVM_EFFECTIVENESS_PRIOR_DRAWS
+        long_term_hits = (
+            self.sklearn_svm_expert_total_hits[strategy_id]
+            + prior_draws * _EXPECTED_RANDOM_HITS_PER_DRAW
+        ) / (evaluated + prior_draws)
+        recent = self.sklearn_svm_expert_recent_hits[strategy_id]
+        recent_hits = (
+            sum(recent) + prior_draws * _EXPECTED_RANDOM_HITS_PER_DRAW
+        ) / (len(recent) + prior_draws)
+        confidence = evaluated / (evaluated + prior_draws)
+        blended_hits = (
+            long_term_hits * (1 - 0.70 * confidence)
+            + recent_hits * 0.70 * confidence
+        )
+        return _clamp(
+            blended_hits / _EXPECTED_RANDOM_HITS_PER_DRAW,
+            0.5,
+            1.5,
+        )
+
+    def _sklearn_svm_features(
+        self,
+        number: int,
+        rankings: dict[str, list[int]],
+    ) -> tuple[float, ...]:
+        gap = self.current_gaps()[number]
+        mean_gap = self._mean_gap(number)
+        overdue = (
+            0.0
+            if mean_gap <= 0
+            else _clamp((gap - mean_gap) / mean_gap, -1, 1)
+        )
+        lifetime_rate = self.appearances[number] / max(self.draw_count, 1)
+        lifetime_residual = _clamp(
+            (lifetime_rate - _BASE_PROBABILITY) / _BASE_PROBABILITY,
+            -1,
+            1,
+        )
+        recent5 = self._sklearn_svm_recent_residual(number, 5)
+        recent20 = self._sklearn_svm_recent_residual(number, 20)
+        recent100 = self._sklearn_svm_recent_residual(number, 100)
+        expert_strengths = [
+            _rank_strength(rankings[strategy_id], number)
+            for strategy_id in _SKLEARN_SVM_EXPERT_IDS
+        ]
+        expert_weights = [
+            self._sklearn_svm_expert_weight(strategy_id)
+            for strategy_id in _SKLEARN_SVM_EXPERT_IDS
+        ]
+        top_six_support = sum(
+            rankings[strategy_id].index(number) < _NUMBERS_PER_DRAW
+            for strategy_id in _SKLEARN_SVM_EXPERT_IDS
+        )
+        top_quarter_limit = math.ceil(_NUMBER_COUNT * 0.25)
+        top_quarter_support = sum(
+            rankings[strategy_id].index(number) < top_quarter_limit
+            for strategy_id in _SKLEARN_SVM_EXPERT_IDS
+        )
+        features = [
+            number / _NUMBER_COUNT,
+            float(number <= 24),
+            float(number % 2 == 1),
+            float(number in _PRIMES),
+            min(gap / 60, 1),
+            float(gap == 1),
+            float(2 <= gap <= 4),
+            float(gap >= 12),
+            overdue,
+            lifetime_residual,
+            recent5,
+            recent20,
+            recent100,
+            _clamp(recent5 - recent20, -1, 1),
+            self._sklearn_svm_relationship_residual(number),
+        ]
+        for strength, weight in zip(expert_strengths, expert_weights):
+            features.extend((strength, strength * weight / 1.5))
+        features.extend(
+            (
+                _average(expert_strengths),
+                _median(expert_strengths),
+                top_six_support / len(_SKLEARN_SVM_EXPERT_IDS),
+                top_quarter_support / len(_SKLEARN_SVM_EXPERT_IDS),
+                _variance(expert_strengths),
+            )
+        )
+        if len(features) != _SKLEARN_SVM_FEATURE_COUNT:
+            raise AssertionError(  # pragma: no cover - fixed schema invariant
+                "Unexpected Scikit Online SVM feature count"
+            )
+        return tuple(features)
+
+    def _train_sklearn_svm(self, drawn: set[int]) -> None:
+        if (
+            self.sklearn_svm is None
+            or not self.sklearn_svm_pending_features
+        ):
+            return
+        numbers = list(range(1, _NUMBER_COUNT + 1))
+        features = np.asarray(
+            [self.sklearn_svm_pending_features[number] for number in numbers],
+            dtype=float,
+        )
+        labels = np.asarray([int(number in drawn) for number in numbers])
+        positive_weight = (_NUMBER_COUNT - _NUMBERS_PER_DRAW) / _NUMBERS_PER_DRAW
+        sample_weights = np.asarray(
+            [positive_weight if label else 1.0 for label in labels],
+            dtype=float,
+        )
+        if self.sklearn_svm_fitted:
+            self.sklearn_svm.partial_fit(
+                features,
+                labels,
+                sample_weight=sample_weights,
+            )
+        else:
+            self.sklearn_svm.partial_fit(
+                features,
+                labels,
+                classes=np.asarray([0, 1]),
+                sample_weight=sample_weights,
+            )
+            self.sklearn_svm_fitted = True
+        self.sklearn_svm_trained_draws += 1
+        for strategy_id, ranking in self.sklearn_svm_pending_rankings.items():
+            hits = len(drawn.intersection(ranking[:_NUMBERS_PER_DRAW]))
+            self.sklearn_svm_expert_total_hits[strategy_id] += hits
+            self.sklearn_svm_expert_evaluated_draws[strategy_id] += 1
+            self.sklearn_svm_expert_recent_hits[strategy_id].append(hits)
+
+    def _sklearn_svm_scores(
+        self,
+        rankings: dict[str, list[int]],
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        self.sklearn_svm_pending_rankings = {
+            strategy_id: list(rankings[strategy_id])
+            for strategy_id in _SKLEARN_SVM_EXPERT_IDS
+        }
+        self.sklearn_svm_pending_features = {
+            number: self._sklearn_svm_features(number, rankings)
+            for number in range(1, _NUMBER_COUNT + 1)
+        }
+        expert_weights = {
+            strategy_id: self._sklearn_svm_expert_weight(strategy_id)
+            for strategy_id in _SKLEARN_SVM_EXPERT_IDS
+        }
+        if self.sklearn_svm is not None and self.sklearn_svm_fitted:
+            feature_rows = np.asarray(
+                [
+                    self.sklearn_svm_pending_features[number]
+                    for number in range(1, _NUMBER_COUNT + 1)
+                ],
+                dtype=float,
+            )
+            decision_values = self.sklearn_svm.decision_function(feature_rows)
+            margins = {
+                number: float(decision_values[number - 1])
+                for number in range(1, _NUMBER_COUNT + 1)
+            }
+            score_label = "Margin"
+        else:
+            weight_total = sum(expert_weights.values()) or 1.0
+            margins = {
+                number: sum(
+                    _rank_strength(rankings[strategy_id], number)
+                    * expert_weights[strategy_id]
+                    for strategy_id in _SKLEARN_SVM_EXPERT_IDS
+                )
+                / weight_total
+                for number in range(1, _NUMBER_COUNT + 1)
+            }
+            score_label = "Cold-start consensus"
+        scores = _scale_scores(margins)
+        details: dict[int, tuple[str, ...]] = {}
+        for number in range(1, _NUMBER_COUNT + 1):
+            strongest = sorted(
+                _SKLEARN_SVM_EXPERT_IDS,
+                key=lambda strategy_id: (
+                    -_rank_strength(rankings[strategy_id], number)
+                    * expert_weights[strategy_id],
+                    strategy_id,
+                ),
+            )[:3]
+            details[number] = (
+                f"{score_label} {margins[number]:.3f}",
+                f"Trained draws {self.sklearn_svm_trained_draws}",
+                f"Strongest expert inputs: {', '.join(strongest)}",
+            )
+        return scores, details
+
+    def _lag_logistic_features(self, number: int) -> tuple[float, ...]:
+        """Build compact candidate features shared across all 49 labels."""
+        lag_pattern = self._lag_logistic_pattern(number)
+        gap = self.current_gaps()[number]
+        mean_gap = self._mean_gap(number)
+        overdue = (
+            0.0
+            if mean_gap <= 0
+            else _clamp((gap - mean_gap) / mean_gap, -1, 1)
+        )
+        lifetime_rate = self.appearances[number] / max(self.draw_count, 1)
+        lifetime_residual = _clamp(
+            (lifetime_rate - _BASE_PROBABILITY) / _BASE_PROBABILITY,
+            -1,
+            1,
+        )
+        recent5 = self._sklearn_svm_recent_residual(number, 5)
+        recent20 = self._sklearn_svm_recent_residual(number, 20)
+        features = (
+            *(float(value) for value in lag_pattern),
+            sum(lag_pattern) / _LAG_LOGISTIC_LAG_COUNT,
+            min(gap / 40, 1),
+            float(gap == 1),
+            float(2 <= gap <= 4),
+            float(gap >= 12),
+            overdue,
+            lifetime_residual,
+            recent5,
+            recent20,
+            self._sklearn_svm_recent_residual(number, 100),
+            _clamp(recent5 - recent20, -1, 1),
+        )
+        if len(features) != _LAG_LOGISTIC_FEATURE_COUNT:
+            raise AssertionError(  # pragma: no cover - fixed schema invariant
+                "Unexpected Lagged Logistic feature count"
+            )
+        return features
+
+    def _lag_logistic_feature_matrix(self) -> np.ndarray:
+        return np.asarray(
+            [
+                self._lag_logistic_features(number)
+                for number in range(1, _NUMBER_COUNT + 1)
+            ],
+            dtype=float,
+        )
+
+    def _lag_logistic_pattern(self, number: int) -> tuple[int, ...]:
+        lag_draws = list(reversed(list(self.recent_draws)[-_LAG_LOGISTIC_LAG_COUNT:]))
+        return tuple(
+            int(lag_index < len(lag_draws) and number in lag_draws[lag_index])
+            for lag_index in range(_LAG_LOGISTIC_LAG_COUNT)
+        )
+
+    def _train_lag_logistic(self, drawn: set[int]) -> None:
+        if self.lag_logistic is None or self.lag_logistic_pending_features is None:
+            return
+        labels = np.asarray(
+            [int(number in drawn) for number in range(1, _NUMBER_COUNT + 1)]
+        )
+        if self.lag_logistic_fitted:
+            self.lag_logistic.partial_fit(
+                self.lag_logistic_pending_features,
+                labels,
+            )
+        else:
+            self.lag_logistic.partial_fit(
+                self.lag_logistic_pending_features,
+                labels,
+                classes=np.asarray([0, 1]),
+            )
+            self.lag_logistic_fitted = True
+        self.lag_logistic_trained_draws += 1
+
+    def _lag_logistic_scores(
+        self,
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        self.lag_logistic_pending_features = self._lag_logistic_feature_matrix()
+        model_ready = (
+            self.lag_logistic is not None
+            and self.lag_logistic_fitted
+            and self.lag_logistic_trained_draws
+            >= _LAG_LOGISTIC_MIN_TRAINING_DRAWS
+        )
+        if model_ready:
+            probabilities = self.lag_logistic.predict_proba(
+                self.lag_logistic_pending_features
+            )[:, 1]
+            scores = {
+                number: float(probabilities[number - 1])
+                for number in range(1, _NUMBER_COUNT + 1)
+            }
+            score_label = "Estimated hit probability"
+        else:
+            denominator = self.draw_count + _LAG_LOGISTIC_PRIOR_DRAWS
+            scores = {
+                number: (
+                    self.appearances[number]
+                    + _LAG_LOGISTIC_PRIOR_DRAWS * _BASE_PROBABILITY
+                )
+                / denominator
+                for number in range(1, _NUMBER_COUNT + 1)
+            }
+            score_label = "Cold-start probability"
+        details: dict[int, tuple[str, ...]] = {
+            number: (
+                f"{score_label} {scores[number]:.2%}",
+                "Lag 1/2/3 pattern "
+                + "/".join(str(value) for value in self._lag_logistic_pattern(number)),
+                f"Trained transitions {self.lag_logistic_trained_draws}",
+                "Compact shared model; no future-draw inputs",
+            )
+            for number in range(1, _NUMBER_COUNT + 1)
+        }
+        return scores, details
 
     def _cis_expert_accuracy(
         self,
@@ -1167,6 +1626,12 @@ class _StrategyState:
         if "cis" in self.enabled_strategy_ids:
             self._train_cis(drawn)
 
+        if "sklearn_svm" in self.enabled_strategy_ids:
+            self._train_sklearn_svm(drawn)
+
+        if "lag_logistic" in self.enabled_strategy_ids:
+            self._train_lag_logistic(drawn)
+
         if "mkfr" in self.enabled_strategy_ids:
             for number in range(1, _NUMBER_COUNT + 1):
                 target = int(number in drawn)
@@ -1355,7 +1820,7 @@ class _StrategyState:
             self.previous_draw = set(drawn)
         self.current_month = int(draw_date[5:7]) if draw_date else 0
         if self.enabled_strategy_ids.intersection(
-            {"co_occurrence", "predictive_grid", "svc", "tbl"}
+            {"co_occurrence", "lag_logistic", "predictive_grid", "svc", "tbl"}
         ):
             self.recent_draws.append(drawn)
         if "emd" in self.enabled_strategy_ids:
@@ -3795,7 +4260,7 @@ class _StrategyState:
                 ),
             )
             if "fresh_random" in requested:
-                fresh_random_details = {
+                fresh_random_details: dict[int, tuple[str, ...]] = {
                     number: (
                         f"Random rank {random_rank[number]}",
                         f"Freshness rank {freshness_rank[number]}",
@@ -3895,6 +4360,48 @@ class _StrategyState:
                     doublet_triplet_markov_scores,
                     gaps,
                     doublet_triplet_markov_details,
+                )
+
+        if "sklearn_svm" in enabled:
+            sklearn_svm_scores, sklearn_svm_details = self._sklearn_svm_scores(
+                rankings
+            )
+            rankings["sklearn_svm"] = _ranking_from_scores(
+                sklearn_svm_scores,
+                gaps,
+            )
+            if "sklearn_svm" in requested:
+                built["sklearn_svm"] = _strategy(
+                    "sklearn_svm",
+                    "Scikit Online SVM",
+                    (
+                        "Scikit-learn online linear SVM using temporal, frequency, "
+                        "expert-rank, and leakage-safe efficacy inputs."
+                    ),
+                    sklearn_svm_scores,
+                    gaps,
+                    sklearn_svm_details,
+                )
+
+        if "lag_logistic" in enabled:
+            lag_logistic_scores, lag_logistic_details = (
+                self._lag_logistic_scores()
+            )
+            rankings["lag_logistic"] = _ranking_from_scores(
+                lag_logistic_scores,
+                gaps,
+            )
+            if "lag_logistic" in requested:
+                built["lag_logistic"] = _strategy(
+                    "lag_logistic",
+                    "Lagged Logistic",
+                    (
+                        "Compact online logistic model combining exact three-draw "
+                        "lags with leakage-safe gap and frequency context."
+                    ),
+                    lag_logistic_scores,
+                    gaps,
+                    lag_logistic_details,
                 )
 
         if "cis" in enabled:

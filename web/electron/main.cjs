@@ -83,13 +83,20 @@ const strategyPlugins = [
   { id: "mixed", label: "Mix" },
   { id: "svc", label: "SVC" },
   { id: "tbl", label: "TBL" },
+  { id: "sklearn_svm", label: "Scikit Online SVM" },
+  { id: "lag_logistic", label: "Lagged Logistic" },
   { id: "cis", label: "CIS" },
   { id: "residual_coverage", label: "Residual Coverage" },
   { id: "chained", label: "Chained Strategy" },
 ];
 const defaultStrategyPluginIds = strategyPlugins
   .map((plugin) => plugin.id)
-  .filter((strategyId) => strategyId !== "mkrd");
+  .filter(
+    (strategyId) =>
+      strategyId !== "mkrd" &&
+      strategyId !== "sklearn_svm" &&
+      strategyId !== "lag_logistic",
+  );
 let enabledStrategyIds = new Set(defaultStrategyPluginIds);
 
 const dashboardViews = [
