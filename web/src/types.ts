@@ -100,6 +100,10 @@ export interface DatasetSelection {
   requiresTrust?: boolean;
 }
 
+export interface RecentDataset extends DatasetSelection {
+  lastOpenedAt?: string;
+}
+
 export interface DatasetSummary extends DatasetSelection {
   drawCount: number;
   numberObservations: number;
@@ -509,6 +513,8 @@ export interface PossibleDrawNumberRequest {
 
 export interface DesktopApi {
   openDataset(): Promise<DatasetSelection | null>;
+  getRecentDatasets(): Promise<RecentDataset[]>;
+  openRecentDataset(path: string): Promise<DatasetSelection>;
   getReportPlugins(): Promise<ReportPluginState>;
   getStrategyPlugins(): Promise<StrategyPluginState>;
   setStrategyPlugins(strategyIds: StrategyId[]): Promise<StrategyPluginState>;

@@ -17,25 +17,25 @@ export const coOccurrenceBands: CoOccurrenceBand[] = [
     id: "low",
     label: "Low lift",
     description: "Pair appears below 80% of the random baseline.",
-    color: "#2f6fb3",
+    color: "#78dce8",
   },
   {
     id: "normal",
     label: "Near baseline",
     description: "Pair appears within the ordinary baseline range.",
-    color: "#3f8f68",
+    color: "#a9dc76",
   },
   {
     id: "elevated",
     label: "Elevated",
     description: "Pair appears at least 20% above the random baseline.",
-    color: "#d58a1f",
+    color: "#ffd866",
   },
   {
     id: "high",
     label: "High lift",
     description: "Pair appears at least 50% above the random baseline.",
-    color: "#c65335",
+    color: "#ff6188",
   },
 ];
 

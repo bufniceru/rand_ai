@@ -30,6 +30,7 @@ import type {
   DatasetSelection,
   MenuAction,
   PossibleDrawNumberRequest,
+  RecentDataset,
   ReportId,
   ReportPluginState,
   StrategyId,
@@ -111,6 +112,7 @@ const visitedWorkspaceTabs = ref<Set<WorkspaceTabId>>(new Set(["statistics"]));
 const enabledReportIds = ref<ReportId[]>([]);
 const enabledStrategyIds = ref<StrategyId[]>([]);
 const strategyPlugins = ref<StrategyPlugin[]>([]);
+const recentDatasets = ref<RecentDataset[]>([]);
 const settingsOpen = ref(false);
 const savingSettings = ref(false);
 const lastSeenDrawCountStorageKey = "rand-ai-last-seen-draw-count";
@@ -328,6 +330,28 @@ async function chooseDataset(): Promise<void> {
     if (dataset) stageDataset(dataset);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+function recentDatasetKind(dataset: RecentDataset): string {
+  return /\.ya?ml$/i.test(dataset.path) ? "YAML" : "Pickle";
+}
+
+async function chooseRecentDataset(dataset: RecentDataset): Promise<void> {
+  errorMessage.value = "";
+  if (!window.randAiDesktop) {
+    errorMessage.value = "Dataset access is available in the Electron desktop application.";
+    return;
+  }
+  try {
+    stageDataset(await window.randAiDesktop.openRecentDataset(dataset.path));
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+    try {
+      recentDatasets.value = await window.randAiDesktop.getRecentDatasets();
+    } catch {
+      // Keep the existing list if refreshing it also fails.
+    }
   }
 }
 
@@ -572,12 +596,14 @@ onMounted(async () => {
     window.randAiDesktop?.onAnalysisProgress(handleAnalysisProgress) ?? null;
   if (window.randAiDesktop) {
     try {
-      const [reportState, strategyState] = await Promise.all([
+      const [reportState, strategyState, recentDatasetState] = await Promise.all([
         window.randAiDesktop.getReportPlugins(),
         window.randAiDesktop.getStrategyPlugins(),
+        window.randAiDesktop.getRecentDatasets(),
       ]);
       acceptReportPluginState(reportState);
       acceptStrategyPluginState(strategyState);
+      recentDatasets.value = recentDatasetState;
     } catch (error) {
       errorMessage.value = error instanceof Error ? error.message : String(error);
     }
@@ -596,10 +622,8 @@ onBeforeUnmount(() => {
   <div class="app-shell">
     <header class="app-toolbar">
       <div class="brand-lockup">
-        <div class="brand-mark">RA</div>
         <div>
           <strong>Rand AI</strong>
-          <span>Draw statistics desktop</span>
         </div>
       </div>
       <nav
@@ -623,9 +647,6 @@ onBeforeUnmount(() => {
           @click="selectWorkspaceTab(tab.id)"
         >
           <span>{{ tab.label }}</span>
-          <small v-if="tab.id === 'statistics' && analysisStale">
-            Reanalyze
-          </small>
         </button>
       </nav>
     </header>
@@ -865,11 +886,41 @@ onBeforeUnmount(() => {
         </button>
         <small>YAML imports start immediately. Existing pickle files require a trust confirmation.</small>
       </section>
-      <section class="welcome-features">
-        <article><strong>21</strong><span>Interactive statistics charts</span></article>
-        <article><strong>49</strong><span>Number-level frequency positions</span></article>
-        <article><strong>250</strong><span>Draws in the last-seen workspace</span></article>
-      </section>
+      <div class="welcome-sidebar">
+        <section class="welcome-recents" aria-label="Recent dataset files">
+          <header>
+            <div>
+              <p class="eyebrow">Open again</p>
+              <h2>Recent files</h2>
+            </div>
+            <span>{{ recentDatasets.length }}/10</span>
+          </header>
+          <ul v-if="recentDatasets.length > 0">
+            <li v-for="dataset in recentDatasets" :key="dataset.path">
+              <button
+                type="button"
+                :disabled="loading"
+                :title="dataset.path"
+                @click="chooseRecentDataset(dataset)"
+              >
+                <span>
+                  <strong>{{ dataset.name }}</strong>
+                  <small>{{ dataset.path }}</small>
+                </span>
+                <b>{{ recentDatasetKind(dataset) }}</b>
+              </button>
+            </li>
+          </ul>
+          <p v-else>
+            YAML and trusted pickle files you open will appear here.
+          </p>
+        </section>
+        <section class="welcome-features">
+          <article><strong>21</strong><span>Interactive statistics charts</span></article>
+          <article><strong>49</strong><span>Number-level frequency positions</span></article>
+          <article><strong>250</strong><span>Draws in the last-seen workspace</span></article>
+        </section>
+      </div>
     </main>
 
     <div v-if="errorMessage" class="error-banner">

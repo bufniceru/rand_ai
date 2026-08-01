@@ -54,7 +54,7 @@ function percent(value: number): string {
 
 function bandColor(bandId: string): string {
   return (
-    model.value.bands.find((band) => band.id === bandId)?.color ?? "#7b8798"
+    model.value.bands.find((band) => band.id === bandId)?.color ?? "#727072"
   );
 }
 </script>
@@ -157,8 +157,8 @@ function bandColor(bandId: string): string {
               :cx="node.x"
               :cy="node.y"
               :r="node.size"
-              fill="#ffffff"
-              stroke="#173d64"
+              fill="#403e41"
+              stroke="#78dce8"
               stroke-width="1.5"
             />
             <text :x="node.x" :y="node.y + 3.5">{{ node.number }}</text>

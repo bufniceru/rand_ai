@@ -344,7 +344,32 @@ function recentDatasetLabel(dataset) {
   return label.length <= 96 ? label : `${label.slice(0, 93)}...`;
 }
 
-async function selectRecentDataset(dataset) {
+function recentDatasetPayload(dataset) {
+  const extension = path.extname(dataset.path).toLowerCase();
+  return {
+    path: dataset.path,
+    name: dataset.name,
+    sizeBytes: dataset.sizeBytes,
+    requiresTrust: ![".yaml", ".yml"].includes(extension),
+    lastOpenedAt:
+      typeof dataset.lastOpenedAt === "string" ? dataset.lastOpenedAt : undefined,
+  };
+}
+
+async function resolveRecentDataset(requestedPath) {
+  const resolvedPath = path.resolve(String(requestedPath ?? ""));
+  const comparisonPath =
+    process.platform === "win32" ? resolvedPath.toLowerCase() : resolvedPath;
+  const dataset = recentDatasets.find((candidate) => {
+    const candidatePath =
+      process.platform === "win32"
+        ? candidate.path.toLowerCase()
+        : candidate.path;
+    return candidatePath === comparisonPath;
+  });
+  if (!dataset) {
+    throw new Error("This dataset is not in the recent-files list.");
+  }
   try {
     const stats = await fs.promises.stat(dataset.path);
     if (!stats.isFile()) {
@@ -354,20 +379,31 @@ async function selectRecentDataset(dataset) {
       throw new Error("Dataset file must not exceed 100 MiB.");
     }
     const extension = path.extname(dataset.path).toLowerCase();
-    sendMenuAction("datasetSelected", {
-      dataset: {
-        path: dataset.path,
-        name: path.basename(dataset.path),
-        sizeBytes: stats.size,
-        requiresTrust: ![".yaml", ".yml"].includes(extension),
-      },
-    });
+    if (![".yaml", ".yml", ".pkl", ".pickle"].includes(extension)) {
+      throw new Error("The recent file is not a supported Draws dataset.");
+    }
+    return {
+      path: dataset.path,
+      name: path.basename(dataset.path),
+      sizeBytes: stats.size,
+      requiresTrust: ![".yaml", ".yml"].includes(extension),
+    };
   } catch (error) {
     recentDatasets = recentDatasets.filter(
       (recentDataset) => recentDataset.path !== dataset.path,
     );
     saveRecentDatasets();
     buildApplicationMenu();
+    throw error;
+  }
+}
+
+async function selectRecentDataset(dataset) {
+  try {
+    sendMenuAction("datasetSelected", {
+      dataset: await resolveRecentDataset(dataset.path),
+    });
+  } catch (error) {
     dialog.showErrorBox(
       "Could not open recent dataset",
       `${dataset.path}\n\n${error.message}`,
@@ -754,6 +790,14 @@ function createWindow() {
 }
 
 ipcMain.handle("dataset:open", async () => chooseDataset());
+
+ipcMain.handle("dataset:recent-list", () =>
+  recentDatasets.map(recentDatasetPayload),
+);
+
+ipcMain.handle("dataset:recent-open", async (_event, requestedPath) =>
+  resolveRecentDataset(requestedPath),
+);
 
 ipcMain.handle("report-plugins:get", () => reportPluginState());
 

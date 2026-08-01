@@ -5,7 +5,7 @@ import type {
   TableRow,
 } from "../types";
 
-const chartColors = ["#2e63c5", "#d93a3a", "#2f9e69", "#f0a43c", "#7b61c9", "#2d8f9f"];
+const chartColors = ["#78dce8", "#ff6188", "#a9dc76", "#ffd866", "#ab9df2", "#fc9867"];
 
 function table(analysis: AnalysisPayload, name: string): TablePayload {
   const value = analysis.tables[name];
@@ -19,14 +19,14 @@ function numberValue(row: TableRow, key: string): number {
 
 function baseLayout(title: string, xTitle = "", yTitle = ""): Record<string, unknown> {
   return {
-    title: { text: title, x: 0.02, xanchor: "left", font: { size: 18, color: "#172033" } },
-    paper_bgcolor: "#ffffff",
-    plot_bgcolor: "#ffffff",
-    font: { family: "Segoe UI, Helvetica Neue, sans-serif", color: "#42506a" },
+    title: { text: title, x: 0.02, xanchor: "left", font: { size: 18, color: "#fcfcfa" } },
+    paper_bgcolor: "#403e41",
+    plot_bgcolor: "#403e41",
+    font: { family: "Segoe UI, Helvetica Neue, sans-serif", color: "#b7b5b7" },
     margin: { l: 62, r: 24, t: 62, b: 58 },
-    xaxis: { title: { text: xTitle }, gridcolor: "rgba(78,92,118,.12)" },
-    yaxis: { title: { text: yTitle }, gridcolor: "rgba(78,92,118,.12)" },
-    hoverlabel: { bgcolor: "#172033", font: { color: "#ffffff" } },
+    xaxis: { title: { text: xTitle }, gridcolor: "rgba(252,252,250,.12)", zerolinecolor: "#5b595c" },
+    yaxis: { title: { text: yTitle }, gridcolor: "rgba(252,252,250,.12)", zerolinecolor: "#5b595c" },
+    hoverlabel: { bgcolor: "#221f22", bordercolor: "#ffd866", font: { color: "#fcfcfa" } },
     legend: { orientation: "h", y: 1.08, x: 1, xanchor: "right" },
   };
 }
@@ -55,7 +55,7 @@ function heatmap(
         x,
         y,
         z: y.map((row) => x.map((column) => lookup.get(`${row}|${column}`) ?? 0)),
-        colorscale: "Viridis",
+        colorscale: [[0, "#2d2a2e"], [0.25, "#ab9df2"], [0.5, "#78dce8"], [0.75, "#a9dc76"], [1, "#ffd866"]],
         hovertemplate: `${yTitle}: %{y}<br>${xTitle}: %{x}<br>Value: %{z}<extra></extra>`,
       }],
       layout: baseLayout(title, xTitle, yTitle),
@@ -70,7 +70,7 @@ function heatmap(
       x,
       y,
       z: source.rows.map((row) => x.map((column) => numberValue(row, column))),
-      colorscale: "Viridis",
+      colorscale: [[0, "#ff6188"], [0.5, "#403e41"], [1, "#78dce8"]],
       zmin: -1,
       zmax: 1,
       hovertemplate: `${yTitle}: %{y}<br>${xTitle}: %{x}<br>Correlation: %{z:.3f}<extra></extra>`,
@@ -93,7 +93,7 @@ function numberFrequencies(analysis: AnalysisPayload): FigureSpec {
         name: "Observed",
         x: rows.map((row) => numberValue(row, "number")),
         y: rows.map((row) => numberValue(row, "count")),
-        marker: { color: "#2e63c5" },
+        marker: { color: "#78dce8" },
         hovertemplate: "Number %{x}<br>Count %{y}<extra></extra>",
       },
       {
@@ -102,7 +102,7 @@ function numberFrequencies(analysis: AnalysisPayload): FigureSpec {
         name: "Expected",
         x: rows.map((row) => numberValue(row, "number")),
         y: rows.map((row) => numberValue(row, "expected_count")),
-        line: { color: "#d93a3a", width: 3 },
+        line: { color: "#ff6188", width: 3 },
         hovertemplate: "Number %{x}<br>Expected %{y:.2f}<extra></extra>",
       },
     ],
@@ -119,7 +119,7 @@ function drawSumDistribution(analysis: AnalysisPayload): FigureSpec {
       type: "bar",
       x: rows.map((row) => numberValue(row, "value")),
       y: rows.map((row) => numberValue(row, "count")),
-      marker: { color: "#2e63c5" },
+      marker: { color: "#78dce8" },
     }],
     layout: baseLayout("Draw-sum distribution", "Sum of six numbers", "Draws"),
   };
@@ -156,7 +156,7 @@ function composition(analysis: AnalysisPayload): FigureSpec {
         xref: "paper",
         yref: "paper",
         showarrow: false,
-        font: { size: 13, color: "#42506a" },
+        font: { size: 13, color: "#b7b5b7" },
       })),
     },
   };
@@ -199,7 +199,7 @@ function distanceFigure(
       type: "bar",
       x: source.rows.map((row) => numberValue(row, xKey)),
       y: source.rows.map((row) => numberValue(row, yKey)),
-      marker: { color: "#2e63c5" },
+      marker: { color: "#78dce8" },
     }],
     layout: {
       ...baseLayout(title, "Distance (0–43)", "Occurrences"),
@@ -207,7 +207,7 @@ function distanceFigure(
         title: { text: "Distance (0–43)" },
         range: [-0.5, 43.5],
         dtick: 1,
-        gridcolor: "rgba(78,92,118,.12)",
+        gridcolor: "rgba(252,252,250,.12)",
       },
     },
   };
@@ -266,7 +266,7 @@ function matchingPairs(analysis: AnalysisPayload): FigureSpec {
         lookup.get("observed_matching_combination_pairs") ?? 0,
         lookup.get("expected_matching_combination_pairs") ?? 0,
       ],
-      marker: { color: ["#2e63c5", "#d93a3a"] },
+      marker: { color: ["#78dce8", "#ff6188"] },
     }],
     layout: baseLayout("Matching six-number combination pairs", "", "Matching pairs"),
   };
@@ -292,9 +292,9 @@ function freshnessGapDistribution(analysis: AnalysisPayload): FigureSpec {
       marker: {
         color: rows.map((row) => numberValue(row, "hit_rate")),
         colorscale: [
-          [0, "#dbe7fb"],
-          [0.5, "#5a86d6"],
-          [1, "#204f9e"],
+          [0, "#403e41"],
+          [0.5, "#78dce8"],
+          [1, "#ffd866"],
         ],
         colorbar: { title: { text: "Hit rate %" } },
       },
@@ -307,7 +307,7 @@ function freshnessGapDistribution(analysis: AnalysisPayload): FigureSpec {
       xaxis: {
         title: { text: "Gap (intervening draws since the previous hit)" },
         dtick: rows.length > 60 ? 5 : 1,
-        gridcolor: "rgba(78,92,118,.12)",
+        gridcolor: "rgba(252,252,250,.12)",
       },
     },
   };
