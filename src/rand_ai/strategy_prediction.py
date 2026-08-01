@@ -82,7 +82,41 @@ _SKLEARN_SVM_EXPERT_IDS = (
 )
 _SKLEARN_SVM_RECENT_WINDOW = 40
 _SKLEARN_SVM_EFFECTIVENESS_PRIOR_DRAWS = 24.0
-_SKLEARN_SVM_FEATURE_COUNT = 32
+_SKLEARN_SVM_FEATURE_NAMES = (
+    "number_value",
+    "low_high",
+    "odd_even",
+    "prime",
+    "gap_60",
+    "gap_one",
+    "gap_two_to_four",
+    "gap_at_least_twelve",
+    "overdue_ratio",
+    "lifetime_frequency_residual",
+    "recent_frequency_residual_5",
+    "recent_frequency_residual_20",
+    "recent_frequency_residual_100",
+    "recent_5_vs_20_trend",
+    "latest_draw_compatibility",
+    "mksp_strength",
+    "mksp_efficacy_interaction",
+    "doublet_triplet_markov_strength",
+    "doublet_triplet_markov_efficacy_interaction",
+    "bayesian_strength",
+    "bayesian_efficacy_interaction",
+    "tbl_strength",
+    "tbl_efficacy_interaction",
+    "mknp_strength",
+    "mknp_efficacy_interaction",
+    "emd_strength",
+    "emd_efficacy_interaction",
+    "expert_mean",
+    "expert_median",
+    "expert_top_six_support",
+    "expert_top_quarter_support",
+    "expert_rank_variance",
+)
+_SKLEARN_SVM_FEATURE_COUNT = len(_SKLEARN_SVM_FEATURE_NAMES)
 _PROXIMITY_BUCKETS = ("paired", "tight", "near", "balanced", "wide", "isolated")
 _EARTH_MOVER_BUCKETS = ("Overlap", "Near", "Close", "Middle", "Far", "Distant")
 _PRIMES = {
