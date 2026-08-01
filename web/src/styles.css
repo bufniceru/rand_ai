@@ -2068,8 +2068,10 @@ tbody tr:nth-child(even) {
 }
 
 .all-predictions-cell {
+  --prediction-cell-saturation: 1;
   width: 78px;
   height: 78px;
+  position: relative;
   display: grid;
   place-items: center;
   border: 1px solid #b6d5f2;
@@ -2078,14 +2080,35 @@ tbody tr:nth-child(even) {
   background: #e7f3ff;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.46);
   cursor: pointer;
-  transition:
-    transform 120ms ease,
-    filter 120ms ease;
+  transition: transform 120ms ease;
 }
 
 .all-predictions-cell:hover {
-  filter: brightness(1.04);
   transform: translateY(-2px);
+}
+
+.prediction-cell-color {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #e7f3ff;
+  filter: saturate(var(--prediction-cell-saturation));
+  pointer-events: none;
+  transition: filter 120ms ease;
+}
+
+.all-predictions-cell:hover .prediction-cell-color {
+  filter:
+    saturate(var(--prediction-cell-saturation))
+    brightness(1.04);
+}
+
+.all-predictions-grid.is-historical-prediction .all-predictions-cell {
+  --prediction-cell-saturation: 0.8;
+}
+
+.all-predictions-grid.is-historical-prediction .all-predictions-cell.is-drawn {
+  --prediction-cell-saturation: 1.2;
 }
 
 .all-predictions-cell:focus-visible {
@@ -2112,6 +2135,8 @@ tbody tr:nth-child(even) {
 .all-predictions-cell > strong {
   width: 40px;
   height: 40px;
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
   border: 3px solid rgba(255, 255, 255, 0.9);

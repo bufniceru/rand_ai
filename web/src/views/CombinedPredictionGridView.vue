@@ -765,6 +765,7 @@ onBeforeUnmount(clearNumberActionTimer);
           >
             <div
               class="all-predictions-grid"
+              :class="{ 'is-historical-prediction': actualNumbers.size > 0 }"
               role="grid"
               :aria-label="
                 selectedStrategy
@@ -784,7 +785,6 @@ onBeforeUnmount(clearNumberActionTimer);
                     selectedCoverageThreshold !== null &&
                     cell.reports.length >= selectedCoverageThreshold,
                 }"
-                :style="sectorStyle(cell)"
                 :title="mainGridCellTitle(cell)"
                 role="gridcell"
                 tabindex="0"
@@ -793,6 +793,11 @@ onBeforeUnmount(clearNumberActionTimer);
                 @keydown.enter.prevent="selectedPredictionNumber = cell.number"
                 @keydown.space.prevent="selectedPredictionNumber = cell.number"
               >
+                <span
+                  class="prediction-cell-color"
+                  :style="sectorStyle(cell)"
+                  aria-hidden="true"
+                ></span>
                 <strong>{{ cell.number }}</strong>
               </article>
             </div>
