@@ -85,6 +85,10 @@ const strategyPlugins = [
   { id: "tbl", label: "TBL" },
   { id: "sklearn_svm", label: "Scikit Online SVM" },
   { id: "lag_logistic", label: "Lagged Logistic" },
+  {
+    id: "sparse_neural_ticket",
+    label: "Sparse Neural Ticket (Experimental)",
+  },
   { id: "cis", label: "CIS" },
   { id: "residual_coverage", label: "Residual Coverage" },
   { id: "chained", label: "Chained Strategy" },
@@ -95,7 +99,8 @@ const defaultStrategyPluginIds = strategyPlugins
     (strategyId) =>
       strategyId !== "mkrd" &&
       strategyId !== "sklearn_svm" &&
-      strategyId !== "lag_logistic",
+      strategyId !== "lag_logistic" &&
+      strategyId !== "sparse_neural_ticket",
   );
 let enabledStrategyIds = new Set(defaultStrategyPluginIds);
 

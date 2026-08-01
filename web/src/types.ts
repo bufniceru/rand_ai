@@ -39,6 +39,7 @@ export type StrategyId =
   | "tbl"
   | "sklearn_svm"
   | "lag_logistic"
+  | "sparse_neural_ticket"
   | "cis"
   | "residual_coverage"
   | "chained";

@@ -14,6 +14,11 @@ from sklearn.linear_model import SGDClassifier
 
 from rand_ai.draw import Draw
 from rand_ai.prediction import CombinedPrediction
+from rand_ai.sparse_neural_ticket import (
+    SparseNeuralTicketArtifact,
+    history_fingerprint,
+    load_sparse_neural_ticket,
+)
 
 _NUMBER_COUNT = 49
 _NUMBERS_PER_DRAW = 6
@@ -180,6 +185,7 @@ _BASE_STRATEGY_IDS = (
     "tbl",
     "sklearn_svm",
     "lag_logistic",
+    "sparse_neural_ticket",
     "cis",
 )
 _CHAIN_EXPERT_IDS = (
@@ -237,8 +243,15 @@ _STRATEGY_DEPENDENCIES = {
         "tbl",
     },
     "sklearn_svm": set(_SKLEARN_SVM_EXPERT_IDS),
+    "sparse_neural_ticket": {"sklearn_svm", "lag_logistic"},
     "residual_coverage": set(_BASE_STRATEGY_IDS).difference(
-        {"mknp", "mkrd", "sklearn_svm", "lag_logistic"}
+        {
+            "mknp",
+            "mkrd",
+            "sklearn_svm",
+            "lag_logistic",
+            "sparse_neural_ticket",
+        }
     ),
     "chained": set(_CHAIN_EXPERT_IDS),
 }
@@ -408,6 +421,8 @@ class _EfficacyTracker:
         self.evaluated_draws = 0
         self.random_hits = 0
         self.strategy_hits: dict[str, int] = {}
+        self.strategy_evaluated_draws: dict[str, int] = {}
+        self.strategy_random_hits: dict[str, int] = {}
 
     def compare(
         self,
@@ -434,6 +449,13 @@ class _EfficacyTracker:
                 self.strategy_hits[strategy_id] = (
                     self.strategy_hits.get(strategy_id, 0) + hits
                 )
+                self.strategy_evaluated_draws[strategy_id] = (
+                    self.strategy_evaluated_draws.get(strategy_id, 0) + 1
+                )
+                self.strategy_random_hits[strategy_id] = (
+                    self.strategy_random_hits.get(strategy_id, 0)
+                    + current_random_hits
+                )
             record = StrategyEfficacyRecord(
                 reference_draw_number=suite.reference_draw_number,
                 target_draw_number=suite.target_draw_number,
@@ -442,29 +464,44 @@ class _EfficacyTracker:
                 strategy_hits=current_strategy_hits,
             )
 
-        expected_random_hits = self.evaluated_draws * _EXPECTED_RANDOM_HITS_PER_DRAW
         updated_strategies = tuple(
             replace(
                 strategy,
                 efficacy=StrategyEfficacy(
-                    evaluated_draws=self.evaluated_draws,
+                    evaluated_draws=self.strategy_evaluated_draws.get(
+                        strategy.strategy_id,
+                        0,
+                    ),
                     strategy_hits=self.strategy_hits.get(strategy.strategy_id, 0),
-                    random_hits=self.random_hits,
-                    expected_random_hits=expected_random_hits,
+                    random_hits=self.strategy_random_hits.get(
+                        strategy.strategy_id,
+                        0,
+                    ),
+                    expected_random_hits=(
+                        self.strategy_evaluated_draws.get(strategy.strategy_id, 0)
+                        * _EXPECTED_RANDOM_HITS_PER_DRAW
+                    ),
                     average_hits_per_draw=(
                         self.strategy_hits.get(strategy.strategy_id, 0)
-                        / self.evaluated_draws
-                        if self.evaluated_draws
+                        / self.strategy_evaluated_draws.get(
+                            strategy.strategy_id,
+                            1,
+                        )
+                        if self.strategy_evaluated_draws.get(strategy.strategy_id, 0)
                         else 0.0
                     ),
                     random_average_hits_per_draw=(
-                        self.random_hits / self.evaluated_draws
-                        if self.evaluated_draws
+                        self.strategy_random_hits.get(strategy.strategy_id, 0)
+                        / self.strategy_evaluated_draws.get(
+                            strategy.strategy_id,
+                            1,
+                        )
+                        if self.strategy_evaluated_draws.get(strategy.strategy_id, 0)
                         else 0.0
                     ),
                     hit_difference=(
                         self.strategy_hits.get(strategy.strategy_id, 0)
-                        - self.random_hits
+                        - self.strategy_random_hits.get(strategy.strategy_id, 0)
                     ),
                 ),
             )
@@ -814,6 +851,14 @@ class _StrategyState:
         self.lag_logistic_fitted = False
         self.lag_logistic_trained_draws = 0
         self.lag_logistic_pending_features: np.ndarray | None = None
+        self.sparse_neural_ticket: SparseNeuralTicketArtifact | None = (
+            load_sparse_neural_ticket()
+            if "sparse_neural_ticket" in self.enabled_strategy_ids
+            else None
+        )
+        self.sparse_neural_ticket_history: list[list[str | int | None]] = []
+        self.sparse_neural_ticket_ready = False
+        self.sparse_neural_ticket_invalid = False
         self.cis_weights = [0.0] * (22 + len(_CIS_EXPERTS) * 4)
         self.cis_draw_count = 0
         self.cis_total_hits = {
@@ -1289,6 +1334,57 @@ class _StrategyState:
                 "Compact shared model; no future-draw inputs",
             )
             for number in range(1, _NUMBER_COUNT + 1)
+        }
+        return scores, details
+
+    def _sparse_neural_ticket_scores(
+        self,
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]] | None:
+        artifact = self.sparse_neural_ticket
+        if artifact is None or self.sparse_neural_ticket_invalid:
+            return None
+        if not self.sparse_neural_ticket_ready:
+            if self.draw_count < artifact.activation_reference_draw:
+                return None
+            if self.draw_count > artifact.activation_reference_draw:
+                self.sparse_neural_ticket_invalid = True
+                return None
+            if (
+                history_fingerprint(self.sparse_neural_ticket_history)
+                != artifact.prefix_fingerprint
+            ):
+                self.sparse_neural_ticket_invalid = True
+                return None
+            self.sparse_neural_ticket_ready = True
+
+        if self.lag_logistic_pending_features is None:
+            raise AssertionError("Sparse Neural Ticket lag features are unavailable")
+        svm_features = np.asarray(
+            [
+                self.sklearn_svm_pending_features[number]
+                for number in range(1, _NUMBER_COUNT + 1)
+            ],
+            dtype=np.float64,
+        )
+        lag_features = np.asarray(
+            self.lag_logistic_pending_features,
+            dtype=np.float64,
+        )[:, :4]
+        features = np.concatenate((svm_features, lag_features), axis=1)
+        probabilities = artifact.predict(features)
+        scores = {
+            number: float(probabilities[number - 1])
+            for number in range(1, _NUMBER_COUNT + 1)
+        }
+        gate = "passed" if artifact.promotion_passed else "failed"
+        details: dict[int, tuple[str, ...]] = {
+            number: (
+                f"Five-seed probability {scores[number]:.2%}",
+                f"Ticket round {artifact.selected_round}",
+                f"Active weights {artifact.active_weights}/{artifact.total_weights}",
+                f"Research promotion gate {gate}",
+            )
+            for number in scores
         }
         return scores, details
 
@@ -1819,6 +1915,10 @@ class _StrategyState:
             self.previous_previous_draw = self.previous_draw
             self.previous_draw = set(drawn)
         self.current_month = int(draw_date[5:7]) if draw_date else 0
+        if "sparse_neural_ticket" in self.enabled_strategy_ids:
+            self.sparse_neural_ticket_history.append(
+                [draw_date, *sorted(drawn)]
+            )
         if self.enabled_strategy_ids.intersection(
             {"co_occurrence", "lag_logistic", "predictive_grid", "svc", "tbl"}
         ):
@@ -4403,6 +4503,28 @@ class _StrategyState:
                     gaps,
                     lag_logistic_details,
                 )
+
+        if "sparse_neural_ticket" in enabled:
+            sparse_result = self._sparse_neural_ticket_scores()
+            if sparse_result is not None:
+                sparse_scores, sparse_details = sparse_result
+                rankings["sparse_neural_ticket"] = _ranking_from_scores(
+                    sparse_scores,
+                    gaps,
+                )
+                if "sparse_neural_ticket" in requested:
+                    built["sparse_neural_ticket"] = _strategy(
+                        "sparse_neural_ticket",
+                        "Sparse Neural Ticket (Experimental)",
+                        (
+                            "Frozen five-seed magnitude-pruned neural ensemble. "
+                            "Its research promotion gate failed; enabled only for "
+                            "continued observation on later draws."
+                        ),
+                        sparse_scores,
+                        gaps,
+                        sparse_details,
+                    )
 
         if "cis" in enabled:
             cis_scores, cis_details = self._cis_scores(rankings)

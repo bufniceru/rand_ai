@@ -12,7 +12,7 @@
     "build:electron": "vue-tsc --noEmit && vite build --mode electron",
     "test": "vitest run",
     "electron": "npm run build:electron && electron .",
-    "bridge:build": "cd .. && .venv\\Scripts\\pyinstaller.exe --noconfirm --clean --onefile --collect-submodules dateutil --name rand-ai-bridge src/rand_ai/gui_bridge.py",
+    "bridge:build": "cd .. && .venv\\Scripts\\pyinstaller.exe --noconfirm --clean --onefile --collect-submodules dateutil --exclude-module torch --add-data \"src/rand_ai/sparse_neural_ticket_v1.npz;rand_ai\" --name rand-ai-bridge src/rand_ai/gui_bridge.py",
     "electron:build": "npm run bridge:build && npm run build:electron && electron-builder --win portable",
     "electron:build:hook": "node scripts/watch-electron-build.cjs"
   },
