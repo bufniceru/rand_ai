@@ -38,6 +38,7 @@ export type StrategyId =
   | "svc"
   | "tbl"
   | "sklearn_svm"
+  | "lag_logistic"
   | "cis"
   | "residual_coverage"
   | "chained";

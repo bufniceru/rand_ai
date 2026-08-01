@@ -18,6 +18,8 @@ from rand_ai.strategy_prediction import (
     _BAYESIAN_NUMBER_DECAY,
     _CIS_EXPERTS,
     _EXPECTED_RANDOM_HITS_PER_DRAW,
+    _LAG_LOGISTIC_FEATURE_COUNT,
+    _LAG_LOGISTIC_MIN_TRAINING_DRAWS,
     _MKFR_MAX_ORDER,
     _MKFR_MIN_CONTEXT_SUPPORT,
     _MKFR_PRIOR_STRENGTH,
@@ -40,7 +42,7 @@ from rand_ai.strategy_prediction import (
 )
 
 
-def test_builds_twenty_three_named_rankings_and_reports_progress() -> None:
+def test_builds_twenty_four_named_rankings_and_reports_progress() -> None:
     draws = Draws()
     draws.add(Draw(1, 2, 8, 17, 31, 49))
     draws.add(Draw(3, 6, 12, 22, 36, 47))
@@ -78,6 +80,7 @@ def test_builds_twenty_three_named_rankings_and_reports_progress() -> None:
         "SVC",
         "TBL",
         "Scikit Online SVM",
+        "Lagged Logistic",
         "CIS",
         "RCOV",
         "Chained Strategy",
@@ -259,6 +262,73 @@ def test_sklearn_svm_is_deterministic_and_does_not_learn_from_future_draws() -> 
 
     assert first == repeated
     assert first[0] == changed_future[0]
+
+
+def test_lag_logistic_builds_compact_shared_candidate_features() -> None:
+    state = _StrategyState(("lag_logistic",))
+    draws = (
+        {1, 2, 3, 4, 5, 6},
+        {7, 8, 9, 10, 11, 12},
+        {13, 14, 15, 16, 17, 18},
+    )
+    for drawn in draws:
+        state.remember(drawn)
+
+    features = state._lag_logistic_feature_matrix()
+
+    assert features.shape == (49, _LAG_LOGISTIC_FEATURE_COUNT)
+    assert list(features[0, :4]) == pytest.approx([0, 0, 1, 1 / 3])
+    assert list(features[12, :4]) == pytest.approx([1, 0, 0, 1 / 3])
+    assert all(-1 <= value <= 1 for value in features.flat)
+    assert state._lag_logistic_pattern(1) == (0, 0, 1)
+    assert state._lag_logistic_pattern(13) == (1, 0, 0)
+
+
+def test_lag_logistic_trains_next_draw_targets_and_switches_to_probabilities() -> None:
+    state = _StrategyState(("lag_logistic",))
+    scores: dict[int, float] = {}
+    details: dict[int, tuple[str, ...]] = {}
+    for draw_index in range(_LAG_LOGISTIC_MIN_TRAINING_DRAWS + 1):
+        start = draw_index % 44 + 1
+        drawn = set(range(start, start + 6))
+        state.train(drawn)
+        state.remember(drawn)
+        scores, details = state._lag_logistic_scores()
+
+    assert state.lag_logistic_fitted
+    assert state.lag_logistic_trained_draws == _LAG_LOGISTIC_MIN_TRAINING_DRAWS
+    assert len(scores) == 49
+    assert all(0 <= probability <= 1 for probability in scores.values())
+    assert details[1][0].startswith("Estimated hit probability")
+    assert details[1][2] == (
+        f"Trained transitions {_LAG_LOGISTIC_MIN_TRAINING_DRAWS}"
+    )
+
+
+def test_lag_logistic_is_deterministic_and_does_not_learn_from_future_draws() -> None:
+    prefix = [
+        Draw(1, 2, 8, 17, 31, 49),
+        Draw(3, 6, 12, 22, 36, 47),
+        Draw(1, 9, 18, 27, 38, 45),
+        Draw(4, 11, 20, 29, 37, 46),
+    ]
+
+    def prediction(extra: Draw) -> tuple[int, ...]:
+        draws = Draws()
+        for draw in (*prefix, extra):
+            draws.add(draw)
+        draws.prepare_predictions()
+        suites = build_prediction_suites(
+            draws.draws,
+            enabled_strategy_ids=("lag_logistic",),
+        )
+        return suites[3].strategies[0].top_numbers
+
+    first = prediction(Draw(5, 14, 23, 32, 40, 48))
+    repeated = prediction(Draw(5, 14, 23, 32, 40, 48))
+    changed_future = prediction(Draw(7, 15, 24, 33, 41, 49))
+
+    assert first == repeated == changed_future
 
 
 def test_builds_only_selected_composite_and_association_plugins(

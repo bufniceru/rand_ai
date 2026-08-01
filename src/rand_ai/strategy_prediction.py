@@ -117,6 +117,26 @@ _SKLEARN_SVM_FEATURE_NAMES = (
     "expert_rank_variance",
 )
 _SKLEARN_SVM_FEATURE_COUNT = len(_SKLEARN_SVM_FEATURE_NAMES)
+_LAG_LOGISTIC_LAG_COUNT = 3
+_LAG_LOGISTIC_FEATURE_NAMES = (
+    "lag_1",
+    "lag_2",
+    "lag_3",
+    "lag_hit_share",
+    "gap_40",
+    "gap_one",
+    "gap_two_to_four",
+    "gap_at_least_twelve",
+    "overdue_ratio",
+    "lifetime_frequency_residual",
+    "recent_frequency_residual_5",
+    "recent_frequency_residual_20",
+    "recent_frequency_residual_100",
+    "recent_5_vs_20_trend",
+)
+_LAG_LOGISTIC_FEATURE_COUNT = len(_LAG_LOGISTIC_FEATURE_NAMES)
+_LAG_LOGISTIC_MIN_TRAINING_DRAWS = 48
+_LAG_LOGISTIC_PRIOR_DRAWS = 24.0
 _PROXIMITY_BUCKETS = ("paired", "tight", "near", "balanced", "wide", "isolated")
 _EARTH_MOVER_BUCKETS = ("Overlap", "Near", "Close", "Middle", "Far", "Distant")
 _PRIMES = {
@@ -159,6 +179,7 @@ _BASE_STRATEGY_IDS = (
     "svc",
     "tbl",
     "sklearn_svm",
+    "lag_logistic",
     "cis",
 )
 _CHAIN_EXPERT_IDS = (
@@ -217,7 +238,7 @@ _STRATEGY_DEPENDENCIES = {
     },
     "sklearn_svm": set(_SKLEARN_SVM_EXPERT_IDS),
     "residual_coverage": set(_BASE_STRATEGY_IDS).difference(
-        {"mknp", "mkrd", "sklearn_svm"}
+        {"mknp", "mkrd", "sklearn_svm", "lag_logistic"}
     ),
     "chained": set(_CHAIN_EXPERT_IDS),
 }
@@ -777,6 +798,22 @@ class _StrategyState:
             strategy_id: deque(maxlen=_SKLEARN_SVM_RECENT_WINDOW)
             for strategy_id in _SKLEARN_SVM_EXPERT_IDS
         }
+        self.lag_logistic = (
+            SGDClassifier(
+                loss="log_loss",
+                penalty="l2",
+                alpha=0.001,
+                learning_rate="optimal",
+                fit_intercept=True,
+                average=True,
+                random_state=_RANDOM_SEED,
+            )
+            if "lag_logistic" in self.enabled_strategy_ids
+            else None
+        )
+        self.lag_logistic_fitted = False
+        self.lag_logistic_trained_draws = 0
+        self.lag_logistic_pending_features: np.ndarray | None = None
         self.cis_weights = [0.0] * (22 + len(_CIS_EXPERTS) * 4)
         self.cis_draw_count = 0
         self.cis_total_hits = {
@@ -1139,6 +1176,122 @@ class _StrategyState:
             )
         return scores, details
 
+    def _lag_logistic_features(self, number: int) -> tuple[float, ...]:
+        """Build compact candidate features shared across all 49 labels."""
+        lag_pattern = self._lag_logistic_pattern(number)
+        gap = self.current_gaps()[number]
+        mean_gap = self._mean_gap(number)
+        overdue = (
+            0.0
+            if mean_gap <= 0
+            else _clamp((gap - mean_gap) / mean_gap, -1, 1)
+        )
+        lifetime_rate = self.appearances[number] / max(self.draw_count, 1)
+        lifetime_residual = _clamp(
+            (lifetime_rate - _BASE_PROBABILITY) / _BASE_PROBABILITY,
+            -1,
+            1,
+        )
+        recent5 = self._sklearn_svm_recent_residual(number, 5)
+        recent20 = self._sklearn_svm_recent_residual(number, 20)
+        features = (
+            *(float(value) for value in lag_pattern),
+            sum(lag_pattern) / _LAG_LOGISTIC_LAG_COUNT,
+            min(gap / 40, 1),
+            float(gap == 1),
+            float(2 <= gap <= 4),
+            float(gap >= 12),
+            overdue,
+            lifetime_residual,
+            recent5,
+            recent20,
+            self._sklearn_svm_recent_residual(number, 100),
+            _clamp(recent5 - recent20, -1, 1),
+        )
+        if len(features) != _LAG_LOGISTIC_FEATURE_COUNT:
+            raise AssertionError(  # pragma: no cover - fixed schema invariant
+                "Unexpected Lagged Logistic feature count"
+            )
+        return features
+
+    def _lag_logistic_feature_matrix(self) -> np.ndarray:
+        return np.asarray(
+            [
+                self._lag_logistic_features(number)
+                for number in range(1, _NUMBER_COUNT + 1)
+            ],
+            dtype=float,
+        )
+
+    def _lag_logistic_pattern(self, number: int) -> tuple[int, ...]:
+        lag_draws = list(reversed(list(self.recent_draws)[-_LAG_LOGISTIC_LAG_COUNT:]))
+        return tuple(
+            int(lag_index < len(lag_draws) and number in lag_draws[lag_index])
+            for lag_index in range(_LAG_LOGISTIC_LAG_COUNT)
+        )
+
+    def _train_lag_logistic(self, drawn: set[int]) -> None:
+        if self.lag_logistic is None or self.lag_logistic_pending_features is None:
+            return
+        labels = np.asarray(
+            [int(number in drawn) for number in range(1, _NUMBER_COUNT + 1)]
+        )
+        if self.lag_logistic_fitted:
+            self.lag_logistic.partial_fit(
+                self.lag_logistic_pending_features,
+                labels,
+            )
+        else:
+            self.lag_logistic.partial_fit(
+                self.lag_logistic_pending_features,
+                labels,
+                classes=np.asarray([0, 1]),
+            )
+            self.lag_logistic_fitted = True
+        self.lag_logistic_trained_draws += 1
+
+    def _lag_logistic_scores(
+        self,
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        self.lag_logistic_pending_features = self._lag_logistic_feature_matrix()
+        model_ready = (
+            self.lag_logistic is not None
+            and self.lag_logistic_fitted
+            and self.lag_logistic_trained_draws
+            >= _LAG_LOGISTIC_MIN_TRAINING_DRAWS
+        )
+        if model_ready:
+            probabilities = self.lag_logistic.predict_proba(
+                self.lag_logistic_pending_features
+            )[:, 1]
+            scores = {
+                number: float(probabilities[number - 1])
+                for number in range(1, _NUMBER_COUNT + 1)
+            }
+            score_label = "Estimated hit probability"
+        else:
+            denominator = self.draw_count + _LAG_LOGISTIC_PRIOR_DRAWS
+            scores = {
+                number: (
+                    self.appearances[number]
+                    + _LAG_LOGISTIC_PRIOR_DRAWS * _BASE_PROBABILITY
+                )
+                / denominator
+                for number in range(1, _NUMBER_COUNT + 1)
+            }
+            score_label = "Cold-start probability"
+        details: dict[int, tuple[str, ...]] = {
+            number: (
+                f"{score_label} {scores[number]:.2%}",
+                "Lag 1/2/3 pattern "
+                + "/".join(str(value) for value in self._lag_logistic_pattern(number)),
+                f"Trained transitions {self.lag_logistic_trained_draws}",
+                "Compact shared model; no future-draw inputs",
+            )
+            for number in range(1, _NUMBER_COUNT + 1)
+        }
+        return scores, details
+
     def _cis_expert_accuracy(
         self,
         strategy_id: str,
@@ -1476,6 +1629,9 @@ class _StrategyState:
         if "sklearn_svm" in self.enabled_strategy_ids:
             self._train_sklearn_svm(drawn)
 
+        if "lag_logistic" in self.enabled_strategy_ids:
+            self._train_lag_logistic(drawn)
+
         if "mkfr" in self.enabled_strategy_ids:
             for number in range(1, _NUMBER_COUNT + 1):
                 target = int(number in drawn)
@@ -1664,7 +1820,7 @@ class _StrategyState:
             self.previous_draw = set(drawn)
         self.current_month = int(draw_date[5:7]) if draw_date else 0
         if self.enabled_strategy_ids.intersection(
-            {"co_occurrence", "predictive_grid", "svc", "tbl"}
+            {"co_occurrence", "lag_logistic", "predictive_grid", "svc", "tbl"}
         ):
             self.recent_draws.append(drawn)
         if "emd" in self.enabled_strategy_ids:
@@ -4225,6 +4381,27 @@ class _StrategyState:
                     sklearn_svm_scores,
                     gaps,
                     sklearn_svm_details,
+                )
+
+        if "lag_logistic" in enabled:
+            lag_logistic_scores, lag_logistic_details = (
+                self._lag_logistic_scores()
+            )
+            rankings["lag_logistic"] = _ranking_from_scores(
+                lag_logistic_scores,
+                gaps,
+            )
+            if "lag_logistic" in requested:
+                built["lag_logistic"] = _strategy(
+                    "lag_logistic",
+                    "Lagged Logistic",
+                    (
+                        "Compact online logistic model combining exact three-draw "
+                        "lags with leakage-safe gap and frequency context."
+                    ),
+                    lag_logistic_scores,
+                    gaps,
+                    lag_logistic_details,
                 )
 
         if "cis" in enabled:
