@@ -6037,6 +6037,11 @@ tbody tr:nth-child(even) {
   opacity: 0.6;
 }
 
+.draw-portfolio-results header button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 .draw-portfolio-summary {
   display: grid;
   grid-template-columns: repeat(6, minmax(120px, 1fr));
@@ -7208,4 +7213,138 @@ svg text {
 .prediction-efficacy-overview tr.is-tied td:nth-last-child(-n + 3),
 .prediction-efficacy-overview tr.is-pending td:nth-last-child(-n + 3) {
   color: var(--monokai-cyan);
+}
+
+@media print {
+  html.draw-portfolio-pdf-export,
+  html.draw-portfolio-pdf-export body,
+  html.draw-portfolio-pdf-export #app,
+  html.draw-portfolio-pdf-export .app-shell,
+  html.draw-portfolio-pdf-export .dashboard-layout,
+  html.draw-portfolio-pdf-export .workspace {
+    color-scheme: light;
+    background: #ffffff !important;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-shell {
+    min-height: 0;
+    padding: 0 !important;
+    color: #21384a !important;
+    background: #ffffff !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-controls,
+  html.draw-portfolio-pdf-export .portfolio-backtest-panel,
+  html.draw-portfolio-pdf-export .draw-portfolio-results > header > div:last-child {
+    display: none !important;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-header,
+  html.draw-portfolio-pdf-export .draw-portfolio-workspace,
+  html.draw-portfolio-pdf-export .draw-portfolio-disclaimer {
+    max-width: none;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-header {
+    margin-bottom: 4mm;
+    break-inside: avoid;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-header h1,
+  html.draw-portfolio-pdf-export .draw-portfolio-pool h2,
+  html.draw-portfolio-pdf-export .draw-portfolio-results h2 {
+    color: #21384a !important;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-header > div > p:last-child,
+  html.draw-portfolio-pdf-export .draw-portfolio-pool header p,
+  html.draw-portfolio-pdf-export .draw-portfolio-results header p {
+    color: #607587 !important;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-target,
+  html.draw-portfolio-pdf-export .draw-portfolio-summary article,
+  html.draw-portfolio-pdf-export .draw-portfolio-pool,
+  html.draw-portfolio-pdf-export .draw-portfolio-results {
+    border-color: #cadbe4 !important;
+    color: #21384a !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-target dt,
+  html.draw-portfolio-pdf-export .draw-portfolio-results dt,
+  html.draw-portfolio-pdf-export .draw-portfolio-summary span,
+  html.draw-portfolio-pdf-export .draw-portfolio-summary small,
+  html.draw-portfolio-pdf-export .draw-portfolio-pool li > span,
+  html.draw-portfolio-pdf-export .draw-portfolio-pool li > small,
+  html.draw-portfolio-pdf-export .draw-portfolio-index {
+    color: #657d8d !important;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-summary {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 2mm;
+    break-inside: avoid;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-summary article {
+    min-height: 18mm;
+    padding: 2.5mm;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-summary strong {
+    color: #155c70 !important;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-pool,
+  html.draw-portfolio-pdf-export .draw-portfolio-results {
+    padding: 3mm;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-pool {
+    break-inside: avoid;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-pool ol {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 2mm;
+    margin-top: 3mm;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-pool li,
+  html.draw-portfolio-pdf-export .draw-portfolio-results > ol > li {
+    border-color: #d3e1e8 !important;
+    color: #21384a !important;
+    background: #f9fcfd !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-results {
+    break-inside: auto;
+    break-before: page;
+    page-break-before: always;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-results > ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2mm;
+    margin-top: 3mm;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-results > ol > li {
+    gap: 2.5mm;
+    padding: 2.5mm;
+  }
+
+  html.draw-portfolio-pdf-export .draw-portfolio-disclaimer {
+    margin-top: 3mm;
+    border-left-color: #e2a638 !important;
+    color: #645b46 !important;
+    background: #fff9e8 !important;
+    break-inside: avoid;
+  }
 }

@@ -507,6 +507,10 @@ export interface DrawComparisonPdfRequest {
   suggestedName: string;
 }
 
+export interface DrawPortfolioPdfRequest {
+  suggestedName: string;
+}
+
 export type PossibleDrawNumberState = "possible" | "for-sure";
 
 export interface PossibleDrawNumberRequest {
@@ -546,6 +550,7 @@ export interface DesktopApi {
   saveDrawComparisonPdf(
     request: DrawComparisonPdfRequest,
   ): Promise<ExportResult>;
+  saveDrawPortfolioPdf(request: DrawPortfolioPdfRequest): Promise<ExportResult>;
   printDrawComparison(): Promise<void>;
   showForSureLimitError(number: number): Promise<void>;
   getDrawEditorData(): Promise<DrawEditorData>;

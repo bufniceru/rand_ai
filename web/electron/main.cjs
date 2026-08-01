@@ -1043,6 +1043,35 @@ ipcMain.handle("draw-comparison:save-pdf", async (event, request) => {
   return { canceled: false, path: result.filePath };
 });
 
+ipcMain.handle("draw-portfolio:save-pdf", async (event, request) => {
+  const parent = BrowserWindow.fromWebContents(event.sender) ?? mainWindow;
+  const requestedName =
+    typeof request?.suggestedName === "string"
+      ? path.basename(request.suggestedName)
+      : "rand-ai-draw-portfolio.pdf";
+  const safeStem =
+    requestedName
+      .replace(/\.pdf$/i, "")
+      .replace(/[^a-zA-Z0-9._-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "rand-ai-draw-portfolio";
+  const result = await dialog.showSaveDialog(parent, {
+    title: "Save draw portfolio",
+    defaultPath: `${safeStem}.pdf`,
+    filters: [{ name: "PDF document", extensions: ["pdf"] }],
+  });
+  if (result.canceled || !result.filePath) {
+    return { canceled: true };
+  }
+  const pdf = await event.sender.printToPDF({
+    printBackground: true,
+    landscape: true,
+    pageSize: "A4",
+    preferCSSPageSize: true,
+  });
+  fs.writeFileSync(result.filePath, pdf);
+  return { canceled: false, path: result.filePath };
+});
+
 ipcMain.handle("draw-comparison:print", async (event) => {
   await new Promise((resolve, reject) => {
     event.sender.print(

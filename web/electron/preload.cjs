@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld("randAiDesktop", {
   exportAnalysis: (request) => ipcRenderer.invoke("analysis:export", request),
   saveDrawComparisonPdf: (request) =>
     ipcRenderer.invoke("draw-comparison:save-pdf", request),
+  saveDrawPortfolioPdf: (request) =>
+    ipcRenderer.invoke("draw-portfolio:save-pdf", request),
   printDrawComparison: () => ipcRenderer.invoke("draw-comparison:print"),
   showForSureLimitError: (number) =>
     ipcRenderer.invoke("possible-draw:for-sure-limit-error", number),

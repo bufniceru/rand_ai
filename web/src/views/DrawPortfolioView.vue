@@ -31,6 +31,8 @@ const requestedDrawCount = ref(10);
 const result = ref<DrawPortfolioResult | null>(null);
 const generating = ref(false);
 const copyMessage = ref("");
+const pdfSaving = ref(false);
+const pdfMessage = ref("");
 const generationMessage = ref("");
 const simulationPortfolioSize = ref(10);
 const simulationResult = ref<PortfolioBacktestResult | null>(null);
@@ -85,6 +87,7 @@ async function generate(): Promise<void> {
   if (!suite || predictiveStrategyCount.value === 0) return;
   generating.value = true;
   copyMessage.value = "";
+  pdfMessage.value = "";
   generationMessage.value = "";
   await nextTick();
   await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
@@ -116,6 +119,39 @@ async function copyAll(): Promise<void> {
     copyMessage.value = `${result.value.draws.length} draws copied.`;
   } catch {
     copyMessage.value = "Clipboard access failed. Select and copy the draws manually.";
+  }
+}
+
+function suggestedPdfName(): string {
+  const suite = latestSuite.value;
+  if (!suite) return "rand-ai-draw-portfolio.pdf";
+  return `rand-ai-draw-portfolio-target-${suite.targetDrawNumber}.pdf`;
+}
+
+async function savePdf(): Promise<void> {
+  if (!result.value) return;
+  const api = window.randAiDesktop;
+  if (!api) {
+    pdfMessage.value = "PDF saving is available inside the desktop app.";
+    return;
+  }
+
+  pdfSaving.value = true;
+  pdfMessage.value = "";
+  document.documentElement.classList.add("draw-portfolio-pdf-export");
+  try {
+    await nextTick();
+    const exportResult = await api.saveDrawPortfolioPdf({
+      suggestedName: suggestedPdfName(),
+    });
+    pdfMessage.value = exportResult.canceled
+      ? "PDF saving canceled."
+      : `PDF saved to ${exportResult.path ?? "the selected location"}.`;
+  } catch (error) {
+    pdfMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    document.documentElement.classList.remove("draw-portfolio-pdf-export");
+    pdfSaving.value = false;
   }
 }
 
@@ -269,6 +305,7 @@ watch(
   () => {
     result.value = null;
     copyMessage.value = "";
+    pdfMessage.value = "";
     generationMessage.value = "";
     if (simulationRunning.value) cancelSimulation();
     simulationResult.value = null;
@@ -410,9 +447,17 @@ onBeforeUnmount(() => {
               <h2 id="portfolio-results-title">Generated draws</h2>
               <p>Sorted numbers · model-relative score · overlap with another draw</p>
             </div>
-            <div>
+            <div class="draw-portfolio-result-actions">
               <button type="button" @click="copyAll">Copy All</button>
-              <span role="status">{{ copyMessage }}</span>
+              <button
+                type="button"
+                :disabled="pdfSaving || generating"
+                @click="savePdf"
+              >
+                {{ pdfSaving ? "Generating PDF…" : "Save PDF" }}
+              </button>
+              <span v-if="copyMessage" role="status">{{ copyMessage }}</span>
+              <span v-if="pdfMessage" role="status">{{ pdfMessage }}</span>
             </div>
           </header>
           <ol>
