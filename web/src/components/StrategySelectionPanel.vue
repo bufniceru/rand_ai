@@ -74,7 +74,7 @@ function applySelection(): void {
     <header>
       <div>
         <strong>Calculated strategies</strong>
-        <small>Unchecked strategies are excluded after reanalysis.</small>
+        <small>Only strategies enabled in Settings are shown.</small>
       </div>
       <b>{{ selectedCount }} of {{ plugins.length }}</b>
     </header>

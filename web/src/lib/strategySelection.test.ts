@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { StrategyPlugin } from "../types";
 import {
+  enabledStrategyPlugins,
   orderedStrategySelection,
   strategySelectionsEqual,
 } from "./strategySelection";
@@ -12,6 +13,12 @@ const plugins: StrategyPlugin[] = [
 ];
 
 describe("strategy selection", () => {
+  it("shows only strategies enabled in Settings", () => {
+    expect(
+      enabledStrategyPlugins(plugins, ["proximity", "freshness"]),
+    ).toEqual(plugins.slice(0, 2));
+  });
+
   it("returns selected strategies in canonical plugin order", () => {
     expect(
       orderedStrategySelection(plugins, ["chained", "freshness"]),

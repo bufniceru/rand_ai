@@ -15,6 +15,7 @@ import {
 } from "../lib/familyEfficacy";
 import { groupStrategiesByFamily } from "../lib/strategyFamilies";
 import { strategyColor } from "../lib/strategyColors";
+import { enabledStrategyPlugins } from "../lib/strategySelection";
 import type { EfficacyChartRow } from "../lib/efficacyChart";
 import type {
   PossibleDrawNumberState,
@@ -71,6 +72,9 @@ const selectedIndex = computed(() =>
   Math.max(0, props.predictionSuites.length - 1 - referenceOffset.value),
 );
 const selectedPrediction = computed(() => props.predictionSuites[selectedIndex.value] ?? null);
+const selectableStrategyPlugins = computed(() =>
+  enabledStrategyPlugins(props.strategyPlugins, props.enabledStrategyIds),
+);
 const selectedStrategy = computed(
   () =>
     selectedStrategyId.value === "all"
@@ -751,7 +755,7 @@ onBeforeUnmount(clearNumberActionTimer);
           aria-labelledby="prediction-control-tab-selection"
         >
           <StrategySelectionPanel
-            :plugins="strategyPlugins"
+            :plugins="selectableStrategyPlugins"
             :enabled-strategy-ids="enabledStrategyIds"
             :busy="strategySelectionBusy"
             @apply="emit('applyStrategies', $event)"
@@ -1313,15 +1317,17 @@ onBeforeUnmount(clearNumberActionTimer);
     </strong>
     <p>
       {{
-        enabledStrategyIds.length === 0 || selectedPrediction
-          ? "Select at least one strategy below and apply the selection."
+        enabledStrategyIds.length === 0
+          ? "Enable at least one strategy in Settings and run the analysis again."
+          : selectedPrediction
+            ? "The enabled selection produced no strategy results."
           : "The imported dataset does not contain any draws."
       }}
     </p>
     <StrategySelectionPanel
-      v-if="strategyPlugins.length > 0"
+      v-if="selectableStrategyPlugins.length > 0"
       class="prediction-empty-strategy-selection"
-      :plugins="strategyPlugins"
+      :plugins="selectableStrategyPlugins"
       :enabled-strategy-ids="enabledStrategyIds"
       :busy="strategySelectionBusy"
       @apply="emit('applyStrategies', $event)"
