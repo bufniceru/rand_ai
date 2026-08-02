@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { groupStrategiesByFamily } from "../lib/strategyFamilies";
 import type { StrategyId, StrategyPlugin } from "../types";
 
 const props = defineProps<{
@@ -56,6 +57,7 @@ const strategyDescriptions: Record<StrategyId, string> = {
 };
 
 const selectedCount = computed(() => selectedStrategyIds.value.size);
+const groupedPlugins = computed(() => groupStrategiesByFamily(props.plugins));
 const selectedIdsInPluginOrder = computed(() =>
   props.plugins
     .map((plugin) => plugin.id)
@@ -153,30 +155,43 @@ onMounted(() => dialog.value?.focus());
         </button>
       </div>
 
-      <div class="strategy-settings-grid">
-        <label
-          v-for="plugin in plugins"
-          :key="plugin.id"
-          class="strategy-setting-option"
-          :class="{ enabled: selectedStrategyIds.has(plugin.id) }"
+      <div class="strategy-settings-families">
+        <section
+          v-for="family in groupedPlugins"
+          :key="family.id"
+          class="settings-strategy-family"
+          :style="{ '--family-color': family.color }"
+          :aria-labelledby="`settings-strategy-family-${family.id}`"
         >
-          <input
-            type="checkbox"
-            :checked="selectedStrategyIds.has(plugin.id)"
-            :disabled="saving"
-            @change="
-              setStrategyEnabled(
-                plugin.id,
-                ($event.target as HTMLInputElement).checked,
-              )
-            "
-          >
-          <span class="strategy-setting-check" aria-hidden="true" />
-          <span>
-            <strong>{{ plugin.label }}</strong>
-            <small>{{ strategyDescriptions[plugin.id] }}</small>
-          </span>
-        </label>
+          <h3 :id="`settings-strategy-family-${family.id}`">
+            {{ family.label }}
+          </h3>
+          <div>
+            <label
+              v-for="plugin in family.strategies"
+              :key="plugin.id"
+              class="strategy-setting-option"
+              :class="{ enabled: selectedStrategyIds.has(plugin.id) }"
+            >
+              <input
+                type="checkbox"
+                :checked="selectedStrategyIds.has(plugin.id)"
+                :disabled="saving"
+                @change="
+                  setStrategyEnabled(
+                    plugin.id,
+                    ($event.target as HTMLInputElement).checked,
+                  )
+                "
+              >
+              <span class="strategy-setting-check" aria-hidden="true" />
+              <span>
+                <strong>{{ plugin.label }}</strong>
+                <small>{{ strategyDescriptions[plugin.id] }}</small>
+              </span>
+            </label>
+          </div>
+        </section>
       </div>
 
       <p class="settings-dialog-note">

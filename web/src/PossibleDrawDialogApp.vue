@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { strategyColor } from "./lib/strategyColors";
 import type {
   CombinedPredictionDialogData,
   PossibleDrawNumberRequest,
@@ -510,25 +511,6 @@ function strategyFullName(strategy: StrategyPrediction): string {
   }[strategy.id] ?? strategy.name;
 }
 
-function cardColor(id: string): string {
-  return {
-    freshness: "#f58a59", proximity: "#efb23e", emd: "#d9a531",
-    entropy: "#c95d42", markov100: "#f3b94e", mkfr: "#1f8f75",
-    mksp: "#517aa3",
-    mknp: "#2f7f9f",
-    mkrd: "#6d5aa8",
-    chi_square: "#6256c7", bayesian: "#d477b8",
-    predictive_grid: "#008ca8", co_occurrence: "#4f7f3f",
-    doublet_triplet_markov: "#7c3aed", mixed: "#dd6b20",
-    svc: "#9567e8", tbl: "#1695a8", sklearn_svm: "#2fb7a8",
-    lag_logistic: "#e8793e", sparse_neural_ticket: "#d4a72c",
-    cis: "#b12f67",
-    fresh_random: "#7b56c2", randomness: "#3264ad",
-    residual_coverage: "#0f766e",
-    chained: "#9a3412",
-  }[id] ?? "#6e8195";
-}
-
 function acceptData(data: CombinedPredictionDialogData): void {
   if (focusedNumber.value === null) {
     focusedNumber.value = data.possibleDraw.lastSeenRows[0]?.number ?? 1;
@@ -760,7 +742,7 @@ onBeforeUnmount(() => {
               v-for="strategy in orderedStrategies"
               :key="strategy.id"
               class="prediction-meter-card"
-              :style="{ '--meter-color': cardColor(strategy.id) }"
+              :style="{ '--meter-color': strategyColor(strategy.id) }"
               :title="strategyMeterTitle(strategy)"
             >
               <h2>{{ strategyFullName(strategy) }}</h2>

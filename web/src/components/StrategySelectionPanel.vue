@@ -104,6 +104,7 @@ function applySelection(): void {
         v-for="family in groupedPlugins"
         :key="family.id"
         class="strategy-selection-family"
+        :style="{ '--family-color': family.color }"
         :aria-labelledby="`strategy-selection-family-${family.id}`"
       >
         <h3 :id="`strategy-selection-family-${family.id}`">
@@ -226,6 +227,7 @@ function applySelection(): void {
   margin: 0;
   padding: 5px 7px 3px;
   border-bottom: 1px solid var(--monokai-border, #c8d8e7);
+  border-left: 4px solid var(--family-color, #496984);
   color: var(--monokai-muted, #496984);
   font-size: 8px;
   font-weight: 950;

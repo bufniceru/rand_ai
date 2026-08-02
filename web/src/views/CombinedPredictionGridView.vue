@@ -14,6 +14,7 @@ import {
   type FamilyEfficacy,
 } from "../lib/familyEfficacy";
 import { groupStrategiesByFamily } from "../lib/strategyFamilies";
+import { strategyColor } from "../lib/strategyColors";
 import type { EfficacyChartRow } from "../lib/efficacyChart";
 import type {
   PossibleDrawNumberState,
@@ -484,37 +485,7 @@ function strategyFullName(strategy: StrategyPrediction): string {
   }[strategy.id] ?? strategy.name;
 }
 
-function strategyColor(strategyId: string): string {
-  return {
-    proximity: "#ffd866",
-    freshness: "#fc9867",
-    emd: "#a9dc76",
-    randomness: "#78dce8",
-    fresh_random: "#ab9df2",
-    chi_square: "#ab9df2",
-    entropy: "#ff6188",
-    markov100: "#ffd866",
-    mkfr: "#a9dc76",
-    mksp: "#78dce8",
-    mknp: "#78dce8",
-    mkrd: "#ab9df2",
-    bayesian: "#ff6188",
-    predictive_grid: "#78dce8",
-    co_occurrence: "#a9dc76",
-    doublet_triplet_markov: "#ab9df2",
-    mixed: "#fc9867",
-    svc: "#ab9df2",
-    tbl: "#78dce8",
-    sklearn_svm: "#2fb7a8",
-    lag_logistic: "#e8793e",
-    sparse_neural_ticket: "#d4a72c",
-    cis: "#ff6188",
-    residual_coverage: "#a9dc76",
-    chained: "#fc9867",
-  }[strategyId] ?? "#727072";
-}
-
-function strategyDisplayColor(strategyId: string): string {
+function strategyDisplayColor(strategyId: StrategyId): string {
   return mutedStrategyIds.value.has(strategyId)
     ? "#ffffff"
     : strategyColor(strategyId);
@@ -824,6 +795,7 @@ onBeforeUnmount(clearNumberActionTimer);
               v-for="group in groupedFamilyEfficacyRanking"
               :key="group.id"
               class="prediction-strategy-family"
+              :style="{ '--family-color': group.color }"
               :aria-labelledby="`prediction-color-family-${group.id}`"
             >
               <h3 :id="`prediction-color-family-${group.id}`">
