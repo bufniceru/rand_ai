@@ -1,6 +1,6 @@
 import type { StrategyId } from "../types";
 
-export const STRATEGY_CATEGORIES = [
+export const STRATEGY_FAMILIES = [
   { id: "frequency-recency", label: "Frequency & Recency" },
   { id: "shape-similarity", label: "Shape & Similarity" },
   { id: "markov-sequence", label: "Markov & Sequence" },
@@ -12,9 +12,9 @@ export const STRATEGY_CATEGORIES = [
   { id: "random-baselines", label: "Random Baselines" },
 ] as const;
 
-export type StrategyCategoryId = (typeof STRATEGY_CATEGORIES)[number]["id"];
+export type StrategyFamilyId = (typeof STRATEGY_FAMILIES)[number]["id"];
 
-export const STRATEGY_CATEGORY_BY_ID = {
+export const STRATEGY_FAMILY_BY_ID = {
   proximity: "shape-similarity",
   freshness: "frequency-recency",
   emd: "shape-similarity",
@@ -40,29 +40,41 @@ export const STRATEGY_CATEGORY_BY_ID = {
   cis: "ensembles-coverage",
   residual_coverage: "ensembles-coverage",
   chained: "ensembles-coverage",
-} as const satisfies Record<StrategyId, StrategyCategoryId>;
+} as const satisfies Record<StrategyId, StrategyFamilyId>;
 
-export interface StrategyCategoryGroup<T> {
-  id: StrategyCategoryId;
+export interface StrategyFamilyGroup<T> {
+  id: StrategyFamilyId;
   label: string;
   strategies: T[];
 }
 
-export function groupStrategiesByCategory<T extends { id: StrategyId }>(
+export function groupStrategiesByFamily<T extends { id: StrategyId }>(
   strategies: readonly T[],
-): StrategyCategoryGroup<T>[] {
-  const strategiesByCategory = new Map<StrategyCategoryId, T[]>(
-    STRATEGY_CATEGORIES.map((category) => [category.id, []]),
+  rankedFamilyIds: readonly StrategyFamilyId[] = STRATEGY_FAMILIES.map(
+    (family) => family.id,
+  ),
+): StrategyFamilyGroup<T>[] {
+  const strategiesByFamily = new Map<StrategyFamilyId, T[]>(
+    STRATEGY_FAMILIES.map((family) => [family.id, []]),
   );
 
   for (const strategy of strategies) {
-    strategiesByCategory.get(STRATEGY_CATEGORY_BY_ID[strategy.id])?.push(strategy);
+    strategiesByFamily.get(STRATEGY_FAMILY_BY_ID[strategy.id])?.push(strategy);
   }
 
-  return STRATEGY_CATEGORIES.flatMap((category) => {
-    const groupedStrategies = strategiesByCategory.get(category.id) ?? [];
-    return groupedStrategies.length > 0
-      ? [{ ...category, strategies: groupedStrategies }]
+  const familyById = new Map(
+    STRATEGY_FAMILIES.map((family) => [family.id, family]),
+  );
+  const uniqueRankedIds = [...new Set(rankedFamilyIds)];
+  const remainingIds = STRATEGY_FAMILIES.map((family) => family.id).filter(
+    (familyId) => !uniqueRankedIds.includes(familyId),
+  );
+
+  return [...uniqueRankedIds, ...remainingIds].flatMap((familyId) => {
+    const family = familyById.get(familyId);
+    const groupedStrategies = strategiesByFamily.get(familyId) ?? [];
+    return family && groupedStrategies.length > 0
+      ? [{ ...family, strategies: groupedStrategies }]
       : [];
   });
 }

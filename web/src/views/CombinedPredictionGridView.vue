@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import EfficacyComparisonChart from "../components/EfficacyComparisonChart.vue";
 import {
   RANDOM_BENCHMARK_SIMULATIONS,
   randomTailProbability,
-  runRandomBenchmark,
+  runPooledRandomBenchmarks,
   type RandomBenchmarkSummary,
 } from "../lib/randomBenchmark";
-import { groupStrategiesByCategory } from "../lib/strategyCategories";
+import {
+  RANDOM_HITS_PER_EVALUATION,
+  buildFamilyEfficacy,
+  type FamilyEfficacy,
+} from "../lib/familyEfficacy";
+import { groupStrategiesByFamily } from "../lib/strategyFamilies";
+import type { EfficacyChartRow } from "../lib/efficacyChart";
 import type {
   PossibleDrawNumberState,
   PredictionSuite,
@@ -35,9 +42,12 @@ const selectedCoverageThreshold = ref<number | null>(null);
 const mutedStrategyIds = ref<Set<string>>(new Set());
 const isNumbersGridExpanded = ref(true);
 const isEfficacyExpanded = ref(true);
+const isFamilyEfficacyExpanded = ref(true);
 const efficacyDrawCount = ref(0);
 const efficacyRangeAnchor = ref<"first" | "latest">("first");
-const efficacyRandomBenchmark = shallowRef<RandomBenchmarkSummary | null>(null);
+const efficacyRandomBenchmarks = shallowRef<
+  ReadonlyMap<number, RandomBenchmarkSummary>
+>(new Map());
 const efficacyRetestCount = ref(0);
 const isEfficacyRetesting = ref(false);
 const selectedPredictionNumber = ref<number | null>(null);
@@ -146,6 +156,9 @@ const efficacySelectionKey = computed(() =>
     .map((record) => record.targetDrawNumber)
     .join(","),
 );
+const efficacyRandomBenchmark = computed(
+  () => efficacyRandomBenchmarks.value.get(1) ?? null,
+);
 const efficacyByStrategy = computed(() => {
   const records = selectedEfficacyHistory.value;
   const evaluatedDraws = records.length;
@@ -187,8 +200,8 @@ const efficacyRangeLabel = computed(() => {
   return `Target draws ${records[0].targetDrawNumber}–${records.at(-1)?.targetDrawNumber}`;
 });
 const efficacyRandomDatasetLabel = computed(() =>
-  efficacyRandomBenchmark.value
-    ? `${RANDOM_BENCHMARK_SIMULATIONS.toLocaleString()} datasets · run #${efficacyRetestCount.value}`
+  efficacyRandomBenchmarks.value.size > 0
+    ? `${RANDOM_BENCHMARK_SIMULATIONS.toLocaleString()} pooled datasets · run #${efficacyRetestCount.value}`
     : "Exact mean · run for 95% interval",
 );
 const efficacyRandomRangeLabel = computed(() => {
@@ -202,17 +215,54 @@ const efficacyRanking = computed(() =>
     const leftEfficacy = efficacyByStrategy.value.get(left.id);
     const rightEfficacy = efficacyByStrategy.value.get(right.id);
     const difference =
-      (rightEfficacy?.hitDifference ?? -Number.MAX_SAFE_INTEGER) -
-      (leftEfficacy?.hitDifference ?? -Number.MAX_SAFE_INTEGER);
+      (rightEfficacy?.averageHitsPerDraw ?? -Number.MAX_SAFE_INTEGER) -
+      (leftEfficacy?.averageHitsPerDraw ?? -Number.MAX_SAFE_INTEGER);
     if (difference !== 0) return difference;
-    const hitDifference =
-      (rightEfficacy?.strategyHits ?? 0) - (leftEfficacy?.strategyHits ?? 0);
-    if (hitDifference !== 0) return hitDifference;
     return left.name.localeCompare(right.name);
   }),
 );
-const groupedEfficacyRanking = computed(() =>
-  groupStrategiesByCategory(efficacyRanking.value),
+const familyEfficacyRanking = computed(() =>
+  buildFamilyEfficacy(
+    selectedPrediction.value?.strategies ?? [],
+    efficacyByStrategy.value,
+    selectedEfficacyHistory.value.length,
+    efficacyRandomBenchmarks.value,
+  ),
+);
+const groupedFamilyEfficacyRanking = computed(() =>
+  groupStrategiesByFamily(
+    efficacyRanking.value,
+    familyEfficacyRanking.value.map((family) => family.id),
+  ),
+);
+const familyStrategyCounts = computed(() => [
+  ...new Set(familyEfficacyRanking.value.map((family) => family.strategyCount)),
+]);
+const strategyEfficacyChartRows = computed<EfficacyChartRow[]>(() =>
+  selectedEfficacyHistory.value.length === 0
+    ? []
+    : efficacyRanking.value.map((strategy) => {
+        const efficacy = efficacyFor(strategy);
+        const rate = efficacy?.averageHitsPerDraw ?? 0;
+        return {
+          id: strategy.id,
+          label: strategyFullName(strategy),
+          rate,
+          normalizedLift: rate - RANDOM_HITS_PER_EVALUATION,
+          detail: `${efficacy?.evaluatedDraws ?? 0} selected draws`,
+        };
+      }),
+);
+const familyEfficacyChartRows = computed<EfficacyChartRow[]>(() =>
+  selectedEfficacyHistory.value.length === 0
+    ? []
+    : familyEfficacyRanking.value.map((family) => ({
+        id: family.id,
+        label: family.label,
+        rate: family.hitsPerEvaluation,
+        normalizedLift: family.normalizedLift,
+        detail: `${family.strategyCount} enabled strategies · ${family.evaluations} strategy-draw evaluations`,
+      })),
 );
 
 watch(
@@ -238,7 +288,7 @@ watch(
 );
 
 watch(efficacySelectionKey, () => {
-  efficacyRandomBenchmark.value = null;
+  efficacyRandomBenchmarks.value = new Map();
   efficacyRetestCount.value = 0;
   isEfficacyRetesting.value = false;
 });
@@ -309,7 +359,10 @@ async function retestRandomDataset(): Promise<void> {
   await nextTick();
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   try {
-    efficacyRandomBenchmark.value = runRandomBenchmark(drawCount);
+    efficacyRandomBenchmarks.value = runPooledRandomBenchmarks(
+      drawCount,
+      [1, ...familyStrategyCounts.value],
+    );
     efficacyRetestCount.value += 1;
   } finally {
     isEfficacyRetesting.value = false;
@@ -339,6 +392,54 @@ function efficacyClass(efficacy: StrategyEfficacy | null): string {
   if (efficacy.hitDifference > 0) return "is-ahead";
   if (efficacy.hitDifference < 0) return "is-behind";
   return "is-tied";
+}
+
+function familyRandomRangeLabel(family: FamilyEfficacy): string {
+  const benchmark = family.randomBenchmark;
+  return benchmark
+    ? `${benchmark.lower95Hits}–${benchmark.upper95Hits}`
+    : "Run Retest";
+}
+
+function familyRandomTailLabel(family: FamilyEfficacy): string {
+  const benchmark = family.randomBenchmark;
+  if (!benchmark) return "Run Retest";
+  const probability = randomTailProbability(benchmark, family.familyHits);
+  if (probability < 0.001) return "<0.1%";
+  if (probability < 0.1) return `${(probability * 100).toFixed(1)}%`;
+  return `${Math.round(probability * 100)}%`;
+}
+
+function familyLiftLabel(family: FamilyEfficacy): string {
+  if (family.evaluations === 0) return "Awaiting results";
+  const lift = family.normalizedLift.toFixed(3);
+  return family.normalizedLift > 0 ? `+${lift}` : lift;
+}
+
+function familyVerdict(family: FamilyEfficacy): string {
+  if (family.evaluations === 0) return "No completed predictions yet";
+  if (family.normalizedLift > 0) return "Beats random mean";
+  if (family.normalizedLift < 0) return "Trails random mean";
+  return "Tied with random mean";
+}
+
+function familyEfficacyClass(family: FamilyEfficacy): string {
+  if (family.evaluations === 0) return "is-pending";
+  if (family.normalizedLift > 0) return "is-ahead";
+  if (family.normalizedLift < 0) return "is-behind";
+  return "is-tied";
+}
+
+function familyStrategyNames(family: FamilyEfficacy): string {
+  const names = new Map(
+    (selectedPrediction.value?.strategies ?? []).map((strategy) => [
+      strategy.id,
+      strategyFullName(strategy),
+    ]),
+  );
+  return family.strategyIds
+    .map((strategyId) => names.get(strategyId) ?? strategyId)
+    .join(", ");
 }
 
 function strategyFullName(strategy: StrategyPrediction): string {
@@ -681,12 +782,12 @@ onBeforeUnmount(clearNumberActionTimer);
               <span>All colors</span>
             </label>
             <section
-              v-for="group in groupedEfficacyRanking"
+              v-for="group in groupedFamilyEfficacyRanking"
               :key="group.id"
-              class="prediction-strategy-category"
-              :aria-labelledby="`prediction-color-category-${group.id}`"
+              class="prediction-strategy-family"
+              :aria-labelledby="`prediction-color-family-${group.id}`"
             >
-              <h3 :id="`prediction-color-category-${group.id}`">
+              <h3 :id="`prediction-color-family-${group.id}`">
                 {{ group.label }}
               </h3>
               <label
@@ -894,23 +995,83 @@ onBeforeUnmount(clearNumberActionTimer);
 
         <template v-if="selectedStrategyId === 'all'">
           <section
+            class="prediction-efficacy-controls"
+            aria-label="Historical efficacy comparison controls"
+          >
+            <header>
+              <strong>Historical efficacy comparison</strong>
+              <small>Uniform expectation: 0.735 hits per strategy-draw</small>
+            </header>
+            <div class="efficacy-range-controls">
+              <label class="efficacy-count-control">
+                <span>Completed draws to compare</span>
+                <input
+                  v-model.number="efficacyDrawCount"
+                  type="number"
+                  min="1"
+                  :max="maximumEfficacyDraws"
+                  :disabled="maximumEfficacyDraws === 0"
+                  @change="normalizeEfficacyDrawCount"
+                />
+                <small>Maximum {{ maximumEfficacyDraws }}</small>
+              </label>
+              <fieldset>
+                <legend>Take records from</legend>
+                <label>
+                  <input
+                    v-model="efficacyRangeAnchor"
+                    type="radio"
+                    value="first"
+                  />
+                  <span>First N — top to bottom</span>
+                </label>
+                <label>
+                  <input
+                    v-model="efficacyRangeAnchor"
+                    type="radio"
+                    value="latest"
+                  />
+                  <span>Latest N records</span>
+                </label>
+              </fieldset>
+              <output>
+                <strong>{{ appliedEfficacyDrawCount }} draws</strong>
+                <span>{{ efficacyRangeLabel }}</span>
+              </output>
+              <div class="efficacy-retest-control">
+                <button
+                  type="button"
+                  :disabled="
+                    selectedEfficacyHistory.length === 0 || isEfficacyRetesting
+                  "
+                  title="Run 10,000 random Top-6 datasets for the strategy and family reports"
+                  @click="retestRandomDataset"
+                >
+                  {{ isEfficacyRetesting ? "Retesting…" : "Retest" }}
+                </button>
+                <small>{{ efficacyRandomDatasetLabel }}</small>
+              </div>
+            </div>
+          </section>
+
+          <section
             class="prediction-efficacy-overview"
             :class="{ 'is-collapsed': !isEfficacyExpanded }"
             aria-label="All strategies compared with random selections"
           >
             <header>
               <div>
-                <strong>Historical efficacy versus random</strong>
+                <strong>Historical strategies efficacy versus random</strong>
               </div>
               <div class="prediction-collapsible-actions">
-                <small>Uniform expectation: 0.735 hits per draw</small>
+                <small>{{ efficacyRanking.length }} enabled strategies</small>
                 <button
                   type="button"
                   class="prediction-collapsible-toggle"
                   :aria-expanded="isEfficacyExpanded"
-                  aria-controls="prediction-efficacy-panel"
-                  :aria-label="isEfficacyExpanded ? 'Collapse historical efficacy report' : 'Expand historical efficacy report'"
-                  :title="isEfficacyExpanded ? 'Collapse historical efficacy report' : 'Expand historical efficacy report'"
+                  aria-controls="prediction-strategy-efficacy-panel"
+                  :aria-label="isEfficacyExpanded ? 'Collapse historical strategies efficacy report' : 'Expand historical strategies efficacy report'"
+                  :title="isEfficacyExpanded ? 'Collapse historical strategies efficacy report' : 'Expand historical strategies efficacy report'"
                   @click="isEfficacyExpanded = !isEfficacyExpanded"
                 >
                   {{ isEfficacyExpanded ? "«" : "»" }}
@@ -919,58 +1080,8 @@ onBeforeUnmount(clearNumberActionTimer);
             </header>
             <div
               v-show="isEfficacyExpanded"
-              id="prediction-efficacy-panel"
+              id="prediction-strategy-efficacy-panel"
             >
-              <div class="efficacy-range-controls">
-                <label class="efficacy-count-control">
-                  <span>Completed draws to compare</span>
-                  <input
-                    v-model.number="efficacyDrawCount"
-                    type="number"
-                    min="1"
-                    :max="maximumEfficacyDraws"
-                    :disabled="maximumEfficacyDraws === 0"
-                    @change="normalizeEfficacyDrawCount"
-                  />
-                  <small>Maximum {{ maximumEfficacyDraws }}</small>
-                </label>
-                <fieldset>
-                  <legend>Take records from</legend>
-                  <label>
-                    <input
-                      v-model="efficacyRangeAnchor"
-                      type="radio"
-                      value="first"
-                    />
-                    <span>First N — top to bottom</span>
-                  </label>
-                  <label>
-                    <input
-                      v-model="efficacyRangeAnchor"
-                      type="radio"
-                      value="latest"
-                    />
-                    <span>Latest N records</span>
-                  </label>
-                </fieldset>
-                <output>
-                  <strong>{{ appliedEfficacyDrawCount }} tests</strong>
-                  <span>{{ efficacyRangeLabel }}</span>
-                </output>
-                <div class="efficacy-retest-control">
-                  <button
-                    type="button"
-                    :disabled="
-                      selectedEfficacyHistory.length === 0 || isEfficacyRetesting
-                    "
-                    title="Run 10,000 random Top-6 datasets for the selected historical draws"
-                    @click="retestRandomDataset"
-                  >
-                    {{ isEfficacyRetesting ? "Retesting…" : "Retest" }}
-                  </button>
-                  <small>{{ efficacyRandomDatasetLabel }}</small>
-                </div>
-              </div>
               <div class="efficacy-table-wrap">
                 <table>
                 <thead>
@@ -1014,6 +1125,113 @@ onBeforeUnmount(clearNumberActionTimer);
                 </tbody>
                 </table>
               </div>
+              <EfficacyComparisonChart
+                id="strategy-efficacy-rate-chart"
+                title="Strategy hits per draw"
+                :rows="strategyEfficacyChartRows"
+                mode="rate"
+                rate-unit="draw"
+              />
+              <EfficacyComparisonChart
+                id="strategy-efficacy-lift-chart"
+                title="Strategy normalized lift from random"
+                :rows="strategyEfficacyChartRows"
+                mode="lift"
+                rate-unit="draw"
+              />
+            </div>
+          </section>
+
+          <section
+            class="prediction-efficacy-overview"
+            :class="{ 'is-collapsed': !isFamilyEfficacyExpanded }"
+            aria-label="Strategy families compared with random selections"
+          >
+            <header>
+              <div>
+                <strong>Historical families efficacy versus random</strong>
+              </div>
+              <div class="prediction-collapsible-actions">
+                <small>{{ familyEfficacyRanking.length }} active families</small>
+                <button
+                  type="button"
+                  class="prediction-collapsible-toggle"
+                  :aria-expanded="isFamilyEfficacyExpanded"
+                  aria-controls="prediction-family-efficacy-panel"
+                  :aria-label="isFamilyEfficacyExpanded ? 'Collapse historical families efficacy report' : 'Expand historical families efficacy report'"
+                  :title="isFamilyEfficacyExpanded ? 'Collapse historical families efficacy report' : 'Expand historical families efficacy report'"
+                  @click="isFamilyEfficacyExpanded = !isFamilyEfficacyExpanded"
+                >
+                  {{ isFamilyEfficacyExpanded ? "«" : "»" }}
+                </button>
+              </div>
+            </header>
+            <div
+              v-show="isFamilyEfficacyExpanded"
+              id="prediction-family-efficacy-panel"
+            >
+              <p class="family-efficacy-note">
+                Family results pool every enabled member strategy across the
+                selected draws. Each member strategy on each draw is one evaluation;
+                this is not a new family consensus ticket.
+              </p>
+              <div class="efficacy-table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Family</th>
+                      <th>Strategies</th>
+                      <th>Draws</th>
+                      <th>Evaluations</th>
+                      <th>Pooled hits</th>
+                      <th>Random mean</th>
+                      <th>Random 95%</th>
+                      <th>Hits/evaluation</th>
+                      <th>Lift/evaluation</th>
+                      <th>Random ≥ result</th>
+                      <th>Result</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="(family, index) in familyEfficacyRanking"
+                      :key="family.id"
+                      :class="familyEfficacyClass(family)"
+                    >
+                      <th scope="row" :title="familyStrategyNames(family)">
+                        <span class="efficacy-rank">#{{ index + 1 }}</span>
+                        {{ family.label }}
+                      </th>
+                      <td :title="familyStrategyNames(family)">
+                        {{ family.strategyCount }}
+                      </td>
+                      <td>{{ family.evaluatedDraws }}</td>
+                      <td>{{ family.evaluations }}</td>
+                      <td>{{ formatHitTotal(family.familyHits) }}</td>
+                      <td>{{ formatHitTotal(family.randomHits) }}</td>
+                      <td>{{ familyRandomRangeLabel(family) }}</td>
+                      <td>{{ family.hitsPerEvaluation.toFixed(3) }}</td>
+                      <td>{{ familyLiftLabel(family) }}</td>
+                      <td>{{ familyRandomTailLabel(family) }}</td>
+                      <td>{{ familyVerdict(family) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <EfficacyComparisonChart
+                id="family-efficacy-rate-chart"
+                title="Family hits per evaluation"
+                :rows="familyEfficacyChartRows"
+                mode="rate"
+                rate-unit="evaluation"
+              />
+              <EfficacyComparisonChart
+                id="family-efficacy-lift-chart"
+                title="Family normalized lift from random"
+                :rows="familyEfficacyChartRows"
+                mode="lift"
+                rate-unit="evaluation"
+              />
             </div>
           </section>
         </template>
