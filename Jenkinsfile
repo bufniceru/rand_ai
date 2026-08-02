@@ -1,6 +1,23 @@
 pipeline {
     agent any
 
+    parameters {
+        gitParameter(
+            name: 'SOURCE_BRANCH',
+            type: 'PT_BRANCH',
+            branchFilter: 'origin/(.*)',
+            defaultValue: 'master',
+            selectedValue: 'DEFAULT',
+            sortMode: 'ASCENDING_SMART',
+            quickFilterEnabled: true,
+            description: 'Select the remote Git branch to build'
+        )
+    }
+
+    options {
+        skipDefaultCheckout(true)
+    }
+
     environment {
         UV_INSTALL_DIR = 'C:\\ProgramData\\Jenkins\\.jenkins\\tools\\uv'
         UV_NO_MODIFY_PATH = '1'
@@ -89,20 +106,28 @@ pipeline {
                 }
             }
         }
-        // stage('Checkout') {
-        //     steps {
-        //         checkout scm
-        //     }
-        // }
         stage('Checkout') {
             steps {
-                checkout scmGit(
-                    branches: [[name: '*/master']],
-                    userRemoteConfigs: [[
-                        credentialsId: 'github-rand-ai-ssh',
-                        url: 'git@github.com:bufniceru/rand_ai.git'
-                    ]]
-                )
+                script {
+                    def requestedBranch = params.SOURCE_BRANCH
+                    def sourceBranch = requestedBranch == null ? 'master' : requestedBranch.trim()
+                    if (!sourceBranch) {
+                        error('SOURCE_BRANCH must not be empty')
+                    }
+
+                    echo "Checking out remote branch: ${sourceBranch}"
+                    deleteDir()
+
+                    def checkoutResult = checkout scmGit(
+                        branches: [[name: "*/${sourceBranch}"]],
+                        userRemoteConfigs: [[
+                            credentialsId: 'github-rand-ai-ssh',
+                            url: 'git@github.com:bufniceru/rand_ai.git'
+                        ]]
+                    )
+
+                    echo "Building ${checkoutResult.GIT_BRANCH} at ${checkoutResult.GIT_COMMIT}"
+                }
             }
         }
         stage('Display project version') {
