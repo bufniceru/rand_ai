@@ -211,12 +211,6 @@ const efficacyRanking = computed(() =>
     return left.name.localeCompare(right.name);
   }),
 );
-const efficacyRankByStrategyId = computed(
-  () =>
-    new Map(
-      efficacyRanking.value.map((strategy, index) => [strategy.id, index + 1]),
-    ),
-);
 const groupedEfficacyRanking = computed(() =>
   groupStrategiesByCategory(efficacyRanking.value),
 );
@@ -649,30 +643,20 @@ onBeforeUnmount(clearNumberActionTimer);
             >
               All
             </button>
-            <section
-              v-for="group in groupedEfficacyRanking"
-              :key="group.id"
-              class="prediction-strategy-category"
-              :aria-labelledby="`prediction-strategy-category-${group.id}`"
+            <button
+              v-for="(strategy, index) in efficacyRanking"
+              :key="strategy.id"
+              type="button"
+              :aria-pressed="strategy.id === selectedStrategyId"
+              :class="{ active: strategy.id === selectedStrategyId }"
+              :title="`#${index + 1} by effectiveness · ${strategyFullName(strategy)}`"
+              @click="selectedStrategyId = strategy.id"
             >
-              <h3 :id="`prediction-strategy-category-${group.id}`">
-                {{ group.label }}
-              </h3>
-              <button
-                v-for="strategy in group.strategies"
-                :key="strategy.id"
-                type="button"
-                :aria-pressed="strategy.id === selectedStrategyId"
-                :class="{ active: strategy.id === selectedStrategyId }"
-                :title="`#${efficacyRankByStrategyId.get(strategy.id)} by effectiveness · ${strategyFullName(strategy)}`"
-                @click="selectedStrategyId = strategy.id"
-              >
-                <span>
-                  <b>#{{ efficacyRankByStrategyId.get(strategy.id) }}</b>
-                  {{ strategyFullName(strategy) }}
-                </span>
-              </button>
-            </section>
+              <span>
+                <b>#{{ index + 1 }}</b>
+                {{ strategyFullName(strategy) }}
+              </span>
+            </button>
           </div>
         </div>
 
