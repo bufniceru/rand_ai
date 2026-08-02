@@ -53,6 +53,7 @@ const selectedStrategyId = ref("all");
 const selectedControlTab = ref<PredictionControlTab>("strategies");
 const selectedCoverageThreshold = ref<number | null>(null);
 const mutedStrategyIds = ref<Set<string>>(new Set());
+const isStrategySidebarExpanded = ref(true);
 const isNumbersGridExpanded = ref(true);
 const isEfficacyExpanded = ref(true);
 const isFamilyEfficacyExpanded = ref(true);
@@ -568,8 +569,13 @@ onBeforeUnmount(clearNumberActionTimer);
     v-if="selectedPrediction && selectedPrediction.strategies.length > 0"
     class="combined-prediction-view"
   >
-    <div class="prediction-workspace-layout">
+    <div
+      class="prediction-workspace-layout"
+      :class="{ 'is-strategy-sidebar-collapsed': !isStrategySidebarExpanded }"
+    >
       <aside
+        v-show="isStrategySidebarExpanded"
+        id="prediction-strategy-sidebar"
         class="prediction-strategy-sidebar"
         aria-label="Prediction navigation and selectors"
       >
@@ -627,9 +633,22 @@ onBeforeUnmount(clearNumberActionTimer);
           class="prediction-control-cassette"
           aria-labelledby="prediction-controls-title"
         >
-          <h2 id="prediction-controls-title" class="prediction-controls-title">
-            Strategies
-          </h2>
+          <div class="prediction-controls-heading">
+            <h2 id="prediction-controls-title" class="prediction-controls-title">
+              Strategies
+            </h2>
+            <button
+              type="button"
+              class="prediction-sidebar-toggle"
+              aria-controls="prediction-strategy-sidebar"
+              :aria-expanded="isStrategySidebarExpanded"
+              aria-label="Collapse strategies pane"
+              title="Collapse strategies pane"
+              @click="isStrategySidebarExpanded = false"
+            >
+              «
+            </button>
+          </div>
           <div
             class="prediction-control-tablist"
             role="tablist"
@@ -833,6 +852,19 @@ onBeforeUnmount(clearNumberActionTimer);
           </div>
         </section>
       </aside>
+
+      <button
+        v-if="!isStrategySidebarExpanded"
+        type="button"
+        class="prediction-sidebar-toggle prediction-sidebar-expand-toggle"
+        aria-controls="prediction-strategy-sidebar"
+        :aria-expanded="isStrategySidebarExpanded"
+        aria-label="Expand strategies pane"
+        title="Expand strategies pane"
+        @click="isStrategySidebarExpanded = true"
+      >
+        »
+      </button>
 
       <div class="prediction-workspace-content">
         <section
