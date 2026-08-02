@@ -115,6 +115,7 @@ const strategyPlugins = ref<StrategyPlugin[]>([]);
 const recentDatasets = ref<RecentDataset[]>([]);
 const settingsOpen = ref(false);
 const savingSettings = ref(false);
+const updatingStrategySelection = ref(false);
 const lastSeenDrawCountStorageKey = "rand-ai-last-seen-draw-count";
 const storedLastSeenDrawCount = Number(
   window.localStorage.getItem(lastSeenDrawCountStorageKey) ?? "50",
@@ -246,6 +247,49 @@ function acceptStrategyPluginState(state: StrategyPluginState): void {
   options.enabledStrategies = [...state.enabledStrategies];
 }
 
+function strategySelectionChanged(strategyIds: readonly StrategyId[]): boolean {
+  return (
+    strategyIds.length !== enabledStrategyIds.value.length ||
+    strategyIds.some(
+      (strategyId, index) => strategyId !== enabledStrategyIds.value[index],
+    )
+  );
+}
+
+async function updateStrategySelection(
+  strategyIds: StrategyId[],
+  afterPersist?: () => void,
+): Promise<boolean> {
+  if (!window.randAiDesktop || !strategySelectionChanged(strategyIds)) {
+    return false;
+  }
+
+  updatingStrategySelection.value = true;
+  try {
+    const state = await window.randAiDesktop.setStrategyPlugins(strategyIds);
+    acceptStrategyPluginState(state);
+    afterPersist?.();
+    if (activeDataset.value) {
+      if (loading.value) reportRefreshPending = true;
+      else await analyzeDataset(activeDataset.value, normalizeOptions());
+    }
+    return true;
+  } finally {
+    updatingStrategySelection.value = false;
+  }
+}
+
+async function applyPredictionStrategySelection(
+  strategyIds: StrategyId[],
+): Promise<void> {
+  errorMessage.value = "";
+  try {
+    await updateStrategySelection(strategyIds);
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
 async function openSettings(): Promise<void> {
   if (!window.randAiDesktop) return;
   errorMessage.value = "";
@@ -266,11 +310,6 @@ async function saveSettings(
   if (!window.randAiDesktop) return;
   savingSettings.value = true;
   errorMessage.value = "";
-  const strategiesChanged =
-    strategyIds.length !== enabledStrategyIds.value.length ||
-    strategyIds.some(
-      (strategyId, index) => strategyId !== enabledStrategyIds.value[index],
-    );
   try {
     const nextLastSeenDrawCount = Math.min(
       Math.max(Math.trunc(requestedLastSeenDrawCount || 1), 1),
@@ -285,14 +324,12 @@ async function saveSettings(
       lastSeenDrawCountStorageKey,
       String(nextLastSeenDrawCount),
     );
-    if (strategiesChanged) {
-      const state = await window.randAiDesktop.setStrategyPlugins(strategyIds);
-      acceptStrategyPluginState(state);
-    }
-    settingsOpen.value = false;
-    if (strategiesChanged && activeDataset.value) {
-      if (loading.value) reportRefreshPending = true;
-      else await analyzeDataset(activeDataset.value, normalizeOptions());
+    if (strategySelectionChanged(strategyIds)) {
+      await updateStrategySelection(strategyIds, () => {
+        settingsOpen.value = false;
+      });
+    } else {
+      settingsOpen.value = false;
     }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
@@ -827,7 +864,11 @@ onBeforeUnmount(() => {
       <CombinedPredictionGridView
         :prediction-suites="analysis.predictionSuites"
         :efficacy-history="analysis.strategyEfficacyHistory"
+        :strategy-plugins="strategyPlugins"
+        :enabled-strategy-ids="enabledStrategyIds"
+        :strategy-selection-busy="updatingStrategySelection || loading"
         embedded
+        @apply-strategies="applyPredictionStrategySelection"
         @send-number="handlePossibleDrawNumberRequest"
       />
     </main>

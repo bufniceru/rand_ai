@@ -1441,7 +1441,7 @@ tbody tr:nth-child(even) {
 
 .prediction-control-tablist {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 3px;
   padding-bottom: 6px;
   border-bottom: 1px solid #d8e2ec;
@@ -3269,6 +3269,17 @@ tbody tr:nth-child(even) {
 .dialog-empty-state p {
   margin: 10px 0 0;
   color: var(--text-muted);
+}
+
+.dialog-empty-state:has(.prediction-empty-strategy-selection) {
+  width: min(720px, calc(100% - 48px));
+  max-height: calc(100% - 48px);
+  overflow: auto;
+  text-align: left;
+}
+
+.prediction-empty-strategy-selection {
+  margin-top: 18px;
 }
 
 /* Latest completed draw versus the prediction made before it */

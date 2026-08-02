@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import EfficacyComparisonChart from "../components/EfficacyComparisonChart.vue";
+import StrategySelectionPanel from "../components/StrategySelectionPanel.vue";
 import {
   RANDOM_BENCHMARK_SIMULATIONS,
   randomTailProbability,
@@ -19,20 +20,31 @@ import type {
   PredictionSuite,
   StrategyEfficacy,
   StrategyEfficacyRecord,
+  StrategyId,
   StrategyNumberPrediction,
+  StrategyPlugin,
   StrategyPrediction,
 } from "../types";
 
 const props = defineProps<{
   predictionSuites: PredictionSuite[];
   efficacyHistory: StrategyEfficacyRecord[];
+  strategyPlugins: StrategyPlugin[];
+  enabledStrategyIds: StrategyId[];
+  strategySelectionBusy: boolean;
   embedded?: boolean;
 }>();
 const emit = defineEmits<{
   sendNumber: [request: { number: number; state: PossibleDrawNumberState }];
+  applyStrategies: [strategyIds: StrategyId[]];
 }>();
 
-const predictionControlTabs = ["strategies", "colors", "coverage"] as const;
+const predictionControlTabs = [
+  "strategies",
+  "selection",
+  "colors",
+  "coverage",
+] as const;
 type PredictionControlTab = (typeof predictionControlTabs)[number];
 
 const referenceOffset = ref(0);
@@ -703,6 +715,18 @@ onBeforeUnmount(clearNumberActionTimer);
               Strategies
             </button>
             <button
+              id="prediction-control-tab-selection"
+              type="button"
+              role="tab"
+              :aria-selected="selectedControlTab === 'selection'"
+              aria-controls="prediction-control-panel-selection"
+              :tabindex="selectedControlTab === 'selection' ? 0 : -1"
+              :class="{ active: selectedControlTab === 'selection' }"
+              @click="selectedControlTab = 'selection'"
+            >
+              Strategy selection
+            </button>
+            <button
               id="prediction-control-tab-colors"
               type="button"
               role="tab"
@@ -759,6 +783,21 @@ onBeforeUnmount(clearNumberActionTimer);
               </span>
             </button>
           </div>
+        </div>
+
+        <div
+          v-show="selectedControlTab === 'selection'"
+          id="prediction-control-panel-selection"
+          class="prediction-control-panel"
+          role="tabpanel"
+          aria-labelledby="prediction-control-tab-selection"
+        >
+          <StrategySelectionPanel
+            :plugins="strategyPlugins"
+            :enabled-strategy-ids="enabledStrategyIds"
+            :busy="strategySelectionBusy"
+            @apply="emit('applyStrategies', $event)"
+          />
         </div>
 
         <div
@@ -1281,13 +1320,27 @@ onBeforeUnmount(clearNumberActionTimer);
   </section>
 
   <section v-else class="dialog-empty-state">
-    <strong>No prediction strategies are active</strong>
+    <strong>
+      {{
+        enabledStrategyIds.length === 0 || selectedPrediction
+          ? "No prediction strategies are active"
+          : "No prediction draws are available"
+      }}
+    </strong>
     <p>
       {{
-        selectedPrediction
-          ? "Enable at least one item in the Strategies menu."
+        enabledStrategyIds.length === 0 || selectedPrediction
+          ? "Select at least one strategy below and apply the selection."
           : "The imported dataset does not contain any draws."
       }}
     </p>
+    <StrategySelectionPanel
+      v-if="strategyPlugins.length > 0"
+      class="prediction-empty-strategy-selection"
+      :plugins="strategyPlugins"
+      :enabled-strategy-ids="enabledStrategyIds"
+      :busy="strategySelectionBusy"
+      @apply="emit('applyStrategies', $event)"
+    />
   </section>
 </template>
