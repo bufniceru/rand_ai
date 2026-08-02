@@ -625,12 +625,15 @@ onBeforeUnmount(clearNumberActionTimer);
 
         <section
           class="prediction-control-cassette"
-          aria-label="Prediction controls"
+          aria-labelledby="prediction-controls-title"
         >
+          <h2 id="prediction-controls-title" class="prediction-controls-title">
+            Strategies
+          </h2>
           <div
             class="prediction-control-tablist"
             role="tablist"
-            aria-label="Prediction control groups"
+            aria-label="Strategy control groups"
             @keydown.left.prevent="selectAdjacentControlTab(-1)"
             @keydown.right.prevent="selectAdjacentControlTab(1)"
             @keydown.home.prevent="selectControlTabAndFocus('strategies')"
@@ -646,7 +649,7 @@ onBeforeUnmount(clearNumberActionTimer);
               :class="{ active: selectedControlTab === 'strategies' }"
               @click="selectedControlTab = 'strategies'"
             >
-              Strategies
+              List
             </button>
             <button
               id="prediction-control-tab-selection"
@@ -658,7 +661,7 @@ onBeforeUnmount(clearNumberActionTimer);
               :class="{ active: selectedControlTab === 'selection' }"
               @click="selectedControlTab = 'selection'"
             >
-              Strategy selection
+              Selection
             </button>
             <button
               id="prediction-control-tab-colors"
@@ -670,7 +673,7 @@ onBeforeUnmount(clearNumberActionTimer);
               :class="{ active: selectedControlTab === 'colors' }"
               @click="selectedControlTab = 'colors'"
             >
-              Strategy colors
+              Colors
             </button>
             <button
               id="prediction-control-tab-coverage"
@@ -682,7 +685,7 @@ onBeforeUnmount(clearNumberActionTimer);
               :class="{ active: selectedControlTab === 'coverage' }"
               @click="selectedControlTab = 'coverage'"
             >
-              Coverage report
+              Report
             </button>
           </div>
 

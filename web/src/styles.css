@@ -1466,6 +1466,15 @@ tbody tr:nth-child(even) {
   box-shadow: none;
 }
 
+.prediction-controls-title {
+  margin: 0;
+  padding: 1px 2px 0;
+  color: var(--navy-2);
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
 .prediction-control-tablist {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
