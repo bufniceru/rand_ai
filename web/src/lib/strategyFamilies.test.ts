@@ -73,6 +73,29 @@ describe("prediction strategy families", () => {
     ]);
   });
 
+  it("uses canonical family order while preserving plugin order by default", () => {
+    const plugins = [
+      { id: "fresh_random" as const },
+      { id: "mkfr" as const },
+      { id: "freshness" as const },
+      { id: "markov100" as const },
+      { id: "randomness" as const },
+    ];
+
+    const groups = groupStrategiesByFamily(plugins);
+
+    expect(groups.map((group) => group.id)).toEqual([
+      "frequency-recency",
+      "markov-sequence",
+      "random-baselines",
+    ]);
+    expect(groups.map((group) => group.strategies.map((item) => item.id))).toEqual([
+      ["freshness"],
+      ["mkfr", "markov100"],
+      ["fresh_random", "randomness"],
+    ]);
+  });
+
   it("omits empty families and appends unranked active families", () => {
     const groups = groupStrategiesByFamily(
       [

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import EfficacyComparisonChart from "../components/EfficacyComparisonChart.vue";
+import StrategySelectionPanel from "../components/StrategySelectionPanel.vue";
 import {
   RANDOM_BENCHMARK_SIMULATIONS,
   randomTailProbability,
@@ -13,26 +14,38 @@ import {
   type FamilyEfficacy,
 } from "../lib/familyEfficacy";
 import { groupStrategiesByFamily } from "../lib/strategyFamilies";
+import { strategyColor } from "../lib/strategyColors";
 import type { EfficacyChartRow } from "../lib/efficacyChart";
 import type {
   PossibleDrawNumberState,
   PredictionSuite,
   StrategyEfficacy,
   StrategyEfficacyRecord,
+  StrategyId,
   StrategyNumberPrediction,
+  StrategyPlugin,
   StrategyPrediction,
 } from "../types";
 
 const props = defineProps<{
   predictionSuites: PredictionSuite[];
   efficacyHistory: StrategyEfficacyRecord[];
+  strategyPlugins: StrategyPlugin[];
+  enabledStrategyIds: StrategyId[];
+  strategySelectionBusy: boolean;
   embedded?: boolean;
 }>();
 const emit = defineEmits<{
   sendNumber: [request: { number: number; state: PossibleDrawNumberState }];
+  applyStrategies: [strategyIds: StrategyId[]];
 }>();
 
-const predictionControlTabs = ["strategies", "colors", "coverage"] as const;
+const predictionControlTabs = [
+  "strategies",
+  "selection",
+  "colors",
+  "coverage",
+] as const;
 type PredictionControlTab = (typeof predictionControlTabs)[number];
 
 const referenceOffset = ref(0);
@@ -50,7 +63,6 @@ const efficacyRandomBenchmarks = shallowRef<
 >(new Map());
 const efficacyRetestCount = ref(0);
 const isEfficacyRetesting = ref(false);
-const selectedPredictionNumber = ref<number | null>(null);
 let numberActionTimer: ReturnType<typeof setTimeout> | null = null;
 
 const maximumOffset = computed(() => Math.max(0, props.predictionSuites.length - 1));
@@ -97,6 +109,7 @@ const allReportCells = computed(() =>
     const number = index + 1;
     return {
       number,
+      strategyEntry: selectedStrategyNumberByNumber.value.get(number) ?? null,
       reports: (selectedPrediction.value?.strategies ?? [])
         .filter((strategy) => strategy.topNumbers.includes(number))
         .map((strategy) => ({
@@ -112,10 +125,6 @@ const orderedReportCells = computed(() => {
   return selectedStrategyNumbersByScore.value
     .map((entry) => allReportCells.value[entry.number - 1])
     .filter((cell) => cell !== undefined);
-});
-const selectedNumberReports = computed(() => {
-  if (selectedPredictionNumber.value === null) return [];
-  return allReportCells.value[selectedPredictionNumber.value - 1]?.reports ?? [];
 });
 const coverageReport = computed(() => {
   const strategyCount = selectedPrediction.value?.strategies.length ?? 0;
@@ -294,7 +303,6 @@ watch(efficacySelectionKey, () => {
 });
 
 watch(selectedPrediction, (prediction) => {
-  selectedPredictionNumber.value = null;
   const available = new Set<string>(
     prediction?.strategies.map((strategy) => strategy.id) ?? [],
   );
@@ -472,37 +480,7 @@ function strategyFullName(strategy: StrategyPrediction): string {
   }[strategy.id] ?? strategy.name;
 }
 
-function strategyColor(strategyId: string): string {
-  return {
-    proximity: "#ffd866",
-    freshness: "#fc9867",
-    emd: "#a9dc76",
-    randomness: "#78dce8",
-    fresh_random: "#ab9df2",
-    chi_square: "#ab9df2",
-    entropy: "#ff6188",
-    markov100: "#ffd866",
-    mkfr: "#a9dc76",
-    mksp: "#78dce8",
-    mknp: "#78dce8",
-    mkrd: "#ab9df2",
-    bayesian: "#ff6188",
-    predictive_grid: "#78dce8",
-    co_occurrence: "#a9dc76",
-    doublet_triplet_markov: "#ab9df2",
-    mixed: "#fc9867",
-    svc: "#ab9df2",
-    tbl: "#78dce8",
-    sklearn_svm: "#2fb7a8",
-    lag_logistic: "#e8793e",
-    sparse_neural_ticket: "#d4a72c",
-    cis: "#ff6188",
-    residual_coverage: "#a9dc76",
-    chained: "#fc9867",
-  }[strategyId] ?? "#727072";
-}
-
-function strategyDisplayColor(strategyId: string): string {
+function strategyDisplayColor(strategyId: StrategyId): string {
   return mutedStrategyIds.value.has(strategyId)
     ? "#ffffff"
     : strategyColor(strategyId);
@@ -538,35 +516,6 @@ function selectAdjacentControlTab(offset: number): void {
   selectControlTabAndFocus(predictionControlTabs[nextIndex]);
 }
 
-function cellTitle(
-  entry: StrategyNumberPrediction,
-  strategy: StrategyPrediction,
-): string {
-  const outcome = actualNumbers.value.has(entry.number) ? " — drawn next" : "";
-  const details = entry.details.length > 0 ? ` — ${entry.details.join(" · ")}` : "";
-  return `Number ${entry.number}: rank ${entry.rank}, ${strategyFullName(strategy)} score ${scoreLabel(entry)}${details}${outcome} — Click: view strategies; Ctrl+Click: Possible; Ctrl+Double-click: For Sure`;
-}
-
-function allCellTitle(cell: (typeof allReportCells.value)[number]): string {
-  const reports = cell.reports.map((report) => report.name).join(", ");
-  const outcome = actualNumbers.value.has(cell.number) ? " — drawn next" : "";
-  const consensus =
-    cell.reports.length >= 3
-      ? ` — high agreement (${cell.reports.length} strategies)`
-      : "";
-  return `Number ${cell.number}${outcome}${consensus} — predicted by ${reports || "no report"} — Click: view strategies; Ctrl+Click: Possible; Ctrl+Double-click: For Sure`;
-}
-
-function mainGridCellTitle(
-  cell: (typeof allReportCells.value)[number],
-): string {
-  const strategy = selectedStrategy.value;
-  const entry = selectedStrategyNumberByNumber.value.get(cell.number);
-  if (!strategy || !entry) return allCellTitle(cell);
-  const reports = cell.reports.map((report) => report.name).join(", ");
-  return `${cellTitle(entry, strategy)} — Pie colors: ${reports || "no strategy Top-6 selections"}`;
-}
-
 function sectorStyle(cell: (typeof allReportCells.value)[number]): Record<string, string> {
   if (cell.reports.length === 0) return {};
   if (cell.reports.length === 1) {
@@ -595,10 +544,7 @@ function sendNumberToPossibleDraw(
 }
 
 function handlePredictionClick(event: MouseEvent, number: number): void {
-  if (!event.ctrlKey) {
-    selectedPredictionNumber.value = number;
-    return;
-  }
+  if (!event.ctrlKey) return;
   event.preventDefault();
   clearNumberActionTimer();
   numberActionTimer = setTimeout(() => {
@@ -703,6 +649,18 @@ onBeforeUnmount(clearNumberActionTimer);
               Strategies
             </button>
             <button
+              id="prediction-control-tab-selection"
+              type="button"
+              role="tab"
+              :aria-selected="selectedControlTab === 'selection'"
+              aria-controls="prediction-control-panel-selection"
+              :tabindex="selectedControlTab === 'selection' ? 0 : -1"
+              :class="{ active: selectedControlTab === 'selection' }"
+              @click="selectedControlTab = 'selection'"
+            >
+              Strategy selection
+            </button>
+            <button
               id="prediction-control-tab-colors"
               type="button"
               role="tab"
@@ -762,6 +720,21 @@ onBeforeUnmount(clearNumberActionTimer);
         </div>
 
         <div
+          v-show="selectedControlTab === 'selection'"
+          id="prediction-control-panel-selection"
+          class="prediction-control-panel"
+          role="tabpanel"
+          aria-labelledby="prediction-control-tab-selection"
+        >
+          <StrategySelectionPanel
+            :plugins="strategyPlugins"
+            :enabled-strategy-ids="enabledStrategyIds"
+            :busy="strategySelectionBusy"
+            @apply="emit('applyStrategies', $event)"
+          />
+        </div>
+
+        <div
           v-show="selectedControlTab === 'colors'"
           id="prediction-control-panel-colors"
           class="prediction-control-panel"
@@ -785,6 +758,7 @@ onBeforeUnmount(clearNumberActionTimer);
               v-for="group in groupedFamilyEfficacyRanking"
               :key="group.id"
               class="prediction-strategy-family"
+              :style="{ '--family-color': group.color }"
               :aria-labelledby="`prediction-color-family-${group.id}`"
             >
               <h3 :id="`prediction-color-family-${group.id}`">
@@ -907,13 +881,12 @@ onBeforeUnmount(clearNumberActionTimer);
                     selectedCoverageThreshold !== null &&
                     cell.reports.length >= selectedCoverageThreshold,
                 }"
-                :title="mainGridCellTitle(cell)"
                 role="gridcell"
                 tabindex="0"
+                :aria-label="`Prediction number ${cell.number}`"
+                :aria-describedby="`prediction-number-tooltip-${cell.number}`"
                 @click="handlePredictionClick($event, cell.number)"
                 @dblclick="handlePredictionDoubleClick($event, cell.number)"
-                @keydown.enter.prevent="selectedPredictionNumber = cell.number"
-                @keydown.space.prevent="selectedPredictionNumber = cell.number"
               >
                 <span
                   class="prediction-cell-color"
@@ -921,6 +894,59 @@ onBeforeUnmount(clearNumberActionTimer);
                   aria-hidden="true"
                 ></span>
                 <strong>{{ cell.number }}</strong>
+                <aside
+                  :id="`prediction-number-tooltip-${cell.number}`"
+                  class="prediction-number-tooltip"
+                  role="tooltip"
+                >
+                  <header>
+                    <div>
+                      <span>Prediction number</span>
+                      <strong>{{ cell.number }}</strong>
+                    </div>
+                    <span class="prediction-tooltip-count">
+                      {{ cell.reports.length }}
+                      {{ cell.reports.length === 1 ? "strategy" : "strategies" }}
+                    </span>
+                  </header>
+
+                  <div v-if="cell.strategyEntry" class="prediction-tooltip-metrics">
+                    <div>
+                      <span>Selected rank</span>
+                      <strong>#{{ cell.strategyEntry.rank }}</strong>
+                    </div>
+                    <div>
+                      <span>Score</span>
+                      <strong>{{ scoreLabel(cell.strategyEntry) }}</strong>
+                    </div>
+                  </div>
+
+                  <p v-if="actualNumbers.has(cell.number)" class="prediction-tooltip-outcome">
+                    Drawn in target draw {{ selectedPrediction?.targetDrawNumber }}
+                  </p>
+
+                  <section class="prediction-tooltip-strategies">
+                    <h3>Strategies implying this number</h3>
+                    <ul
+                      v-if="cell.reports.length > 0"
+                      :class="{ 'is-long': cell.reports.length > 5 }"
+                    >
+                      <li
+                        v-for="report in cell.reports"
+                        :key="report.id"
+                        :style="{ '--strategy-color': strategyColor(report.id) }"
+                      >
+                        {{ report.name }}
+                      </li>
+                    </ul>
+                    <p v-else>No active strategy implies this number.</p>
+                  </section>
+
+                  <footer>
+                    <span><kbd>Ctrl</kbd> + click: Possible</span>
+                    <span><kbd>Ctrl</kbd> + double-click: For sure</span>
+                  </footer>
+                </aside>
               </article>
             </div>
           </div>
@@ -1238,56 +1264,30 @@ onBeforeUnmount(clearNumberActionTimer);
 
       </div>
     </div>
-
-    <div
-      v-if="selectedPredictionNumber !== null"
-      class="number-popup-backdrop"
-      role="presentation"
-      @click.self="selectedPredictionNumber = null"
-    >
-      <section
-        class="number-popup prediction-strategies-popup"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="`Strategies implying number ${selectedPredictionNumber}`"
-        @keydown.esc="selectedPredictionNumber = null"
-      >
-        <p>Strategies implying number</p>
-        <strong>{{ selectedPredictionNumber }}</strong>
-        <span class="prediction-strategies-popup-summary">
-          {{
-            selectedNumberReports.length === 1
-              ? "1 strategy includes this number in its Top 6"
-              : `${selectedNumberReports.length} strategies include this number in their Top 6`
-          }}
-        </span>
-        <ul v-if="selectedNumberReports.length > 0">
-          <li
-            v-for="report in selectedNumberReports"
-            :key="report.id"
-            :style="{ '--strategy-color': strategyColor(report.id) }"
-          >
-            {{ report.name }}
-          </li>
-        </ul>
-        <p v-else class="prediction-strategies-popup-empty">
-          No active strategy implies this number.
-        </p>
-        <button type="button" autofocus @click="selectedPredictionNumber = null">
-          Close
-        </button>
-      </section>
-    </div>
   </section>
 
   <section v-else class="dialog-empty-state">
-    <strong>No prediction strategies are active</strong>
+    <strong>
+      {{
+        enabledStrategyIds.length === 0 || selectedPrediction
+          ? "No prediction strategies are active"
+          : "No prediction draws are available"
+      }}
+    </strong>
     <p>
       {{
-        selectedPrediction
-          ? "Enable at least one item in the Strategies menu."
+        enabledStrategyIds.length === 0 || selectedPrediction
+          ? "Select at least one strategy below and apply the selection."
           : "The imported dataset does not contain any draws."
       }}
     </p>
+    <StrategySelectionPanel
+      v-if="strategyPlugins.length > 0"
+      class="prediction-empty-strategy-selection"
+      :plugins="strategyPlugins"
+      :enabled-strategy-ids="enabledStrategyIds"
+      :busy="strategySelectionBusy"
+      @apply="emit('applyStrategies', $event)"
+    />
   </section>
 </template>

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
+import { strategyColor } from "../lib/strategyColors";
 import type {
   AnalysisPayload,
   DrawComparisonStrategy,
-  StrategyId,
 } from "../types";
 
 const props = defineProps<{ analysis: AnalysisPayload }>();
@@ -124,36 +124,6 @@ function strategyFullName(strategy: DrawComparisonStrategy): string {
     residual_coverage: "Residual Coverage",
     chained: "Chained Strategy",
   }[strategy.id] ?? strategy.name;
-}
-
-function strategyColor(strategyId: StrategyId): string {
-  return {
-    proximity: "#ffd866",
-    freshness: "#fc9867",
-    emd: "#a9dc76",
-    randomness: "#78dce8",
-    fresh_random: "#ab9df2",
-    chi_square: "#ab9df2",
-    entropy: "#ff6188",
-    markov100: "#ffd866",
-    mkfr: "#a9dc76",
-    mksp: "#78dce8",
-    mknp: "#78dce8",
-    mkrd: "#ab9df2",
-    bayesian: "#ff6188",
-    predictive_grid: "#78dce8",
-    co_occurrence: "#a9dc76",
-    doublet_triplet_markov: "#ab9df2",
-    mixed: "#fc9867",
-    svc: "#ab9df2",
-    tbl: "#78dce8",
-    sklearn_svm: "#2fb7a8",
-    lag_logistic: "#e8793e",
-    sparse_neural_ticket: "#d4a72c",
-    cis: "#ff6188",
-    residual_coverage: "#a9dc76",
-    chained: "#fc9867",
-  }[strategyId];
 }
 
 function formattedDate(date: string | null): string {

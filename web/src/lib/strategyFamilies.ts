@@ -1,15 +1,36 @@
 import type { StrategyId } from "../types";
 
 export const STRATEGY_FAMILIES = [
-  { id: "frequency-recency", label: "Frequency & Recency" },
-  { id: "shape-similarity", label: "Shape & Similarity" },
-  { id: "markov-sequence", label: "Markov & Sequence" },
+  {
+    id: "frequency-recency",
+    label: "Frequency & Recency",
+    color: "#FC9867",
+  },
+  {
+    id: "shape-similarity",
+    label: "Shape & Similarity",
+    color: "#A9DC76",
+  },
+  {
+    id: "markov-sequence",
+    label: "Markov & Sequence",
+    color: "#AB9DF2",
+  },
   {
     id: "relationships-machine-learning",
     label: "Relationships & Machine Learning",
+    color: "#78DCE8",
   },
-  { id: "ensembles-coverage", label: "Ensembles & Coverage" },
-  { id: "random-baselines", label: "Random Baselines" },
+  {
+    id: "ensembles-coverage",
+    label: "Ensembles & Coverage",
+    color: "#FF6188",
+  },
+  {
+    id: "random-baselines",
+    label: "Random Baselines",
+    color: "#FFD866",
+  },
 ] as const;
 
 export type StrategyFamilyId = (typeof STRATEGY_FAMILIES)[number]["id"];
@@ -45,6 +66,7 @@ export const STRATEGY_FAMILY_BY_ID = {
 export interface StrategyFamilyGroup<T> {
   id: StrategyFamilyId;
   label: string;
+  color: string;
   strategies: T[];
 }
 
