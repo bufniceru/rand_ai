@@ -1582,6 +1582,43 @@ tbody tr:nth-child(even) {
   background: rgba(255, 255, 255, 0.96);
 }
 
+.prediction-efficacy-controls {
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.prediction-efficacy-controls > header {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 7px;
+}
+
+.prediction-efficacy-controls > header strong {
+  color: #173d64;
+  font-size: 14px;
+}
+
+.prediction-efficacy-controls > header small,
+.category-efficacy-note {
+  color: #687d92;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.prediction-efficacy-controls .efficacy-range-controls {
+  margin-bottom: 0;
+}
+
+.category-efficacy-note {
+  margin: 0 0 7px;
+  line-height: 1.45;
+}
+
 .prediction-efficacy-overview > header {
   min-height: 30px;
   display: flex;
@@ -5898,7 +5935,8 @@ tbody tr:nth-child(even) {
     grid-template-columns: repeat(2, minmax(110px, 1fr));
   }
 
-  .prediction-efficacy-overview > header {
+  .prediction-efficacy-overview > header,
+  .prediction-efficacy-controls > header {
     align-items: flex-start;
     flex-direction: column;
     gap: 5px;
@@ -6756,6 +6794,7 @@ select:disabled {
 .prediction-control-cassette,
 .prediction-grid-section,
 .prediction-efficacy-overview,
+.prediction-efficacy-controls,
 .prediction-coverage-report,
 .prediction-strategy-sidebar,
 .prediction-strategy-heading,
@@ -7184,6 +7223,8 @@ svg text {
 .prediction-collapsible-header span,
 .prediction-efficacy-overview > header span,
 .prediction-efficacy-overview > header small,
+.prediction-efficacy-controls > header small,
+.category-efficacy-note,
 .efficacy-count-control > span,
 .efficacy-count-control small,
 .efficacy-range-controls legend,
@@ -7204,6 +7245,7 @@ svg text {
 
 .prediction-collapsible-header strong,
 .prediction-efficacy-overview > header strong,
+.prediction-efficacy-controls > header strong,
 .efficacy-range-controls output strong,
 .prediction-coverage-report li strong,
 .prediction-reference-summary strong,
