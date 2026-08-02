@@ -569,6 +569,58 @@ onBeforeUnmount(clearNumberActionTimer);
     v-if="selectedPrediction && selectedPrediction.strategies.length > 0"
     class="combined-prediction-view"
   >
+    <Teleport to="#prediction-toolbar-navigation">
+      <div class="prediction-reference-toolbar">
+        <div
+          class="reference-buttons"
+          aria-label="Prediction history navigation"
+        >
+          <button
+            type="button"
+            :disabled="referenceOffset >= maximumOffset"
+            aria-label="First prediction"
+            title="First"
+            @click="referenceOffset = maximumOffset"
+          >
+            ⏮
+          </button>
+          <button
+            type="button"
+            :disabled="referenceOffset >= maximumOffset"
+            aria-label="Previous prediction"
+            title="Previous"
+            @click="referenceOffset += 1"
+          >
+            ◀
+          </button>
+          <output
+            class="prediction-reference-summary"
+            :aria-label="`Reference draw ${selectedPrediction.referenceDrawNumber}`"
+          >
+            <strong>{{ selectedPrediction.referenceDrawNumber }}</strong>
+          </output>
+          <button
+            type="button"
+            :disabled="referenceOffset === 0"
+            aria-label="Next prediction"
+            title="Next"
+            @click="referenceOffset -= 1"
+          >
+            ▶
+          </button>
+          <button
+            type="button"
+            :disabled="referenceOffset === 0"
+            aria-label="Last prediction"
+            title="Last"
+            @click="referenceOffset = 0"
+          >
+            ⏭
+          </button>
+        </div>
+      </div>
+    </Teleport>
+
     <div
       class="prediction-workspace-layout"
       :class="{ 'is-strategy-sidebar-collapsed': !isStrategySidebarExpanded }"
@@ -577,58 +629,8 @@ onBeforeUnmount(clearNumberActionTimer);
         v-show="isStrategySidebarExpanded"
         id="prediction-strategy-sidebar"
         class="prediction-strategy-sidebar"
-        aria-label="Prediction navigation and selectors"
+        aria-label="Prediction strategy selectors"
       >
-        <div class="prediction-reference-toolbar">
-          <div
-            class="reference-buttons"
-            aria-label="Prediction history navigation"
-          >
-            <button
-              type="button"
-              :disabled="referenceOffset >= maximumOffset"
-              aria-label="First prediction"
-              title="First"
-              @click="referenceOffset = maximumOffset"
-            >
-              ⏮
-            </button>
-            <button
-              type="button"
-              :disabled="referenceOffset >= maximumOffset"
-              aria-label="Previous prediction"
-              title="Previous"
-              @click="referenceOffset += 1"
-            >
-              ◀
-            </button>
-            <output
-              class="prediction-reference-summary"
-              :aria-label="`Reference draw ${selectedPrediction.referenceDrawNumber}`"
-            >
-              <strong>{{ selectedPrediction.referenceDrawNumber }}</strong>
-            </output>
-            <button
-              type="button"
-              :disabled="referenceOffset === 0"
-              aria-label="Next prediction"
-              title="Next"
-              @click="referenceOffset -= 1"
-            >
-              ▶
-            </button>
-            <button
-              type="button"
-              :disabled="referenceOffset === 0"
-              aria-label="Last prediction"
-              title="Last"
-              @click="referenceOffset = 0"
-            >
-              ⏭
-            </button>
-          </div>
-        </div>
-
         <section
           class="prediction-control-cassette"
           aria-labelledby="prediction-controls-title"

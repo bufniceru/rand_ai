@@ -663,6 +663,11 @@ onBeforeUnmount(() => {
           <strong>Rand AI</strong>
         </div>
       </div>
+      <div
+        v-show="activeWorkspaceTab === 'predictions'"
+        id="prediction-toolbar-navigation"
+        class="prediction-toolbar-navigation-slot"
+      ></div>
       <nav
         v-if="analysis"
         class="toolbar-workspace-tabs"

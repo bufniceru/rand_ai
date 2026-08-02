@@ -99,6 +99,58 @@ button:disabled {
   letter-spacing: 0.01em;
 }
 
+.prediction-toolbar-navigation-slot {
+  min-width: 0;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+.prediction-toolbar-navigation-slot .prediction-reference-toolbar {
+  padding: 0;
+  border: 0;
+}
+
+.prediction-toolbar-navigation-slot .reference-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 30px) minmax(54px, auto) repeat(2, 30px);
+  align-items: center;
+  gap: 3px;
+}
+
+.prediction-toolbar-navigation-slot .reference-buttons button {
+  width: 30px;
+  min-height: 28px;
+  padding: 0;
+  border-color: rgba(196, 218, 237, 0.46);
+  color: var(--monokai-fg, #eaf4fc);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+}
+
+.prediction-toolbar-navigation-slot .reference-buttons button:hover:not(:disabled) {
+  border-color: var(--monokai-cyan, #ffffff);
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.prediction-toolbar-navigation-slot .reference-buttons button:disabled {
+  opacity: 0.36;
+}
+
+.prediction-toolbar-navigation-slot .prediction-reference-summary {
+  min-width: 54px;
+  min-height: 28px;
+  padding: 0 7px;
+  border-color: rgba(196, 218, 237, 0.46);
+  color: var(--monokai-muted, #c3d8ea);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.prediction-toolbar-navigation-slot .prediction-reference-summary strong {
+  color: var(--monokai-yellow, #ffffff);
+  font-size: 15px;
+}
+
 .brand-lockup span {
   margin-top: 2px;
   color: #bcd0e1;
@@ -2476,25 +2528,6 @@ tbody tr:nth-child(even) {
   border-radius: 0;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 8px 24px rgba(24, 51, 77, 0.06);
-}
-
-.prediction-reference-toolbar {
-  padding-bottom: 6px;
-  border-bottom: 1px solid #d8e2ec;
-}
-
-.prediction-strategy-sidebar .reference-buttons {
-  display: grid;
-  grid-template-columns: repeat(2, 36px) minmax(68px, 1fr) repeat(2, 36px);
-  align-items: center;
-  gap: 6px;
-}
-
-.prediction-strategy-sidebar .reference-buttons button {
-  width: 100%;
-  min-height: 34px;
-  padding: 0;
-  font-size: 15px;
 }
 
 .prediction-reference-summary {
@@ -6148,11 +6181,6 @@ tbody tr:nth-child(even) {
     padding: 6px;
   }
 
-  .prediction-reference-toolbar {
-    align-items: stretch;
-    flex-direction: column-reverse;
-  }
-
   .reference-buttons {
     justify-content: space-between;
   }
@@ -6160,16 +6188,6 @@ tbody tr:nth-child(even) {
   .prediction-workspace-layout {
     grid-template-columns: 198px minmax(0, 1fr);
     gap: 7px;
-  }
-
-  .prediction-strategy-sidebar .reference-buttons {
-    grid-template-columns: repeat(2, 28px) minmax(42px, 1fr) repeat(2, 28px);
-    gap: 3px;
-  }
-
-  .prediction-strategy-sidebar .reference-buttons button {
-    min-height: 30px;
-    font-size: 11px;
   }
 
   .prediction-control-tablist {
