@@ -2008,6 +2008,26 @@ tbody tr:nth-child(even) {
   gap: 3px;
 }
 
+.prediction-strategy-category {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  margin: 4px 0 0;
+  break-inside: avoid;
+}
+
+.prediction-strategy-category h3 {
+  margin: 0;
+  padding: 5px 9px 4px;
+  border-bottom: 1px solid #c8d8e7;
+  color: #496984;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.075em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
 .prediction-color-legend label {
   height: 36px;
   min-height: 36px;
@@ -7173,6 +7193,7 @@ svg text {
 .prediction-color-legend label,
 .prediction-strategy-tabs button,
 .prediction-strategy-tabs button > span b,
+.prediction-strategy-category h3,
 .prediction-reference-summary,
 .prediction-strategy-heading span,
 .strategy-efficacy-card > header span,
@@ -7197,6 +7218,10 @@ svg text {
 .prediction-coverage-report li.selected,
 .prediction-strategy-tabs button.active > span b {
   color: var(--monokai-fg);
+}
+
+.prediction-strategy-category h3 {
+  border-color: var(--monokai-border);
 }
 
 .prediction-efficacy-overview tr.is-ahead td:nth-last-child(-n + 3),
