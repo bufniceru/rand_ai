@@ -6,6 +6,7 @@ import {
   runRandomBenchmark,
   type RandomBenchmarkSummary,
 } from "../lib/randomBenchmark";
+import { groupStrategiesByCategory } from "../lib/strategyCategories";
 import type {
   PossibleDrawNumberState,
   PredictionSuite,
@@ -209,6 +210,15 @@ const efficacyRanking = computed(() =>
     if (hitDifference !== 0) return hitDifference;
     return left.name.localeCompare(right.name);
   }),
+);
+const efficacyRankByStrategyId = computed(
+  () =>
+    new Map(
+      efficacyRanking.value.map((strategy, index) => [strategy.id, index + 1]),
+    ),
+);
+const groupedEfficacyRanking = computed(() =>
+  groupStrategiesByCategory(efficacyRanking.value),
 );
 
 watch(
@@ -639,20 +649,30 @@ onBeforeUnmount(clearNumberActionTimer);
             >
               All
             </button>
-            <button
-              v-for="(strategy, index) in efficacyRanking"
-              :key="strategy.id"
-              type="button"
-              :aria-pressed="strategy.id === selectedStrategyId"
-              :class="{ active: strategy.id === selectedStrategyId }"
-              :title="`#${index + 1} by effectiveness · ${strategyFullName(strategy)}`"
-              @click="selectedStrategyId = strategy.id"
+            <section
+              v-for="group in groupedEfficacyRanking"
+              :key="group.id"
+              class="prediction-strategy-category"
+              :aria-labelledby="`prediction-strategy-category-${group.id}`"
             >
-              <span>
-                <b>#{{ index + 1 }}</b>
-                {{ strategyFullName(strategy) }}
-              </span>
-            </button>
+              <h3 :id="`prediction-strategy-category-${group.id}`">
+                {{ group.label }}
+              </h3>
+              <button
+                v-for="strategy in group.strategies"
+                :key="strategy.id"
+                type="button"
+                :aria-pressed="strategy.id === selectedStrategyId"
+                :class="{ active: strategy.id === selectedStrategyId }"
+                :title="`#${efficacyRankByStrategyId.get(strategy.id)} by effectiveness · ${strategyFullName(strategy)}`"
+                @click="selectedStrategyId = strategy.id"
+              >
+                <span>
+                  <b>#{{ efficacyRankByStrategyId.get(strategy.id) }}</b>
+                  {{ strategyFullName(strategy) }}
+                </span>
+              </button>
+            </section>
           </div>
         </div>
 
@@ -676,20 +696,30 @@ onBeforeUnmount(clearNumberActionTimer);
               />
               <span>All colors</span>
             </label>
-            <label
-              v-for="strategy in efficacyRanking"
-              :key="strategy.id"
-              class="prediction-color-row"
-              :style="{ '--legend-color': strategyColor(strategy.id) }"
+            <section
+              v-for="group in groupedEfficacyRanking"
+              :key="group.id"
+              class="prediction-strategy-category"
+              :aria-labelledby="`prediction-color-category-${group.id}`"
             >
-              <input
-                type="checkbox"
-                :checked="!mutedStrategyIds.has(strategy.id)"
-                @change="toggleStrategyColor(strategy.id)"
-              />
-              <span>{{ strategyFullName(strategy) }}</span>
-              <i class="prediction-color-swatch" aria-hidden="true"></i>
-            </label>
+              <h3 :id="`prediction-color-category-${group.id}`">
+                {{ group.label }}
+              </h3>
+              <label
+                v-for="strategy in group.strategies"
+                :key="strategy.id"
+                class="prediction-color-row"
+                :style="{ '--legend-color': strategyColor(strategy.id) }"
+              >
+                <input
+                  type="checkbox"
+                  :checked="!mutedStrategyIds.has(strategy.id)"
+                  @change="toggleStrategyColor(strategy.id)"
+                />
+                <span>{{ strategyFullName(strategy) }}</span>
+                <i class="prediction-color-swatch" aria-hidden="true"></i>
+              </label>
+            </section>
           </div>
         </div>
 
