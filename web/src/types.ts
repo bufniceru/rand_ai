@@ -15,6 +15,7 @@ export type ReportId =
   | "last-seen-gap"
   | "last-seen-space"
   | "predictions"
+  | "meta-strategy"
   | "draw-portfolio"
   | "possible-draw";
 export type StrategyId =
@@ -62,6 +63,7 @@ export type WorkspaceTabId =
   | "last-seen-gap"
   | "last-seen-space"
   | "predictions"
+  | "meta-strategy"
   | "draw-portfolio"
   | "possible-draw"
   | "draw-history";

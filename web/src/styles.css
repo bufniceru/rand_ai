@@ -1698,8 +1698,7 @@ tbody tr:nth-child(even) {
   font-size: 14px;
 }
 
-.prediction-efficacy-controls > header small,
-.family-efficacy-note {
+.prediction-efficacy-controls > header small {
   color: #687d92;
   font-size: 11px;
   font-weight: 750;
@@ -1707,11 +1706,6 @@ tbody tr:nth-child(even) {
 
 .prediction-efficacy-controls .efficacy-range-controls {
   margin-bottom: 0;
-}
-
-.family-efficacy-note {
-  margin: 0 0 7px;
-  line-height: 1.45;
 }
 
 .prediction-efficacy-overview > header {
@@ -7510,7 +7504,6 @@ svg text {
 .prediction-efficacy-overview > header span,
 .prediction-efficacy-overview > header small,
 .prediction-efficacy-controls > header small,
-.family-efficacy-note,
 .efficacy-count-control > span,
 .efficacy-count-control small,
 .efficacy-range-controls legend,

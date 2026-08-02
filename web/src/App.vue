@@ -15,6 +15,7 @@ import LastSeenGapHighlightView from "./views/LastSeenGapHighlightView.vue";
 import LastSeenHighlightView from "./views/LastSeenHighlightView.vue";
 import LastSeenSpaceHighlightView from "./views/LastSeenSpaceHighlightView.vue";
 import LatestDrawComparisonView from "./views/LatestDrawComparisonView.vue";
+import MetaStrategyView from "./views/MetaStrategyView.vue";
 import NumbersView from "./views/NumbersView.vue";
 import OverviewView from "./views/OverviewView.vue";
 import PredictionAuditView from "./views/PredictionAuditView.vue";
@@ -93,6 +94,11 @@ const workspaceTabs: {
     reportId: "last-seen-space",
   },
   { id: "predictions", label: "Predictions", reportId: "predictions" },
+  {
+    id: "meta-strategy",
+    label: "Meta Strategy",
+    reportId: "meta-strategy",
+  },
   {
     id: "draw-portfolio",
     label: "Draw Portfolio",
@@ -579,6 +585,7 @@ function handleWorkspaceShortcut(event: KeyboardEvent): void {
     Digit2: "possible-draw",
     Digit3: "draw-history",
     Digit4: "draw-portfolio",
+    Digit5: "meta-strategy",
   }[event.code] as WorkspaceTabId | undefined;
   if (!tabId) return;
   event.preventDefault();
@@ -666,6 +673,11 @@ onBeforeUnmount(() => {
       <div
         v-show="activeWorkspaceTab === 'predictions'"
         id="prediction-toolbar-navigation"
+        class="prediction-toolbar-navigation-slot"
+      ></div>
+      <div
+        v-show="activeWorkspaceTab === 'meta-strategy'"
+        id="meta-strategy-toolbar-navigation"
         class="prediction-toolbar-navigation-slot"
       ></div>
       <nav
@@ -875,6 +887,19 @@ onBeforeUnmount(() => {
         embedded
         @apply-strategies="applyPredictionStrategySelection"
         @send-number="handlePossibleDrawNumberRequest"
+      />
+    </main>
+
+    <main
+      v-if="analysis && visitedWorkspaceTabs.has('meta-strategy')"
+      v-show="activeWorkspaceTab === 'meta-strategy'"
+      class="workspace-tab-panel embedded-workspace-panel"
+      role="tabpanel"
+      aria-label="Meta Strategy"
+    >
+      <MetaStrategyView
+        :meta-history="analysis.metaDrawHistory"
+        :strategy-plugins="strategyPlugins"
       />
     </main>
 

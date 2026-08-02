@@ -32,6 +32,7 @@ const reportPlugins = [
   { id: "last-seen-gap", label: "Last Seen Gap Highlight" },
   { id: "last-seen-space", label: "Last Seen Space Highlight" },
   { id: "predictions", label: "Predictions" },
+  { id: "meta-strategy", label: "Meta Strategy" },
   { id: "draw-portfolio", label: "Draw Portfolio" },
   { id: "possible-draw", label: "Possible Draw" },
 ];
@@ -45,6 +46,7 @@ const legacyReportPluginIds = reportPlugins
       reportId !== "draw-comparison" &&
       reportId !== "strategy-effectiveness" &&
       reportId !== "last-seen-space" &&
+      reportId !== "meta-strategy" &&
       reportId !== "draw-portfolio",
   );
 let enabledReportIds = new Set(reportPlugins.map((plugin) => plugin.id));
@@ -699,6 +701,14 @@ function buildApplicationMenu() {
           enabled:
             activeDatasetPath !== null && enabledReportIds.has("predictions"),
           click: () => sendMenuAction("openWorkspaceTab", { tab: "predictions" }),
+        },
+        {
+          label: "Meta Strategy",
+          accelerator: "CmdOrCtrl+Shift+M",
+          enabled:
+            activeDatasetPath !== null && enabledReportIds.has("meta-strategy"),
+          click: () =>
+            sendMenuAction("openWorkspaceTab", { tab: "meta-strategy" }),
         },
         {
           label: "Possible Draw",

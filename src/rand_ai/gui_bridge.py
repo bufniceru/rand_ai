@@ -54,6 +54,7 @@ REPORT_IDS = (
     "last-seen-gap",
     "last-seen-space",
     "predictions",
+    "meta-strategy",
     "draw-portfolio",
     "possible-draw",
 )
@@ -807,6 +808,7 @@ def build_analysis_payload(
         report_set.intersection(
             {
                 "predictions",
+                "meta-strategy",
                 "draw-portfolio",
                 "possible-draw",
                 "prediction-audit",

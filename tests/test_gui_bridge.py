@@ -59,6 +59,10 @@ def test_parses_report_plugin_selection_in_stable_order() -> None:
         "predictions",
         "draw-portfolio",
     )
+    assert parse_report_ids("meta-strategy,predictions") == (
+        "predictions",
+        "meta-strategy",
+    )
     assert parse_report_ids("") == ()
     with pytest.raises(argparse.ArgumentTypeError, match="unknown report"):
         parse_report_ids("overview,unknown")
@@ -381,6 +385,42 @@ def test_draw_portfolio_prepares_predictions_and_relationships(
     assert payload["possibleDraw"]["relationshipEdges"]
 
 
+def test_meta_strategy_builds_history_without_display_rankings(
+    tmp_path: Path,
+) -> None:
+    draws = _draws()
+    assert draws.draws[-1].prediction is None
+
+    payload = build_analysis_payload(
+        draws,
+        _pickle_path(tmp_path),
+        enabled_reports=("meta-strategy",),
+        enabled_strategies=("freshness", "randomness"),
+    )
+
+    assert payload["options"]["enabledReports"] == ["meta-strategy"]
+    assert payload["combinedPredictions"] == []
+    assert payload["predictionSuites"] == []
+    assert len(payload["strategyEfficacyHistory"]) == 2
+    meta_history = payload["metaDrawHistory"]
+    assert meta_history["enabledStrategyIds"] == ["freshness", "randomness"]
+    assert len(meta_history["records"]) == 3
+    assert meta_history["records"][-1]["settled"] is False
+    assert len(meta_history["records"][-1]["forecasts"]) == 4
+    assert all(
+        len(forecast["familyProbabilities"]) == 1
+        and forecast["familyProbabilities"][0]["familyId"]
+        == "frequency-recency"
+        and forecast["familyProbabilities"][0]["rank"] == 1
+        and forecast["familyProbabilities"][0]["probability"] == 1.0
+        for forecast in meta_history["records"][-1]["forecasts"]
+    )
+    assert any(
+        outcome["familyId"] == "random-baselines" and outcome["rank"] == 0
+        for outcome in meta_history["records"][0]["familyOutcomes"]
+    )
+
+
 def test_analysis_emits_only_enabled_strategy_plugins(tmp_path: Path) -> None:
     source_path = _pickle_path(tmp_path)
     payload = build_analysis_payload(
@@ -513,12 +553,20 @@ def test_strategy_cache_reuses_report_independent_analysis(
         strategy_cache_dir=cache_dir,
         progress=lambda percent, message: second_progress.append((percent, message)),
     )
+    meta = analyze_file(
+        source_path,
+        enabled_reports=("meta-strategy",),
+        enabled_strategies=("freshness",),
+        strategy_cache_dir=cache_dir,
+    )
 
     assert calls == 1
     assert first["predictionSuites"]
     assert second["predictionSuites"] == []
     assert second["predictionAuditHistory"]
     assert second["drawComparisonHistory"]
+    assert meta["predictionSuites"] == []
+    assert len(meta["metaDrawHistory"]["records"]) == 3
     assert any("No compatible cache" in message for _, message in first_progress)
     assert (31, "Loading cached strategy analysis") in second_progress
     assert (60, "Cached strategy analysis is ready") in second_progress

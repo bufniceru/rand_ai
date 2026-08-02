@@ -8,11 +8,7 @@ import {
   runPooledRandomBenchmarks,
   type RandomBenchmarkSummary,
 } from "../lib/randomBenchmark";
-import {
-  RANDOM_HITS_PER_EVALUATION,
-  buildFamilyEfficacy,
-  type FamilyEfficacy,
-} from "../lib/familyEfficacy";
+import { RANDOM_HITS_PER_EVALUATION } from "../lib/familyEfficacy";
 import { groupStrategiesByFamily } from "../lib/strategyFamilies";
 import { strategyColor } from "../lib/strategyColors";
 import type { EfficacyChartRow } from "../lib/efficacyChart";
@@ -56,7 +52,6 @@ const mutedStrategyIds = ref<Set<string>>(new Set());
 const isStrategySidebarExpanded = ref(true);
 const isNumbersGridExpanded = ref(true);
 const isEfficacyExpanded = ref(true);
-const isFamilyEfficacyExpanded = ref(true);
 const efficacyDrawCount = ref(0);
 const efficacyRangeAnchor = ref<"first" | "latest">("first");
 const efficacyRandomBenchmarks = shallowRef<
@@ -231,23 +226,9 @@ const efficacyRanking = computed(() =>
     return left.name.localeCompare(right.name);
   }),
 );
-const familyEfficacyRanking = computed(() =>
-  buildFamilyEfficacy(
-    selectedPrediction.value?.strategies ?? [],
-    efficacyByStrategy.value,
-    selectedEfficacyHistory.value.length,
-    efficacyRandomBenchmarks.value,
-  ),
-);
 const groupedFamilyEfficacyRanking = computed(() =>
-  groupStrategiesByFamily(
-    efficacyRanking.value,
-    familyEfficacyRanking.value.map((family) => family.id),
-  ),
+  groupStrategiesByFamily(efficacyRanking.value),
 );
-const familyStrategyCounts = computed(() => [
-  ...new Set(familyEfficacyRanking.value.map((family) => family.strategyCount)),
-]);
 const strategyEfficacyChartRows = computed<EfficacyChartRow[]>(() =>
   selectedEfficacyHistory.value.length === 0
     ? []
@@ -262,17 +243,6 @@ const strategyEfficacyChartRows = computed<EfficacyChartRow[]>(() =>
           detail: `${efficacy?.evaluatedDraws ?? 0} selected draws`,
         };
       }),
-);
-const familyEfficacyChartRows = computed<EfficacyChartRow[]>(() =>
-  selectedEfficacyHistory.value.length === 0
-    ? []
-    : familyEfficacyRanking.value.map((family) => ({
-        id: family.id,
-        label: family.label,
-        rate: family.hitsPerEvaluation,
-        normalizedLift: family.normalizedLift,
-        detail: `${family.strategyCount} enabled strategies · ${family.evaluations} strategy-draw evaluations`,
-      })),
 );
 
 watch(
@@ -370,7 +340,7 @@ async function retestRandomDataset(): Promise<void> {
   try {
     efficacyRandomBenchmarks.value = runPooledRandomBenchmarks(
       drawCount,
-      [1, ...familyStrategyCounts.value],
+      [1],
     );
     efficacyRetestCount.value += 1;
   } finally {
@@ -401,54 +371,6 @@ function efficacyClass(efficacy: StrategyEfficacy | null): string {
   if (efficacy.hitDifference > 0) return "is-ahead";
   if (efficacy.hitDifference < 0) return "is-behind";
   return "is-tied";
-}
-
-function familyRandomRangeLabel(family: FamilyEfficacy): string {
-  const benchmark = family.randomBenchmark;
-  return benchmark
-    ? `${benchmark.lower95Hits}–${benchmark.upper95Hits}`
-    : "Run Retest";
-}
-
-function familyRandomTailLabel(family: FamilyEfficacy): string {
-  const benchmark = family.randomBenchmark;
-  if (!benchmark) return "Run Retest";
-  const probability = randomTailProbability(benchmark, family.familyHits);
-  if (probability < 0.001) return "<0.1%";
-  if (probability < 0.1) return `${(probability * 100).toFixed(1)}%`;
-  return `${Math.round(probability * 100)}%`;
-}
-
-function familyLiftLabel(family: FamilyEfficacy): string {
-  if (family.evaluations === 0) return "Awaiting results";
-  const lift = family.normalizedLift.toFixed(3);
-  return family.normalizedLift > 0 ? `+${lift}` : lift;
-}
-
-function familyVerdict(family: FamilyEfficacy): string {
-  if (family.evaluations === 0) return "No completed predictions yet";
-  if (family.normalizedLift > 0) return "Beats random mean";
-  if (family.normalizedLift < 0) return "Trails random mean";
-  return "Tied with random mean";
-}
-
-function familyEfficacyClass(family: FamilyEfficacy): string {
-  if (family.evaluations === 0) return "is-pending";
-  if (family.normalizedLift > 0) return "is-ahead";
-  if (family.normalizedLift < 0) return "is-behind";
-  return "is-tied";
-}
-
-function familyStrategyNames(family: FamilyEfficacy): string {
-  const names = new Map(
-    (selectedPrediction.value?.strategies ?? []).map((strategy) => [
-      strategy.id,
-      strategyFullName(strategy),
-    ]),
-  );
-  return family.strategyIds
-    .map((strategyId) => names.get(strategyId) ?? strategyId)
-    .join(", ");
 }
 
 function strategyFullName(strategy: StrategyPrediction): string {
@@ -1107,7 +1029,7 @@ onBeforeUnmount(clearNumberActionTimer);
                   :disabled="
                     selectedEfficacyHistory.length === 0 || isEfficacyRetesting
                   "
-                  title="Run 10,000 random Top-6 datasets for the strategy and family reports"
+                  title="Run 10,000 random Top-6 datasets for the strategy report"
                   @click="retestRandomDataset"
                 >
                   {{ isEfficacyRetesting ? "Retesting…" : "Retest" }}
@@ -1205,98 +1127,6 @@ onBeforeUnmount(clearNumberActionTimer);
             </div>
           </section>
 
-          <section
-            class="prediction-efficacy-overview"
-            :class="{ 'is-collapsed': !isFamilyEfficacyExpanded }"
-            aria-label="Strategy families compared with random selections"
-          >
-            <header>
-              <div>
-                <strong>Historical families efficacy versus random</strong>
-              </div>
-              <div class="prediction-collapsible-actions">
-                <small>{{ familyEfficacyRanking.length }} active families</small>
-                <button
-                  type="button"
-                  class="prediction-collapsible-toggle"
-                  :aria-expanded="isFamilyEfficacyExpanded"
-                  aria-controls="prediction-family-efficacy-panel"
-                  :aria-label="isFamilyEfficacyExpanded ? 'Collapse historical families efficacy report' : 'Expand historical families efficacy report'"
-                  :title="isFamilyEfficacyExpanded ? 'Collapse historical families efficacy report' : 'Expand historical families efficacy report'"
-                  @click="isFamilyEfficacyExpanded = !isFamilyEfficacyExpanded"
-                >
-                  {{ isFamilyEfficacyExpanded ? "«" : "»" }}
-                </button>
-              </div>
-            </header>
-            <div
-              v-show="isFamilyEfficacyExpanded"
-              id="prediction-family-efficacy-panel"
-            >
-              <p class="family-efficacy-note">
-                Family results pool every enabled member strategy across the
-                selected draws. Each member strategy on each draw is one evaluation;
-                this is not a new family consensus ticket.
-              </p>
-              <div class="efficacy-table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Family</th>
-                      <th>Strategies</th>
-                      <th>Draws</th>
-                      <th>Evaluations</th>
-                      <th>Pooled hits</th>
-                      <th>Random mean</th>
-                      <th>Random 95%</th>
-                      <th>Hits/evaluation</th>
-                      <th>Lift/evaluation</th>
-                      <th>Random ≥ result</th>
-                      <th>Result</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="(family, index) in familyEfficacyRanking"
-                      :key="family.id"
-                      :class="familyEfficacyClass(family)"
-                    >
-                      <th scope="row" :title="familyStrategyNames(family)">
-                        <span class="efficacy-rank">#{{ index + 1 }}</span>
-                        {{ family.label }}
-                      </th>
-                      <td :title="familyStrategyNames(family)">
-                        {{ family.strategyCount }}
-                      </td>
-                      <td>{{ family.evaluatedDraws }}</td>
-                      <td>{{ family.evaluations }}</td>
-                      <td>{{ formatHitTotal(family.familyHits) }}</td>
-                      <td>{{ formatHitTotal(family.randomHits) }}</td>
-                      <td>{{ familyRandomRangeLabel(family) }}</td>
-                      <td>{{ family.hitsPerEvaluation.toFixed(3) }}</td>
-                      <td>{{ familyLiftLabel(family) }}</td>
-                      <td>{{ familyRandomTailLabel(family) }}</td>
-                      <td>{{ familyVerdict(family) }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <EfficacyComparisonChart
-                id="family-efficacy-rate-chart"
-                title="Family hits per evaluation"
-                :rows="familyEfficacyChartRows"
-                mode="rate"
-                rate-unit="evaluation"
-              />
-              <EfficacyComparisonChart
-                id="family-efficacy-lift-chart"
-                title="Family normalized lift from random"
-                :rows="familyEfficacyChartRows"
-                mode="lift"
-                rate-unit="evaluation"
-              />
-            </div>
-          </section>
         </template>
 
       </div>
