@@ -149,6 +149,7 @@ export interface AnalysisPayload {
   combinedPredictions: CombinedPredictionHistory[];
   predictionSuites: PredictionSuite[];
   strategyEfficacyHistory: StrategyEfficacyRecord[];
+  metaDrawHistory: MetaDrawHistory;
   predictionAuditHistory: PredictionAuditRecord[];
   drawComparisonHistory: LatestDrawComparison[];
   latestDrawComparison: LatestDrawComparison | null;
@@ -505,6 +506,89 @@ export interface ExportResult {
 
 export interface DrawComparisonPdfRequest {
   suggestedName: string;
+}
+
+export type StrategyFamilyId =
+  | "frequency-recency"
+  | "shape-similarity"
+  | "markov-sequence"
+  | "relationships-machine-learning"
+  | "ensembles-coverage"
+  | "random-baselines";
+
+export interface StrategyFamily {
+  id: StrategyFamilyId;
+  label: string;
+  strategyIds: StrategyId[];
+  predictive: boolean;
+}
+
+export interface FamilyDrawOutcome {
+  familyId: StrategyFamilyId;
+  memberHits: Partial<Record<StrategyId, number>>;
+  strategyCount: number;
+  totalHits: number;
+  meanHitsPerStrategy: number;
+  normalizedLift: number;
+  rank: number;
+  prevailing: boolean;
+}
+
+export interface FamilyEfficiencySnapshot {
+  familyId: StrategyFamilyId;
+  evaluatedDraws: number;
+  evaluations: number;
+  cumulativeHits: number;
+  meanHitsPerStrategy: number;
+  recentEwmaHitsPerStrategy: number;
+  normalizedLift: number;
+  winShare: number;
+  volatility: number;
+  drawsSinceWin: number | null;
+}
+
+export interface FamilyProbability {
+  familyId: StrategyFamilyId;
+  rank: number;
+  rawScore: number;
+  probability: number;
+}
+
+export interface MetaStrategyForecast {
+  metaStrategyId: string;
+  predictedFamilyId: StrategyFamilyId;
+  familyProbabilities: FamilyProbability[];
+}
+
+export interface MetaForecastEvaluation {
+  metaStrategyId: string;
+  topPredictionHit: boolean;
+  winningProbabilityMass: number;
+  reciprocalWinnerRank: number;
+  brierScore: number;
+}
+
+export interface MetaDraw {
+  referenceDrawNumber: number;
+  targetDrawNumber: number;
+  referenceDate: string | null;
+  targetDate: string | null;
+  settled: boolean;
+  familySnapshots: FamilyEfficiencySnapshot[];
+  forecasts: MetaStrategyForecast[];
+  actualNumbers: number[];
+  familyOutcomes: FamilyDrawOutcome[];
+  prevailingFamilyIds: StrategyFamilyId[];
+  forecastEvaluations: MetaForecastEvaluation[];
+}
+
+export interface MetaDrawHistory {
+  schemaVersion: number;
+  familyCatalogVersion: number;
+  strategySetFingerprint: string;
+  enabledStrategyIds: StrategyId[];
+  families: StrategyFamily[];
+  records: MetaDraw[];
 }
 
 export interface DrawPortfolioPdfRequest {

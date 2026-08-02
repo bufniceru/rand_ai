@@ -4607,6 +4607,7 @@ def build_prediction_suites(
     progress: PredictionProgress | None = None,
     efficacy_record: EfficacyRecordCallback | None = None,
     evaluated_suite: PredictionSuiteCallback | None = None,
+    recorded_suite: PredictionSuiteCallback | None = None,
 ) -> tuple[PredictionSuite, ...]:
     """Evaluate all draws and retain only the requested display history."""
     requested = set(enabled_strategy_ids)
@@ -4643,6 +4644,8 @@ def build_prediction_suites(
                     strategies=state.build_strategies(combined, draw_index),
                 )
             )
+            if recorded_suite is not None:
+                recorded_suite(compared)
             if record is not None and efficacy_record is not None:
                 efficacy_record(record)
             if record is not None and evaluated_suite is not None:
@@ -4661,6 +4664,8 @@ def build_prediction_suites(
                 actual_numbers=actual,
                 strategies=(),
             )
+            if recorded_suite is not None:
+                recorded_suite(empty_suite)
             if actual and evaluated_suite is not None:
                 evaluated_suite(empty_suite)
             if draw_index >= history_start:

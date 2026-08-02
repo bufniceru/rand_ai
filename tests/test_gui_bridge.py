@@ -170,6 +170,49 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
     assert set(efficacy_history[0]["strategyHits"]) == {
         strategy["id"] for strategy in latest_suite["strategies"]
     }
+    meta_history = payload["metaDrawHistory"]
+    assert meta_history["schemaVersion"] == 1
+    assert meta_history["familyCatalogVersion"] == 1
+    assert len(meta_history["strategySetFingerprint"]) == 64
+    assert meta_history["enabledStrategyIds"] == list(DEFAULT_STRATEGY_IDS)
+    assert len(meta_history["families"]) == 6
+    assert meta_history["families"][-1] == {
+        "id": "random-baselines",
+        "label": "Random Baselines",
+        "strategyIds": ["randomness", "fresh_random"],
+        "predictive": False,
+    }
+    assert len(meta_history["records"]) == 3
+    first_meta_draw = meta_history["records"][0]
+    assert first_meta_draw["referenceDrawNumber"] == 1
+    assert first_meta_draw["targetDrawNumber"] == 2
+    assert first_meta_draw["settled"]
+    assert first_meta_draw["actualNumbers"] == [1, 10, 20, 30, 40, 49]
+    assert len(first_meta_draw["forecasts"]) == 4
+    assert len(first_meta_draw["forecastEvaluations"]) == 4
+    assert all(
+        sum(
+            probability["probability"]
+            for probability in forecast["familyProbabilities"]
+        )
+        == pytest.approx(1)
+        for forecast in first_meta_draw["forecasts"]
+    )
+    random_outcome = next(
+        outcome
+        for outcome in first_meta_draw["familyOutcomes"]
+        if outcome["familyId"] == "random-baselines"
+    )
+    assert random_outcome["rank"] == 0
+    assert not random_outcome["prevailing"]
+    latest_meta_draw = meta_history["records"][-1]
+    assert latest_meta_draw["referenceDrawNumber"] == 3
+    assert latest_meta_draw["targetDrawNumber"] == 4
+    assert not latest_meta_draw["settled"]
+    assert latest_meta_draw["targetDate"] is None
+    assert latest_meta_draw["actualNumbers"] == []
+    assert latest_meta_draw["familyOutcomes"] == []
+    assert latest_meta_draw["forecastEvaluations"] == []
     audit_history = payload["predictionAuditHistory"]
     assert len(audit_history) == 2
     assert audit_history[0]["targetDrawNumber"] == 2
@@ -434,6 +477,7 @@ def test_strategy_cache_reuses_report_independent_analysis(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    assert not gui_bridge._valid_strategy_artifacts(None)
     source_path = _pickle_path(tmp_path)
     cache_dir = tmp_path / "analysis-cache"
     calls = 0
@@ -489,6 +533,10 @@ def test_strategy_cache_reuses_report_independent_analysis(
         "historyLimit": gui_bridge.MAX_HISTORY_WINDOW,
     }
     assert cached["createdAt"].endswith("+00:00")
+    cached_meta_history = cached["analysis"]["metaDrawHistory"]
+    assert cached_meta_history == first["metaDrawHistory"]
+    assert len(cached_meta_history["records"]) == 3
+    assert cached_meta_history["records"][-1]["settled"] is False
     assert len(cached["analysis"]["portfolioBacktestHistory"]) == 2
     compact = cached["analysis"]["portfolioBacktestHistory"][0]
     assert compact["targetDrawNumber"] == 2

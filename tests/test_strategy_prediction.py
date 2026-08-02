@@ -728,12 +728,15 @@ def test_bayesian_v2_decays_recent_evidence_before_learning_each_draw() -> None:
 
 
 def test_allows_every_strategy_plugin_to_be_disabled() -> None:
+    recorded_suites: list[PredictionSuite] = []
     suites = build_prediction_suites(
         (Draw(),),
         enabled_strategy_ids=(),
+        recorded_suite=recorded_suites.append,
     )
 
     assert suites[0].strategies == ()
+    assert recorded_suites == list(suites)
 
 
 def test_reports_zero_efficacy_until_a_next_draw_is_available() -> None:
@@ -786,14 +789,19 @@ def test_display_history_limit_does_not_limit_efficacy_evaluation() -> None:
     draws.prepare_predictions()
 
     efficacy_records: list[StrategyEfficacyRecord] = []
+    recorded_suites: list[PredictionSuite] = []
     suites = build_prediction_suites(
         draws.draws,
         history_start=3,
         enabled_strategy_ids=("freshness",),
         efficacy_record=efficacy_records.append,
+        recorded_suite=recorded_suites.append,
     )
 
     assert len(suites) == 1
+    assert len(recorded_suites) == 4
+    assert [suite.reference_draw_number for suite in recorded_suites] == [1, 2, 3, 4]
+    assert recorded_suites[-1].actual_numbers == ()
     efficacy = suites[0].strategies[0].efficacy
     assert efficacy is not None
     assert efficacy.evaluated_draws == 3

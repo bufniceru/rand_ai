@@ -23,6 +23,11 @@ from rand_ai.lotto_results import (
     resolve_lotto_results_yaml,
     upsert_lotto_result,
 )
+from rand_ai.meta_prediction import (
+    STRATEGY_FAMILIES,
+    MetaDrawHistory,
+    MetaHistoryBuilder,
+)
 from rand_ai.statistics import CorrelationMethod, DrawsStatistics
 from rand_ai.strategy_prediction import (
     PredictionSuite,
@@ -65,12 +70,12 @@ DEFAULT_STRATEGY_IDS = tuple(
     }
 )
 MAX_HISTORY_WINDOW = 250
-STRATEGY_CACHE_SCHEMA_VERSION = 7
+STRATEGY_CACHE_SCHEMA_VERSION = 8
 STRATEGY_CACHE_MAX_ENTRIES = 20
 STRATEGY_CACHE_MAX_BYTES = 1024 * 1024 * 1024
 PROGRESS_PREFIX = "RAND_AI_PROGRESS "
 ProgressCallback = Callable[[int, str], None]
-StrategyAnalysisArtifacts = dict[str, list[dict[str, Any]]]
+StrategyAnalysisArtifacts = dict[str, Any]
 
 
 def _dataset_fingerprint(draws: Draws) -> str:
@@ -119,8 +124,13 @@ def _valid_strategy_artifacts(value: object) -> bool:
         "drawComparisonHistory",
         "portfolioBacktestHistory",
     )
-    return isinstance(value, dict) and all(
+    if not isinstance(value, dict):
+        return False
+    meta_history = value.get("metaDrawHistory")
+    return all(
         isinstance(value.get(name), list) for name in required
+    ) and isinstance(meta_history, dict) and isinstance(
+        meta_history.get("records"), list
     )
 
 
@@ -468,6 +478,97 @@ def _efficacy_record_payload(
     }
 
 
+def _meta_draw_history_payload(history: MetaDrawHistory) -> dict[str, Any]:
+    """Serialize one complete family-level forecast history."""
+    return {
+        "schemaVersion": history.schema_version,
+        "familyCatalogVersion": history.family_catalog_version,
+        "strategySetFingerprint": history.strategy_set_fingerprint,
+        "enabledStrategyIds": list(history.enabled_strategy_ids),
+        "families": [
+            {
+                "id": family.family_id.value,
+                "label": family.label,
+                "strategyIds": list(family.strategy_ids),
+                "predictive": family.predictive,
+            }
+            for family in STRATEGY_FAMILIES
+        ],
+        "records": [
+            {
+                "referenceDrawNumber": record.reference_draw_number,
+                "targetDrawNumber": record.target_draw_number,
+                "referenceDate": record.reference_date,
+                "targetDate": record.target_date,
+                "settled": record.is_settled,
+                "familySnapshots": [
+                    {
+                        "familyId": snapshot.family_id.value,
+                        "evaluatedDraws": snapshot.evaluated_draws,
+                        "evaluations": snapshot.evaluations,
+                        "cumulativeHits": snapshot.cumulative_hits,
+                        "meanHitsPerStrategy": snapshot.mean_hits_per_strategy,
+                        "recentEwmaHitsPerStrategy": (
+                            snapshot.recent_ewma_hits_per_strategy
+                        ),
+                        "normalizedLift": snapshot.normalized_lift,
+                        "winShare": snapshot.win_share,
+                        "volatility": snapshot.volatility,
+                        "drawsSinceWin": snapshot.draws_since_win,
+                    }
+                    for snapshot in record.family_snapshots
+                ],
+                "forecasts": [
+                    {
+                        "metaStrategyId": forecast.meta_strategy_id,
+                        "predictedFamilyId": forecast.predicted_family_id.value,
+                        "familyProbabilities": [
+                            {
+                                "familyId": probability.family_id.value,
+                                "rank": probability.rank,
+                                "rawScore": probability.raw_score,
+                                "probability": probability.probability,
+                            }
+                            for probability in forecast.family_probabilities
+                        ],
+                    }
+                    for forecast in record.forecasts
+                ],
+                "actualNumbers": list(record.actual_numbers),
+                "familyOutcomes": [
+                    {
+                        "familyId": outcome.family_id.value,
+                        "memberHits": dict(outcome.member_hits),
+                        "strategyCount": outcome.strategy_count,
+                        "totalHits": outcome.total_hits,
+                        "meanHitsPerStrategy": outcome.mean_hits_per_strategy,
+                        "normalizedLift": outcome.normalized_lift,
+                        "rank": outcome.rank,
+                        "prevailing": outcome.is_prevailing,
+                    }
+                    for outcome in record.family_outcomes
+                ],
+                "prevailingFamilyIds": [
+                    family_id.value for family_id in record.prevailing_family_ids
+                ],
+                "forecastEvaluations": [
+                    {
+                        "metaStrategyId": evaluation.meta_strategy_id,
+                        "topPredictionHit": evaluation.top_prediction_hit,
+                        "winningProbabilityMass": (
+                            evaluation.winning_probability_mass
+                        ),
+                        "reciprocalWinnerRank": evaluation.reciprocal_winner_rank,
+                        "brierScore": evaluation.brier_score,
+                    }
+                    for evaluation in record.forecast_evaluations
+                ],
+            }
+            for record in history.records
+        ],
+    }
+
+
 def _prediction_audit_record_payload(
     suite: PredictionSuite,
     target_date: str | None,
@@ -505,6 +606,24 @@ def _build_strategy_analysis(
     prediction_audit_history: list[dict[str, Any]] = []
     draw_comparison_history: list[dict[str, Any]] = []
     portfolio_backtest_history: list[dict[str, Any]] = []
+    meta_history_builder = MetaHistoryBuilder(tuple(strategy_ids))
+
+    def record_all_suite(suite: PredictionSuite) -> None:
+        reference_index = suite.reference_draw_number - 1
+        target_index = suite.target_draw_number - 1
+        meta_history_builder.record_suite(
+            suite,
+            reference_date=(
+                draws.draws[reference_index].date
+                if 0 <= reference_index < len(draws.draws)
+                else None
+            ),
+            target_date=(
+                draws.draws[target_index].date
+                if 0 <= target_index < len(draws.draws)
+                else None
+            ),
+        )
 
     def record_evaluated_suite(suite: PredictionSuite) -> None:
         target_index = suite.target_draw_number - 1
@@ -547,6 +666,7 @@ def _build_strategy_analysis(
         ),
         efficacy_record=efficacy_records.append,
         evaluated_suite=record_evaluated_suite,
+        recorded_suite=record_all_suite,
     )
     return {
         "predictionSuites": [
@@ -558,6 +678,7 @@ def _build_strategy_analysis(
         "predictionAuditHistory": prediction_audit_history,
         "drawComparisonHistory": draw_comparison_history,
         "portfolioBacktestHistory": portfolio_backtest_history,
+        "metaDrawHistory": _meta_draw_history_payload(meta_history_builder.build()),
     }
 
 
@@ -717,6 +838,10 @@ def build_analysis_payload(
         "strategyEfficacyHistory": [],
         "predictionAuditHistory": [],
         "drawComparisonHistory": [],
+        "portfolioBacktestHistory": [],
+        "metaDrawHistory": _meta_draw_history_payload(
+            MetaHistoryBuilder(strategy_ids).build()
+        ),
     }
     if prediction_suites_required:
         _report_progress(progress, 31, "Preparing named PyLotto strategy models")
@@ -832,6 +957,7 @@ def build_analysis_payload(
         "strategyEfficacyHistory": strategy_analysis[
             "strategyEfficacyHistory"
         ],
+        "metaDrawHistory": strategy_analysis["metaDrawHistory"],
         "predictionAuditHistory": (
             strategy_analysis["predictionAuditHistory"]
             if "prediction-audit" in report_set
