@@ -1,20 +1,20 @@
 import type { StrategyEfficacy, StrategyId } from "../types";
 import type { RandomBenchmarkSummary } from "./randomBenchmark";
 import {
-  groupStrategiesByCategory,
-  type StrategyCategoryId,
-} from "./strategyCategories";
+  groupStrategiesByFamily,
+  type StrategyFamilyId,
+} from "./strategyFamilies";
 
 export const RANDOM_HITS_PER_EVALUATION = 36 / 49;
 
-export interface CategoryEfficacy {
-  id: StrategyCategoryId;
+export interface FamilyEfficacy {
+  id: StrategyFamilyId;
   label: string;
   strategyIds: StrategyId[];
   strategyCount: number;
   evaluatedDraws: number;
   evaluations: number;
-  categoryHits: number;
+  familyHits: number;
   randomHits: number;
   expectedRandomHits: number;
   hitsPerEvaluation: number;
@@ -23,22 +23,22 @@ export interface CategoryEfficacy {
   randomBenchmark: RandomBenchmarkSummary | null;
 }
 
-export function buildCategoryEfficacy(
+export function buildFamilyEfficacy(
   strategies: readonly { id: StrategyId }[],
   efficacyByStrategy: ReadonlyMap<StrategyId, StrategyEfficacy>,
   evaluatedDraws: number,
   randomBenchmarks: ReadonlyMap<number, RandomBenchmarkSummary> = new Map(),
-): CategoryEfficacy[] {
+): FamilyEfficacy[] {
   if (!Number.isInteger(evaluatedDraws) || evaluatedDraws < 0) {
     throw new RangeError("Evaluated draw count must be a non-negative integer");
   }
 
-  return groupStrategiesByCategory(strategies)
-    .map((group): CategoryEfficacy => {
+  return groupStrategiesByFamily(strategies)
+    .map((group): FamilyEfficacy => {
       const strategyIds = group.strategies.map((strategy) => strategy.id);
       const strategyCount = strategyIds.length;
       const evaluations = strategyCount * evaluatedDraws;
-      const categoryHits = strategyIds.reduce(
+      const familyHits = strategyIds.reduce(
         (total, strategyId) =>
           total + (efficacyByStrategy.get(strategyId)?.strategyHits ?? 0),
         0,
@@ -46,7 +46,7 @@ export function buildCategoryEfficacy(
       const expectedRandomHits = evaluations * RANDOM_HITS_PER_EVALUATION;
       const randomBenchmark = randomBenchmarks.get(strategyCount) ?? null;
       const randomHits = expectedRandomHits;
-      const hitsPerEvaluation = evaluations > 0 ? categoryHits / evaluations : 0;
+      const hitsPerEvaluation = evaluations > 0 ? familyHits / evaluations : 0;
       const randomHitsPerEvaluation =
         evaluations > 0 ? randomHits / evaluations : 0;
 
@@ -57,7 +57,7 @@ export function buildCategoryEfficacy(
         strategyCount,
         evaluatedDraws,
         evaluations,
-        categoryHits,
+        familyHits,
         randomHits,
         expectedRandomHits,
         hitsPerEvaluation,

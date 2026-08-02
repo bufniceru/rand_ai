@@ -1604,7 +1604,7 @@ tbody tr:nth-child(even) {
 }
 
 .prediction-efficacy-controls > header small,
-.category-efficacy-note {
+.family-efficacy-note {
   color: #687d92;
   font-size: 11px;
   font-weight: 750;
@@ -1614,7 +1614,7 @@ tbody tr:nth-child(even) {
   margin-bottom: 0;
 }
 
-.category-efficacy-note {
+.family-efficacy-note {
   margin: 0 0 7px;
   line-height: 1.45;
 }
@@ -2045,7 +2045,7 @@ tbody tr:nth-child(even) {
   gap: 3px;
 }
 
-.prediction-strategy-category {
+.prediction-strategy-family {
   min-width: 0;
   display: grid;
   gap: 3px;
@@ -2053,7 +2053,7 @@ tbody tr:nth-child(even) {
   break-inside: avoid;
 }
 
-.prediction-strategy-category h3 {
+.prediction-strategy-family h3 {
   margin: 0;
   padding: 5px 9px 4px;
   border-bottom: 1px solid #c8d8e7;
@@ -7224,7 +7224,7 @@ svg text {
 .prediction-efficacy-overview > header span,
 .prediction-efficacy-overview > header small,
 .prediction-efficacy-controls > header small,
-.category-efficacy-note,
+.family-efficacy-note,
 .efficacy-count-control > span,
 .efficacy-count-control small,
 .efficacy-range-controls legend,
@@ -7234,7 +7234,7 @@ svg text {
 .prediction-color-legend label,
 .prediction-strategy-tabs button,
 .prediction-strategy-tabs button > span b,
-.prediction-strategy-category h3,
+.prediction-strategy-family h3,
 .prediction-reference-summary,
 .prediction-strategy-heading span,
 .strategy-efficacy-card > header span,
@@ -7262,7 +7262,7 @@ svg text {
   color: var(--monokai-fg);
 }
 
-.prediction-strategy-category h3 {
+.prediction-strategy-family h3 {
   border-color: var(--monokai-border);
 }
 

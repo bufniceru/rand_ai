@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { StrategyEfficacy, StrategyId } from "../types";
 import {
   RANDOM_HITS_PER_EVALUATION,
-  buildCategoryEfficacy,
-} from "./categoryEfficacy";
+  buildFamilyEfficacy,
+} from "./familyEfficacy";
 import type { RandomBenchmarkSummary } from "./randomBenchmark";
 
 function efficacy(strategyHits: number, evaluatedDraws = 2): StrategyEfficacy {
@@ -29,7 +29,7 @@ function benchmark(meanHits: number): RandomBenchmarkSummary {
   };
 }
 
-describe("category efficacy", () => {
+describe("family efficacy", () => {
   it("pools enabled member results and uses a size-matched random benchmark", () => {
     const strategies = [
       { id: "freshness" as const },
@@ -46,7 +46,7 @@ describe("category efficacy", () => {
       [2, benchmark(3)],
     ]);
 
-    const rows = buildCategoryEfficacy(
+    const rows = buildFamilyEfficacy(
       strategies,
       efficacyByStrategy,
       2,
@@ -58,7 +58,7 @@ describe("category efficacy", () => {
       strategyCount: 2,
       evaluatedDraws: 2,
       evaluations: 4,
-      categoryHits: 4,
+      familyHits: 4,
       hitsPerEvaluation: 1,
     });
     expect(frequency?.randomHits).toBeCloseTo(4 * RANDOM_HITS_PER_EVALUATION);
@@ -71,8 +71,8 @@ describe("category efficacy", () => {
     expect(frequency?.randomBenchmark).toBe(randomBenchmarks.get(2));
   });
 
-  it("omits empty categories and excludes strategies not supplied as enabled", () => {
-    const rows = buildCategoryEfficacy(
+  it("omits empty families and excludes strategies not supplied as enabled", () => {
+    const rows = buildFamilyEfficacy(
       [{ id: "freshness" }],
       new Map([["freshness", efficacy(2)]]),
       2,
@@ -82,7 +82,7 @@ describe("category efficacy", () => {
     expect(rows[0]?.strategyIds).toEqual(["freshness"]);
   });
 
-  it("ranks by normalized efficacy and resolves ties by category name", () => {
+  it("ranks by normalized efficacy and resolves ties by family name", () => {
     const strategies = [
       { id: "freshness" as const },
       { id: "entropy" as const },
@@ -96,7 +96,7 @@ describe("category efficacy", () => {
       ["markov100", efficacy(1)],
     ]);
 
-    const rows = buildCategoryEfficacy(strategies, efficacyByStrategy, 2);
+    const rows = buildFamilyEfficacy(strategies, efficacyByStrategy, 2);
 
     expect(rows.map((row) => row.label)).toEqual([
       "Frequency & Recency",
@@ -106,6 +106,6 @@ describe("category efficacy", () => {
   });
 
   it("rejects an invalid draw count", () => {
-    expect(() => buildCategoryEfficacy([], new Map(), -1)).toThrow(RangeError);
+    expect(() => buildFamilyEfficacy([], new Map(), -1)).toThrow(RangeError);
   });
 });
