@@ -27,8 +27,9 @@ export const STRATEGY_TONE_POSITION_BY_ID = {
   sparse_neural_ticket: 5,
   mixed: 0,
   cis: 1,
-  residual_coverage: 2,
-  chained: 3,
+  decision_tree_selector: 2,
+  residual_coverage: 3,
+  chained: 4,
   randomness: 0,
   fresh_random: 1,
 } as const satisfies Record<StrategyId, number>;

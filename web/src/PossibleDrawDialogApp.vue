@@ -78,6 +78,7 @@ const orderedStrategies = computed(() => {
     "mkfr", "mksp", "mknp", "mkrd", "bayesian", "predictive_grid", "co_occurrence",
     "doublet_triplet_markov", "mixed", "svc", "tbl",
     "cis", "fresh_random", "randomness",
+    "decision_tree_selector",
     "residual_coverage",
     "chained",
   ];
@@ -504,6 +505,7 @@ function strategyFullName(strategy: StrategyPrediction): string {
     lag_logistic: "Lagged Logistic",
     sparse_neural_ticket: "Sparse Neural Ticket (Experimental)",
     cis: "Conditional Independence Score",
+    decision_tree_selector: "Decision Tree Selector",
     fresh_random: "Fresh Random",
     randomness: "Randomness Ensemble",
     residual_coverage: "Residual Coverage",

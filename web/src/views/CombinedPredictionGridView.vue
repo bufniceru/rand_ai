@@ -480,6 +480,7 @@ function strategyFullName(strategy: StrategyPrediction): string {
     lag_logistic: "Lagged Logistic",
     sparse_neural_ticket: "Sparse Neural Ticket (Experimental)",
     cis: "Collective Intelligence Strategy",
+    decision_tree_selector: "Decision Tree Selector",
     residual_coverage: "Residual Coverage",
     chained: "Chained Strategy",
   }[strategy.id] ?? strategy.name;

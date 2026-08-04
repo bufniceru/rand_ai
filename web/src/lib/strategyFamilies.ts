@@ -59,6 +59,7 @@ export const STRATEGY_FAMILY_BY_ID = {
   lag_logistic: "relationships-machine-learning",
   sparse_neural_ticket: "relationships-machine-learning",
   cis: "ensembles-coverage",
+  decision_tree_selector: "ensembles-coverage",
   residual_coverage: "ensembles-coverage",
   chained: "ensembles-coverage",
 } as const satisfies Record<StrategyId, StrategyFamilyId>;

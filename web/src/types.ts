@@ -41,6 +41,7 @@ export type StrategyId =
   | "lag_logistic"
   | "sparse_neural_ticket"
   | "cis"
+  | "decision_tree_selector"
   | "residual_coverage"
   | "chained";
 export type ViewId =

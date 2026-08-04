@@ -11,6 +11,7 @@ from itertools import combinations
 
 import numpy as np
 from sklearn.linear_model import SGDClassifier
+from sklearn.tree import DecisionTreeRegressor
 
 from rand_ai.draw import Draw
 from rand_ai.prediction import CombinedPrediction
@@ -77,6 +78,11 @@ _CIS_RECENT_WINDOW = 40
 _CIS_LEARNER_MAX_BLEND = 0.15
 _CIS_LEARNER_EVIDENCE_DRAWS = 24.0
 _CIS_LEARNER_MIN_ADVANTAGE = 0.10
+_DECISION_TREE_MINIMUM_TRAINING_DRAWS = 72
+_DECISION_TREE_TRAINING_WINDOW = 500
+_DECISION_TREE_MAX_DEPTH = 4
+_DECISION_TREE_MINIMUM_LEAF_DRAWS = 12
+_DECISION_TREE_EXPERT_PRIOR_DRAWS = 24.0
 _SKLEARN_SVM_EXPERT_IDS = (
     "mksp",
     "doublet_triplet_markov",
@@ -187,6 +193,7 @@ _BASE_STRATEGY_IDS = (
     "lag_logistic",
     "sparse_neural_ticket",
     "cis",
+    "decision_tree_selector",
 )
 _CHAIN_EXPERT_IDS = (
     "freshness",
@@ -222,6 +229,40 @@ _CIS_EXPERTS = (
     ("svc", "SVC", 0.05),
     ("tbl", "TBL", 0.05),
 )
+_DECISION_TREE_EXPERT_IDS = tuple(
+    strategy_id for strategy_id, _label, _weight in _CIS_EXPERTS
+)
+_DECISION_TREE_EXPERT_LABELS = {
+    strategy_id: label for strategy_id, label, _weight in _CIS_EXPERTS
+}
+_DECISION_TREE_GLOBAL_FEATURE_NAMES = (
+    "history_evidence",
+    "latest_sum",
+    "latest_span",
+    "latest_odd_share",
+    "latest_low_share",
+    "latest_prime_share",
+    "latest_consecutive_share",
+    "previous_overlap",
+    "gap_mean",
+    "gap_deviation",
+)
+_DECISION_TREE_EXPERT_FEATURE_NAMES = (
+    "smoothed_lifetime_hits",
+    "recent_10_hits",
+    "recent_40_hits",
+    "recent_momentum",
+    "top_six_consensus",
+    "top_six_stability",
+)
+_DECISION_TREE_FEATURE_NAMES = (
+    *_DECISION_TREE_GLOBAL_FEATURE_NAMES,
+    *(
+        f"{strategy_id}_{feature_name}"
+        for strategy_id in _DECISION_TREE_EXPERT_IDS
+        for feature_name in _DECISION_TREE_EXPERT_FEATURE_NAMES
+    ),
+)
 _STRATEGY_DEPENDENCIES = {
     "tbl": {"freshness", "proximity", "randomness"},
     "fresh_random": {"freshness", "randomness"},
@@ -242,6 +283,7 @@ _STRATEGY_DEPENDENCIES = {
         "svc",
         "tbl",
     },
+    "decision_tree_selector": set(_DECISION_TREE_EXPERT_IDS),
     "sklearn_svm": set(_SKLEARN_SVM_EXPERT_IDS),
     "sparse_neural_ticket": {"sklearn_svm", "lag_logistic"},
     "residual_coverage": set(_BASE_STRATEGY_IDS).difference(
@@ -251,6 +293,7 @@ _STRATEGY_DEPENDENCIES = {
             "sklearn_svm",
             "lag_logistic",
             "sparse_neural_ticket",
+            "decision_tree_selector",
         }
     ),
     "chained": set(_CHAIN_EXPERT_IDS),
@@ -882,6 +925,33 @@ class _StrategyState:
         self.cis_pending_features: dict[int, tuple[float, ...]] = {}
         self.cis_pending_ensemble_scores: dict[int, float] = {}
         self.cis_pending_learner_scores: dict[int, float] = {}
+        self.decision_tree_selector = (
+            DecisionTreeRegressor(
+                criterion="squared_error",
+                max_depth=_DECISION_TREE_MAX_DEPTH,
+                min_samples_leaf=_DECISION_TREE_MINIMUM_LEAF_DRAWS,
+                random_state=_RANDOM_SEED,
+            )
+            if "decision_tree_selector" in self.enabled_strategy_ids
+            else None
+        )
+        self.decision_tree_selector_fitted = False
+        self.decision_tree_selector_features: deque[tuple[float, ...]] = deque(
+            maxlen=_DECISION_TREE_TRAINING_WINDOW
+        )
+        self.decision_tree_selector_targets: deque[tuple[float, ...]] = deque(
+            maxlen=_DECISION_TREE_TRAINING_WINDOW
+        )
+        self.decision_tree_selector_pending_features: tuple[float, ...] | None = None
+        self.decision_tree_selector_pending_rankings: dict[str, list[int]] = {}
+        self.decision_tree_selector_total_hits = {
+            strategy_id: 0 for strategy_id in _DECISION_TREE_EXPERT_IDS
+        }
+        self.decision_tree_selector_evaluated_draws = 0
+        self.decision_tree_selector_recent_hits = {
+            strategy_id: deque(maxlen=40)
+            for strategy_id in _DECISION_TREE_EXPERT_IDS
+        }
         self.chain_evaluated_draws = 0
         self.chain_total_hits = {
             strategy_id: 0 for strategy_id in _CHAIN_EXPERT_IDS
@@ -1645,6 +1715,224 @@ class _StrategyState:
             self.chain_recent_hits[strategy_id].append(hits)
         self.chain_evaluated_draws += 1
 
+    def _train_decision_tree_selector(self, drawn: set[int]) -> None:
+        pending_features = self.decision_tree_selector_pending_features
+        pending_rankings = self.decision_tree_selector_pending_rankings
+        if pending_features is None or not pending_rankings:
+            return
+
+        targets = tuple(
+            float(
+                len(
+                    drawn.intersection(
+                        pending_rankings[strategy_id][:_NUMBERS_PER_DRAW]
+                    )
+                )
+            )
+            for strategy_id in _DECISION_TREE_EXPERT_IDS
+        )
+        self.decision_tree_selector_features.append(pending_features)
+        self.decision_tree_selector_targets.append(targets)
+        for strategy_id, hits in zip(_DECISION_TREE_EXPERT_IDS, targets):
+            integer_hits = int(hits)
+            self.decision_tree_selector_total_hits[strategy_id] += integer_hits
+            self.decision_tree_selector_recent_hits[strategy_id].append(integer_hits)
+        self.decision_tree_selector_evaluated_draws += 1
+
+        model = self.decision_tree_selector
+        if (
+            model is not None
+            and len(self.decision_tree_selector_features)
+            >= _DECISION_TREE_MINIMUM_TRAINING_DRAWS
+        ):
+            model.fit(
+                np.asarray(self.decision_tree_selector_features, dtype=float),
+                np.asarray(self.decision_tree_selector_targets, dtype=float),
+            )
+            self.decision_tree_selector_fitted = True
+
+    def _decision_tree_smoothed_hits(self, strategy_id: str) -> float:
+        evaluated = self.decision_tree_selector_evaluated_draws
+        return (
+            self.decision_tree_selector_total_hits[strategy_id]
+            + _DECISION_TREE_EXPERT_PRIOR_DRAWS * _EXPECTED_RANDOM_HITS_PER_DRAW
+        ) / (evaluated + _DECISION_TREE_EXPERT_PRIOR_DRAWS)
+
+    def _decision_tree_selector_features(
+        self,
+        rankings: dict[str, list[int]],
+        gaps: dict[int, int],
+    ) -> tuple[float, ...]:
+        latest = sorted(self.previous_draw)
+        latest_sum = sum(latest) / (_NUMBERS_PER_DRAW * _NUMBER_COUNT)
+        latest_span = (
+            (latest[-1] - latest[0]) / (_NUMBER_COUNT - 1)
+            if len(latest) >= 2
+            else 0.0
+        )
+        latest_odd_share = sum(number % 2 == 1 for number in latest) / max(
+            len(latest), 1
+        )
+        latest_low_share = sum(number <= 24 for number in latest) / max(
+            len(latest), 1
+        )
+        latest_prime_share = sum(number in _PRIMES for number in latest) / max(
+            len(latest), 1
+        )
+        latest_consecutive_share = sum(
+            right - left == 1 for left, right in zip(latest, latest[1:])
+        ) / max(len(latest) - 1, 1)
+        previous_overlap = len(
+            self.previous_draw.intersection(self.previous_previous_draw)
+        ) / _NUMBERS_PER_DRAW
+        gap_values = tuple(gaps.values())
+        gap_mean = _clamp(_average(gap_values) / 40, 0, 1)
+        gap_deviation = _clamp(math.sqrt(_variance(gap_values)) / 40, 0, 1)
+        features = [
+            min(self.draw_count / _DECISION_TREE_TRAINING_WINDOW, 1),
+            latest_sum,
+            latest_span,
+            latest_odd_share,
+            latest_low_share,
+            latest_prime_share,
+            latest_consecutive_share,
+            previous_overlap,
+            gap_mean,
+            gap_deviation,
+        ]
+
+        top_sets = {
+            strategy_id: set(rankings[strategy_id][:_NUMBERS_PER_DRAW])
+            for strategy_id in _DECISION_TREE_EXPERT_IDS
+        }
+        previous_rankings = self.decision_tree_selector_pending_rankings
+        for strategy_id in _DECISION_TREE_EXPERT_IDS:
+            recent = list(self.decision_tree_selector_recent_hits[strategy_id])
+            recent_10_hits = (
+                _average(recent[-10:])
+                if recent
+                else _EXPECTED_RANDOM_HITS_PER_DRAW
+            )
+            recent_40_hits = (
+                _average(recent) if recent else _EXPECTED_RANDOM_HITS_PER_DRAW
+            )
+            candidate_top = top_sets[strategy_id]
+            top_six_consensus = _average(
+                [
+                    sum(number in expert_top for expert_top in top_sets.values())
+                    / len(top_sets)
+                    for number in candidate_top
+                ]
+            )
+            previous = previous_rankings.get(strategy_id)
+            top_six_stability = (
+                len(candidate_top.intersection(previous[:_NUMBERS_PER_DRAW]))
+                / _NUMBERS_PER_DRAW
+                if previous is not None
+                else 0.0
+            )
+            features.extend(
+                (
+                    self._decision_tree_smoothed_hits(strategy_id)
+                    / _NUMBERS_PER_DRAW,
+                    recent_10_hits / _NUMBERS_PER_DRAW,
+                    recent_40_hits / _NUMBERS_PER_DRAW,
+                    (recent_10_hits - recent_40_hits) / _NUMBERS_PER_DRAW,
+                    top_six_consensus,
+                    top_six_stability,
+                )
+            )
+        return tuple(features)
+
+    def _decision_tree_selector_path(
+        self,
+        features: tuple[float, ...],
+    ) -> str:
+        model = self.decision_tree_selector
+        if model is None or not self.decision_tree_selector_fitted:
+            return "Warm-up fallback; no fitted tree path"
+        row = np.asarray([features], dtype=float)
+        node_ids = model.decision_path(row).indices
+        rules: list[str] = []
+        for node_id in node_ids:
+            feature_index = int(model.tree_.feature[node_id])
+            if feature_index < 0:
+                continue
+            threshold = float(model.tree_.threshold[node_id])
+            value = features[feature_index]
+            operator = "≤" if value <= threshold else ">"
+            rules.append(
+                f"{_DECISION_TREE_FEATURE_NAMES[feature_index]} "
+                f"{operator} {threshold:.3f}"
+            )
+        return "Tree path: " + ("; ".join(rules) if rules else "root leaf")
+
+    def _decision_tree_selector_scores(
+        self,
+        rankings: dict[str, list[int]],
+        gaps: dict[int, int],
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        features = self._decision_tree_selector_features(rankings, gaps)
+        model = self.decision_tree_selector
+        if model is not None and self.decision_tree_selector_fitted:
+            prediction = model.predict(np.asarray([features], dtype=float))[0]
+            estimates = {
+                strategy_id: _clamp(float(prediction[index]), 0, _NUMBERS_PER_DRAW)
+                for index, strategy_id in enumerate(_DECISION_TREE_EXPERT_IDS)
+            }
+            mode = (
+                "Decision tree fitted on "
+                f"{len(self.decision_tree_selector_features)} completed draws"
+            )
+        else:
+            estimates = {
+                strategy_id: self._decision_tree_smoothed_hits(strategy_id)
+                for strategy_id in _DECISION_TREE_EXPERT_IDS
+            }
+            mode = (
+                "Smoothed efficacy fallback "
+                f"({len(self.decision_tree_selector_features)}/"
+                f"{_DECISION_TREE_MINIMUM_TRAINING_DRAWS} training draws)"
+            )
+
+        ordered_experts = sorted(
+            _DECISION_TREE_EXPERT_IDS,
+            key=lambda strategy_id: (
+                -estimates[strategy_id],
+                _DECISION_TREE_EXPERT_IDS.index(strategy_id),
+            ),
+        )
+        selected_id = ordered_experts[0]
+        runner_up_id = ordered_experts[1]
+        selected_ranking = rankings[selected_id]
+        scores: dict[int, float] = {
+            number: (_NUMBER_COUNT - rank) / (_NUMBER_COUNT - 1)
+            for rank, number in enumerate(selected_ranking, start=1)
+        }
+        path = self._decision_tree_selector_path(features)
+        selected_label = _DECISION_TREE_EXPERT_LABELS[selected_id]
+        runner_up_label = _DECISION_TREE_EXPERT_LABELS[runner_up_id]
+        rank_by_number = {
+            number: rank for rank, number in enumerate(selected_ranking, start=1)
+        }
+        details: dict[int, tuple[str, ...]] = {
+            number: (
+                f"Selected expert: {selected_label}",
+                mode,
+                f"Estimated hits {estimates[selected_id]:.3f}",
+                f"Runner-up: {runner_up_label} ({estimates[runner_up_id]:.3f})",
+                path,
+                f"Selected-expert rank {rank_by_number[number]}",
+            )
+            for number in selected_ranking
+        }
+        self.decision_tree_selector_pending_features = features
+        self.decision_tree_selector_pending_rankings = {
+            strategy_id: list(rankings[strategy_id])
+            for strategy_id in _DECISION_TREE_EXPERT_IDS
+        }
+        return scores, details
+
     def _chain_expert_weight(self, strategy_id: str) -> float:
         evaluated = self.chain_evaluated_draws
         long_term_hits = self.chain_total_hits[strategy_id]
@@ -1721,6 +2009,9 @@ class _StrategyState:
 
         if "cis" in self.enabled_strategy_ids:
             self._train_cis(drawn)
+
+        if "decision_tree_selector" in self.enabled_strategy_ids:
+            self._train_decision_tree_selector(drawn)
 
         if "sklearn_svm" in self.enabled_strategy_ids:
             self._train_sklearn_svm(drawn)
@@ -4541,6 +4832,27 @@ class _StrategyState:
                     cis_scores,
                     gaps,
                     cis_details,
+                )
+
+        if "decision_tree_selector" in enabled:
+            decision_tree_scores, decision_tree_details = (
+                self._decision_tree_selector_scores(rankings, gaps)
+            )
+            rankings["decision_tree_selector"] = _ranking_from_scores(
+                decision_tree_scores,
+                gaps,
+            )
+            if "decision_tree_selector" in requested:
+                built["decision_tree_selector"] = _strategy(
+                    "decision_tree_selector",
+                    "Decision Tree Selector",
+                    (
+                        "Leakage-safe decision tree selecting one stable expert "
+                        "from draw shape, consensus, and historical efficacy."
+                    ),
+                    decision_tree_scores,
+                    gaps,
+                    decision_tree_details,
                 )
 
         if "residual_coverage" in enabled:

@@ -90,6 +90,7 @@ const strategyPlugins = [
     label: "Sparse Neural Ticket (Experimental)",
   },
   { id: "cis", label: "Collective Intelligence Strategy" },
+  { id: "decision_tree_selector", label: "Decision Tree Selector" },
   { id: "residual_coverage", label: "Residual Coverage" },
   { id: "chained", label: "Chained Strategy" },
 ];
@@ -100,7 +101,8 @@ const defaultStrategyPluginIds = strategyPlugins
       strategyId !== "mkrd" &&
       strategyId !== "sklearn_svm" &&
       strategyId !== "lag_logistic" &&
-      strategyId !== "sparse_neural_ticket",
+      strategyId !== "sparse_neural_ticket" &&
+      strategyId !== "decision_tree_selector",
   );
 let enabledStrategyIds = new Set(defaultStrategyPluginIds);
 
