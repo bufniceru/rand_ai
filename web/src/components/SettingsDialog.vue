@@ -32,7 +32,7 @@ const strategyDescriptions: Record<StrategyId, string> = {
   entropy: "Gap-entropy history with overdue adjustment.",
   markov100: "Recency-weighted gap-state Markov model.",
   mkgsv:
-    "Experimental hierarchical next-draw model for ordered gap and last-seen spaces; its promotion gate failed.",
+    "Experimental guarded Markov 100 correction using historical and fresh ordered gap-space residuals; its v2 promotion gate failed.",
   mkfr: "Variable-order D/!D context transition lift.",
   mksp: "Order-20 space analogues decoded into complete valid draws.",
   mknp: "Order-20 normalized-position analogues decoded into valid translated draws.",
