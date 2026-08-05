@@ -15,6 +15,7 @@ const strategyIds: StrategyId[] = [
   "chi_square",
   "entropy",
   "markov100",
+  "mkgsv",
   "mkfr",
   "mksp",
   "mknp",

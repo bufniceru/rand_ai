@@ -69,6 +69,7 @@ const strategyPlugins = [
   { id: "chi_square", label: "Chi-square Frequency" },
   { id: "entropy", label: "Entropy" },
   { id: "markov100", label: "Markov 100" },
+  { id: "mkgsv", label: "Markov Gap-Space Vector (Experimental)" },
   { id: "mkfr", label: "Markov Freshness" },
   { id: "mksp", label: "Markov Spaces" },
   { id: "mknp", label: "Markov Normalized Positions" },
@@ -99,6 +100,7 @@ const defaultStrategyPluginIds = strategyPlugins
   .filter(
     (strategyId) =>
       strategyId !== "mkrd" &&
+      strategyId !== "mkgsv" &&
       strategyId !== "sklearn_svm" &&
       strategyId !== "lag_logistic" &&
       strategyId !== "sparse_neural_ticket" &&

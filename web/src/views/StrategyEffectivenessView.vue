@@ -34,6 +34,7 @@ const strategyNames: Record<StrategyId, string> = {
   chi_square: "Chi-square Frequency",
   entropy: "Entropy",
   markov100: "Markov 100",
+  mkgsv: "Markov Gap-Space Vector (Experimental)",
   mkfr: "Markov Freshness",
   mksp: "Markov Spaces",
   mknp: "Markov Normalized Positions",

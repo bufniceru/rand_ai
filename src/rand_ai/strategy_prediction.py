@@ -14,6 +14,7 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.tree import DecisionTreeRegressor
 
 from rand_ai.draw import Draw
+from rand_ai.mkgsv import MkgsvModel
 from rand_ai.prediction import CombinedPrediction
 from rand_ai.sparse_neural_ticket import (
     SparseNeuralTicketArtifact,
@@ -178,6 +179,7 @@ _BASE_STRATEGY_IDS = (
     "chi_square",
     "entropy",
     "markov100",
+    "mkgsv",
     "mkfr",
     "mksp",
     "mknp",
@@ -264,6 +266,7 @@ _DECISION_TREE_FEATURE_NAMES = (
     ),
 )
 _STRATEGY_DEPENDENCIES = {
+    "mkgsv": {"markov100"},
     "tbl": {"freshness", "proximity", "randomness"},
     "fresh_random": {"freshness", "randomness"},
     "mixed": {"freshness", "proximity", "emd", "bayesian"},
@@ -290,6 +293,7 @@ _STRATEGY_DEPENDENCIES = {
         {
             "mknp",
             "mkrd",
+            "mkgsv",
             "sklearn_svm",
             "lag_logistic",
             "sparse_neural_ticket",
@@ -902,6 +906,9 @@ class _StrategyState:
         self.sparse_neural_ticket_history: list[list[str | int | None]] = []
         self.sparse_neural_ticket_ready = False
         self.sparse_neural_ticket_invalid = False
+        self.mkgsv = (
+            MkgsvModel() if "mkgsv" in self.enabled_strategy_ids else None
+        )
         self.cis_weights = [0.0] * (22 + len(_CIS_EXPERTS) * 4)
         self.cis_draw_count = 0
         self.cis_total_hits = {
@@ -2007,6 +2014,9 @@ class _StrategyState:
         if "chained" in self.enabled_strategy_ids:
             self._train_chained_effectiveness(drawn)
 
+        if self.mkgsv is not None:
+            self.mkgsv.train(drawn)
+
         if "cis" in self.enabled_strategy_ids:
             self._train_cis(drawn)
 
@@ -2245,6 +2255,8 @@ class _StrategyState:
             self.mkrd_observations.append(
                 (normalized, anchor, _relative_dispersion_profile(drawn))
             )
+        if self.mkgsv is not None:
+            self.mkgsv.remember(drawn)
         self.draw_count += 1
 
     @staticmethod
@@ -2392,6 +2404,23 @@ class _StrategyState:
             )
         return _scale_scores(residuals), details
 
+    def _markov_gap_probabilities(
+        self,
+        gaps: dict[int, int],
+    ) -> dict[int, float]:
+        probabilities = [
+            (hit + _MARKOV_PRIOR_STRENGTH * _BASE_PROBABILITY)
+            / (opportunity + _MARKOV_PRIOR_STRENGTH)
+            for hit, opportunity in zip(
+                self.markov_hits,
+                self.markov_opportunities,
+            )
+        ]
+        return {
+            number: probabilities[min(gaps[number], _MAX_GAP_BUCKET)]
+            for number in range(1, _NUMBER_COUNT + 1)
+        }
+
     def _gap_model_scores(
         self,
         gaps: dict[int, int],
@@ -2399,18 +2428,7 @@ class _StrategyState:
         weighted: bool,
     ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
         if weighted:
-            probabilities = [
-                (hit + _MARKOV_PRIOR_STRENGTH * _BASE_PROBABILITY)
-                / (opportunity + _MARKOV_PRIOR_STRENGTH)
-                for hit, opportunity in zip(
-                    self.markov_hits,
-                    self.markov_opportunities,
-                )
-            ]
-            raw = {
-                number: probabilities[min(gaps[number], _MAX_GAP_BUCKET)]
-                for number in range(1, _NUMBER_COUNT + 1)
-            }
+            raw = self._markov_gap_probabilities(gaps)
             details: dict[int, tuple[str, ...]] = {
                 number: (
                     f"Gap bucket {min(gaps[number], _MAX_GAP_BUCKET)}",
@@ -4449,6 +4467,83 @@ class _StrategyState:
                     markov_scores,
                     gaps,
                     markov_details,
+                )
+
+        if "mkgsv" in enabled:
+            if self.mkgsv is None:  # pragma: no cover - state invariant
+                raise AssertionError("MKGSV model was not initialized")
+            decision = self.mkgsv.predict(
+                self._markov_gap_probabilities(gaps),
+                tuple(rankings["markov100"]),
+            )
+            mkgsv_rows = decision.scores
+            mkgsv_config = self.mkgsv.config
+            proposal = (
+                "No supported replacement"
+                if decision.proposed_outsider is None
+                else (
+                    f"Shadow swap {decision.proposed_insider} → "
+                    f"{decision.proposed_outsider}"
+                )
+            )
+            mkgsv_details: dict[int, tuple[str, ...]] = {
+                number: (
+                    (
+                        f"Champion rank {decision.base_ranking.index(number) + 1}; "
+                        f"probability {row.base_probability:.2%}"
+                    ),
+                    (
+                        f"State gap {row.state.gap} (bucket {row.state.gap_bucket}); "
+                        f"historical {None if row.state.historical is None else (row.state.historical.left_space, row.state.historical.right_space)}; "
+                        f"fresh {None if row.state.fresh is None else (row.state.fresh.left_space, row.state.fresh.right_space)}"
+                    ),
+                    (
+                        "Historical residual unavailable"
+                        if row.historical_evidence is None
+                        else (
+                            f"Historical residual {row.historical_evidence.correction:+.3%}; "
+                            f"pair support {row.historical_evidence.pair_supports}; "
+                            f"triple support {row.historical_evidence.triple_support}"
+                        )
+                    ),
+                    (
+                        "Fresh residual unavailable"
+                        if row.fresh_evidence is None
+                        else (
+                            f"Fresh residual {row.fresh_evidence.correction:+.3%}; "
+                            f"pair support {row.fresh_evidence.pair_supports}; "
+                            f"triple support {row.fresh_evidence.triple_support}"
+                        )
+                    ),
+                    (
+                        f"Guarded correction {row.correction:+.3%}; "
+                        f"corrected probability {row.corrected_probability:.2%}"
+                    ),
+                    proposal,
+                    decision.status,
+                    (
+                        f"Prior strengths {mkgsv_config.single_strength:g} single / "
+                        f"{mkgsv_config.pair_strength:g} pair / "
+                        f"{mkgsv_config.triple_strength:g} triple; "
+                        f"{mkgsv_config.evidence_variant} evidence"
+                    ),
+                )
+                for number, row in mkgsv_rows.items()
+            }
+            mkgsv_scores = decision.ranking_scores
+            rankings["mkgsv"] = list(decision.output_ranking)
+            if "mkgsv" in requested:
+                built["mkgsv"] = _strategy(
+                    "mkgsv",
+                    "Markov Gap-Space Vector (Experimental)",
+                    (
+                        "Guarded Markov 100 boundary correction using binned "
+                        "historical and fresh ordered gap-space residuals. Its "
+                        "v2 promotion gate failed, so it remains experimental."
+                    ),
+                    mkgsv_scores,
+                    gaps,
+                    mkgsv_details,
                 )
 
         if "mkfr" in enabled:

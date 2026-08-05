@@ -44,6 +44,7 @@ export const STRATEGY_FAMILY_BY_ID = {
   chi_square: "frequency-recency",
   entropy: "frequency-recency",
   markov100: "markov-sequence",
+  mkgsv: "markov-sequence",
   mkfr: "markov-sequence",
   mksp: "markov-sequence",
   mknp: "markov-sequence",

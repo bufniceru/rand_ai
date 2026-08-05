@@ -1,0 +1,161 @@
+{
+  "dataset": "data/lotto_results_2019.yaml",
+  "evaluatedDraws": 770,
+  "split": {
+    "warmUp": 320,
+    "validation": 200,
+    "holdout": 250
+  },
+  "selectedConfig": {
+    "single_strength": 64.0,
+    "pair_strength": 4.0,
+    "triple_strength": 2.0
+  },
+  "stateSupport": {
+    "uniqueTripleStates": 10473,
+    "tripleExposures": 37381,
+    "medianTripleSupport": 2.0,
+    "singleExposureStates": 4647,
+    "doubleExposureStates": 1804,
+    "threeToFiveExposureStates": 2163,
+    "sixToTenExposureStates": 1117,
+    "overTenExposureStates": 742
+  },
+  "scopes": {
+    "validation": {
+      "mkgsv": {
+        "evaluatedDraws": 200,
+        "totalHits": 143,
+        "averageHitsPerDraw": 0.715,
+        "zeroHits": 89,
+        "oneHit": 83,
+        "twoOrMoreHits": 28,
+        "brierScore": 0.11786402992644641
+      },
+      "strongestRelatedBaseline": {
+        "id": "proximity",
+        "evaluatedDraws": 200,
+        "totalHits": 161,
+        "averageHitsPerDraw": 0.805,
+        "zeroHits": 78,
+        "oneHit": 86,
+        "twoOrMoreHits": 36
+      },
+      "relatedBaselines": {
+        "markov100": {
+          "evaluatedDraws": 200,
+          "totalHits": 148,
+          "averageHitsPerDraw": 0.74,
+          "zeroHits": 88,
+          "oneHit": 83,
+          "twoOrMoreHits": 29
+        },
+        "freshness": {
+          "evaluatedDraws": 200,
+          "totalHits": 149,
+          "averageHitsPerDraw": 0.745,
+          "zeroHits": 88,
+          "oneHit": 81,
+          "twoOrMoreHits": 31
+        },
+        "proximity": {
+          "evaluatedDraws": 200,
+          "totalHits": 161,
+          "averageHitsPerDraw": 0.805,
+          "zeroHits": 78,
+          "oneHit": 86,
+          "twoOrMoreHits": 36
+        },
+        "combined": {
+          "evaluatedDraws": 200,
+          "totalHits": 140,
+          "averageHitsPerDraw": 0.7,
+          "zeroHits": 89,
+          "oneHit": 83,
+          "twoOrMoreHits": 28
+        }
+      },
+      "pairedVsStrongest": {
+        "candidateWins": 56,
+        "ties": 75,
+        "baselineWins": 69,
+        "meanHitDifference": -0.09,
+        "meanDifference95Interval": [
+          -0.23584804924076522,
+          0.055848049240765224
+        ]
+      },
+      "theoreticalRandomHits": 146.93877551020407
+    },
+    "holdout": {
+      "mkgsv": {
+        "evaluatedDraws": 250,
+        "totalHits": 178,
+        "averageHitsPerDraw": 0.712,
+        "zeroHits": 119,
+        "oneHit": 87,
+        "twoOrMoreHits": 44,
+        "brierScore": 0.11604119106238928
+      },
+      "strongestRelatedBaseline": {
+        "id": "markov100",
+        "evaluatedDraws": 250,
+        "totalHits": 207,
+        "averageHitsPerDraw": 0.828,
+        "zeroHits": 93,
+        "oneHit": 117,
+        "twoOrMoreHits": 40
+      },
+      "relatedBaselines": {
+        "markov100": {
+          "evaluatedDraws": 250,
+          "totalHits": 207,
+          "averageHitsPerDraw": 0.828,
+          "zeroHits": 93,
+          "oneHit": 117,
+          "twoOrMoreHits": 40
+        },
+        "freshness": {
+          "evaluatedDraws": 250,
+          "totalHits": 191,
+          "averageHitsPerDraw": 0.764,
+          "zeroHits": 102,
+          "oneHit": 109,
+          "twoOrMoreHits": 39
+        },
+        "proximity": {
+          "evaluatedDraws": 250,
+          "totalHits": 173,
+          "averageHitsPerDraw": 0.692,
+          "zeroHits": 114,
+          "oneHit": 103,
+          "twoOrMoreHits": 33
+        },
+        "combined": {
+          "evaluatedDraws": 250,
+          "totalHits": 177,
+          "averageHitsPerDraw": 0.708,
+          "zeroHits": 101,
+          "oneHit": 126,
+          "twoOrMoreHits": 23
+        }
+      },
+      "pairedVsStrongest": {
+        "candidateWins": 70,
+        "ties": 89,
+        "baselineWins": 91,
+        "meanHitDifference": -0.116,
+        "meanDifference95Interval": [
+          -0.255123132171544,
+          0.02312313217154395
+        ]
+      },
+      "theoreticalRandomHits": 183.6734693877551
+    }
+  },
+  "promotion": {
+    "passed": false,
+    "defaultEnabled": false,
+    "rule": "MKGSV must beat the strongest related baseline on validation and trail it by no hits on holdout."
+  }
+}
