@@ -17,6 +17,12 @@ from rand_ai.strategy_prediction import (
     _BAYESIAN_GAP_DECAY,
     _BAYESIAN_NUMBER_DECAY,
     _CIS_EXPERTS,
+    _DECISION_TREE_EXPERT_IDS,
+    _DECISION_TREE_FEATURE_NAMES,
+    _DECISION_TREE_MAX_DEPTH,
+    _DECISION_TREE_MINIMUM_LEAF_DRAWS,
+    _DECISION_TREE_MINIMUM_TRAINING_DRAWS,
+    _DECISION_TREE_TRAINING_WINDOW,
     _EXPECTED_RANDOM_HITS_PER_DRAW,
     _LAG_LOGISTIC_FEATURE_COUNT,
     _LAG_LOGISTIC_MIN_TRAINING_DRAWS,
@@ -27,6 +33,7 @@ from rand_ai.strategy_prediction import (
     _MKSP_MIN_CONTEXT_SUPPORT,
     _MKSP_PRIOR_STRENGTH,
     _MKSP_VALUE_COUNT,
+    _NUMBERS_PER_DRAW,
     _SKLEARN_SVM_EXPERT_IDS,
     _SKLEARN_SVM_FEATURE_COUNT,
     _StrategyState,
@@ -42,7 +49,7 @@ from rand_ai.strategy_prediction import (
 )
 
 
-def test_builds_twenty_four_named_rankings_and_reports_progress() -> None:
+def test_builds_twenty_five_named_rankings_and_reports_progress() -> None:
     draws = Draws()
     draws.add(Draw(1, 2, 8, 17, 31, 49))
     draws.add(Draw(3, 6, 12, 22, 36, 47))
@@ -82,6 +89,7 @@ def test_builds_twenty_four_named_rankings_and_reports_progress() -> None:
         "Scikit Online SVM",
         "Lagged Logistic",
         "CIS",
+        "Decision Tree Selector",
         "RCOV",
         "Chained Strategy",
     ]
@@ -119,6 +127,115 @@ def test_builds_twenty_four_named_rankings_and_reports_progress() -> None:
         2 * _EXPECTED_RANDOM_HITS_PER_DRAW
     )
     assert progress == [(1, 3), (2, 3), (3, 3)]
+
+
+def test_decision_tree_selector_builds_with_hidden_experts_and_warm_up() -> None:
+    draws = Draws()
+    draws.add(Draw(1, 2, 8, 17, 31, 49))
+    draws.prepare_predictions()
+    state = _StrategyState(("decision_tree_selector",))
+
+    assert state.requested_strategy_ids == frozenset({"decision_tree_selector"})
+    assert set(_DECISION_TREE_EXPERT_IDS).issubset(state.enabled_strategy_ids)
+    assert state.decision_tree_selector is not None
+    assert state.decision_tree_selector.max_depth == _DECISION_TREE_MAX_DEPTH
+    assert (
+        state.decision_tree_selector.min_samples_leaf
+        == _DECISION_TREE_MINIMUM_LEAF_DRAWS
+    )
+    assert (
+        state.decision_tree_selector_features.maxlen
+        == _DECISION_TREE_TRAINING_WINDOW
+    )
+
+    first_draw = {1, 2, 8, 17, 31, 49}
+    state.train(first_draw)
+    state.remember(first_draw)
+    combined = draws.draws[0].prediction
+    assert combined is not None
+    strategies = state.build_strategies(combined, 0)
+
+    assert [strategy.strategy_id for strategy in strategies] == [
+        "decision_tree_selector"
+    ]
+    selector = strategies[0]
+    assert len(selector.numbers) == 49
+    assert selector.numbers[0].details[0] == "Selected expert: Freshness"
+    assert selector.numbers[0].details[1].startswith("Smoothed efficacy fallback")
+    assert selector.numbers[0].details[4] == (
+        "Warm-up fallback; no fitted tree path"
+    )
+    assert state.decision_tree_selector_pending_features is not None
+    assert (
+        len(state.decision_tree_selector_pending_features)
+        == len(_DECISION_TREE_FEATURE_NAMES)
+    )
+
+
+def test_decision_tree_selector_trains_multi_output_tree_and_reports_path() -> None:
+    state = _StrategyState(("decision_tree_selector",))
+    rankings = {
+        strategy_id: [
+            ((number + expert_index * 3 - 1) % 49) + 1
+            for number in range(1, 50)
+        ]
+        for expert_index, strategy_id in enumerate(_DECISION_TREE_EXPERT_IDS)
+    }
+    feature_count = len(_DECISION_TREE_FEATURE_NAMES)
+    for draw_index in range(_DECISION_TREE_MINIMUM_TRAINING_DRAWS):
+        state.decision_tree_selector_pending_features = (
+            float(draw_index % 2),
+            *(0.0 for _index in range(feature_count - 1)),
+        )
+        state.decision_tree_selector_pending_rankings = {
+            strategy_id: list(ranking)
+            for strategy_id, ranking in rankings.items()
+        }
+        target_expert = _DECISION_TREE_EXPERT_IDS[draw_index % 2]
+        state._train_decision_tree_selector(
+            set(rankings[target_expert][:_NUMBERS_PER_DRAW])
+        )
+
+    assert state.decision_tree_selector_fitted
+    assert len(state.decision_tree_selector_features) == (
+        _DECISION_TREE_MINIMUM_TRAINING_DRAWS
+    )
+    state.previous_draw = {1, 2, 8, 17, 31, 49}
+    state.previous_previous_draw = {3, 6, 12, 22, 36, 47}
+    gaps = {number: number % 17 for number in range(1, 50)}
+
+    scores, details = state._decision_tree_selector_scores(rankings, gaps)
+    selected_ranking = sorted(scores, key=scores.__getitem__, reverse=True)
+
+    assert selected_ranking in rankings.values()
+    assert details[selected_ranking[0]][1].startswith("Decision tree fitted on")
+    assert details[selected_ranking[0]][4].startswith("Tree path: ")
+    assert details[selected_ranking[0]][5] == "Selected-expert rank 1"
+
+
+def test_decision_tree_selector_does_not_learn_from_its_future_draw() -> None:
+    prefix = (
+        Draw(1, 2, 8, 17, 31, 49),
+        Draw(3, 6, 12, 22, 36, 47),
+        Draw(1, 9, 18, 27, 38, 45),
+        Draw(4, 11, 20, 29, 37, 48),
+    )
+
+    def prediction_before(future: Draw) -> StrategyPrediction:
+        draws = Draws()
+        for draw in (*prefix, future):
+            draws.add(draw)
+        draws.prepare_predictions()
+        return build_prediction_suites(
+            draws.draws,
+            enabled_strategy_ids=("decision_tree_selector",),
+        )[-2].strategies[0]
+
+    first = prediction_before(Draw(5, 14, 23, 32, 40, 46))
+    changed_future = prediction_before(Draw(7, 16, 24, 33, 41, 49))
+
+    assert first.top_numbers == changed_future.top_numbers
+    assert first.numbers == changed_future.numbers
 
 
 def test_builds_only_selected_strategy_plugins(

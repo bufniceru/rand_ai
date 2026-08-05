@@ -50,6 +50,8 @@ const strategyDescriptions: Record<StrategyId, string> = {
   sparse_neural_ticket:
     "Experimental frozen five-seed neural ticket; its historical promotion gate failed.",
   cis: "Online learner combining ten strategy experts.",
+  decision_tree_selector:
+    "Leakage-safe decision tree selecting one stable expert for the next draw.",
   residual_coverage:
     "Diversity-first complement covering numbers outside every base Top-6.",
   chained:
