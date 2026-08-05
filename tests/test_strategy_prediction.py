@@ -49,7 +49,7 @@ from rand_ai.strategy_prediction import (
 )
 
 
-def test_builds_twenty_five_named_rankings_and_reports_progress() -> None:
+def test_builds_twenty_six_named_rankings_and_reports_progress() -> None:
     draws = Draws()
     draws.add(Draw(1, 2, 8, 17, 31, 49))
     draws.add(Draw(3, 6, 12, 22, 36, 47))
@@ -75,6 +75,7 @@ def test_builds_twenty_five_named_rankings_and_reports_progress() -> None:
         "Chi²",
         "Entr",
         "Mark",
+        "Markov Gap-Space Vector (Experimental)",
         "MKFR",
         "MKSP",
         "MKNP",
@@ -110,7 +111,7 @@ def test_builds_twenty_five_named_rankings_and_reports_progress() -> None:
             set(strategy.top_numbers)
             for strategy in suites[-1].strategies
             if strategy.strategy_id
-            not in {"mknp", "mkrd", "residual_coverage", "chained"}
+            not in {"mknp", "mkrd", "mkgsv", "residual_coverage", "chained"}
         )
     )
     assert not set(residual.top_numbers).intersection(base_top_numbers)

@@ -68,6 +68,7 @@ def test_parses_strategy_plugin_selection_in_stable_order() -> None:
     assert parse_strategy_ids("entropy,proximity") == ("proximity", "entropy")
     assert parse_strategy_ids("mkrd,mknp,mksp") == ("mksp", "mknp", "mkrd")
     assert "mkrd" not in DEFAULT_STRATEGY_IDS
+    assert "mkgsv" not in DEFAULT_STRATEGY_IDS
     assert "sklearn_svm" not in DEFAULT_STRATEGY_IDS
     assert "lag_logistic" not in DEFAULT_STRATEGY_IDS
     assert "sparse_neural_ticket" not in DEFAULT_STRATEGY_IDS

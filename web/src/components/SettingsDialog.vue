@@ -31,6 +31,8 @@ const strategyDescriptions: Record<StrategyId, string> = {
   chi_square: "Signed frequency deviation from uniform random expectation.",
   entropy: "Gap-entropy history with overdue adjustment.",
   markov100: "Recency-weighted gap-state Markov model.",
+  mkgsv:
+    "Experimental hierarchical next-draw model for ordered gap and last-seen spaces; its promotion gate failed.",
   mkfr: "Variable-order D/!D context transition lift.",
   mksp: "Order-20 space analogues decoded into complete valid draws.",
   mknp: "Order-20 normalized-position analogues decoded into valid translated draws.",

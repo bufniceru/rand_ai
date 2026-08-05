@@ -59,6 +59,7 @@ DEFAULT_STRATEGY_IDS = tuple(
     if strategy_id
     not in {
         "mkrd",
+        "mkgsv",
         "sklearn_svm",
         "lag_logistic",
         "sparse_neural_ticket",
@@ -66,7 +67,7 @@ DEFAULT_STRATEGY_IDS = tuple(
     }
 )
 MAX_HISTORY_WINDOW = 250
-STRATEGY_CACHE_SCHEMA_VERSION = 8
+STRATEGY_CACHE_SCHEMA_VERSION = 9
 STRATEGY_CACHE_MAX_ENTRIES = 20
 STRATEGY_CACHE_MAX_BYTES = 1024 * 1024 * 1024
 PROGRESS_PREFIX = "RAND_AI_PROGRESS "

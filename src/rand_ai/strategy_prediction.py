@@ -14,6 +14,7 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.tree import DecisionTreeRegressor
 
 from rand_ai.draw import Draw
+from rand_ai.mkgsv import MkgsvModel
 from rand_ai.prediction import CombinedPrediction
 from rand_ai.sparse_neural_ticket import (
     SparseNeuralTicketArtifact,
@@ -178,6 +179,7 @@ _BASE_STRATEGY_IDS = (
     "chi_square",
     "entropy",
     "markov100",
+    "mkgsv",
     "mkfr",
     "mksp",
     "mknp",
@@ -290,6 +292,7 @@ _STRATEGY_DEPENDENCIES = {
         {
             "mknp",
             "mkrd",
+            "mkgsv",
             "sklearn_svm",
             "lag_logistic",
             "sparse_neural_ticket",
@@ -902,6 +905,9 @@ class _StrategyState:
         self.sparse_neural_ticket_history: list[list[str | int | None]] = []
         self.sparse_neural_ticket_ready = False
         self.sparse_neural_ticket_invalid = False
+        self.mkgsv = (
+            MkgsvModel() if "mkgsv" in self.enabled_strategy_ids else None
+        )
         self.cis_weights = [0.0] * (22 + len(_CIS_EXPERTS) * 4)
         self.cis_draw_count = 0
         self.cis_total_hits = {
@@ -2007,6 +2013,9 @@ class _StrategyState:
         if "chained" in self.enabled_strategy_ids:
             self._train_chained_effectiveness(drawn)
 
+        if self.mkgsv is not None:
+            self.mkgsv.train(drawn)
+
         if "cis" in self.enabled_strategy_ids:
             self._train_cis(drawn)
 
@@ -2245,6 +2254,8 @@ class _StrategyState:
             self.mkrd_observations.append(
                 (normalized, anchor, _relative_dispersion_profile(drawn))
             )
+        if self.mkgsv is not None:
+            self.mkgsv.remember(drawn)
         self.draw_count += 1
 
     @staticmethod
@@ -4449,6 +4460,48 @@ class _StrategyState:
                     markov_scores,
                     gaps,
                     markov_details,
+                )
+
+        if "mkgsv" in enabled:
+            if self.mkgsv is None:  # pragma: no cover - state invariant
+                raise AssertionError("MKGSV model was not initialized")
+            mkgsv_rows = self.mkgsv.scores()
+            mkgsv_config = self.mkgsv.config
+            mkgsv_scores = {
+                number: row.probability for number, row in mkgsv_rows.items()
+            }
+            mkgsv_details: dict[int, tuple[str, ...]] = {
+                number: (
+                    (
+                        f"State ({row.gap}, {row.left_space}, "
+                        f"{row.right_space})"
+                    ),
+                    f"Posterior probability {row.probability:.2%}",
+                    f"Backoff {row.backoff_path}",
+                    f"Triple support {row.triple_support}",
+                    f"Pair supports {row.pair_supports}",
+                    f"Single supports {row.single_supports}",
+                    (
+                        f"Prior strengths {mkgsv_config.single_strength:g} single / "
+                        f"{mkgsv_config.pair_strength:g} pair / "
+                        f"{mkgsv_config.triple_strength:g} triple"
+                    ),
+                )
+                for number, row in mkgsv_rows.items()
+            }
+            rankings["mkgsv"] = _ranking_from_scores(mkgsv_scores, gaps)
+            if "mkgsv" in requested:
+                built["mkgsv"] = _strategy(
+                    "mkgsv",
+                    "Markov Gap-Space Vector (Experimental)",
+                    (
+                        "Hierarchical Bayesian next-draw hit model for ordered "
+                        "(gap, left space, right space) states. Its promotion "
+                        "gate failed, so it remains experimental."
+                    ),
+                    mkgsv_scores,
+                    gaps,
+                    mkgsv_details,
                 )
 
         if "mkfr" in enabled:
