@@ -4475,6 +4475,7 @@ class _StrategyState:
             decision = self.mkgsv.predict(
                 self._markov_gap_probabilities(gaps),
                 tuple(rankings["markov100"]),
+                markov_scores,
             )
             mkgsv_rows = decision.scores
             mkgsv_config = self.mkgsv.config
@@ -4489,43 +4490,48 @@ class _StrategyState:
             mkgsv_details: dict[int, tuple[str, ...]] = {
                 number: (
                     (
-                        f"Champion rank {decision.base_ranking.index(number) + 1}; "
+                        f"Champion rank {row.champion_rank}; "
                         f"probability {row.base_probability:.2%}"
                     ),
                     (
-                        f"State gap {row.state.gap} (bucket {row.state.gap_bucket}); "
-                        f"historical {None if row.state.historical is None else (row.state.historical.left_space, row.state.historical.right_space)}; "
-                        f"fresh {None if row.state.fresh is None else (row.state.fresh.left_space, row.state.fresh.right_space)}"
-                    ),
-                    (
-                        "Historical residual unavailable"
-                        if row.historical_evidence is None
+                        "Shadow ticket vector unavailable"
+                        if row.selected_vector is None
                         else (
-                            f"Historical residual {row.historical_evidence.correction:+.3%}; "
-                            f"pair support {row.historical_evidence.pair_supports}; "
-                            f"triple support {row.historical_evidence.triple_support}"
+                            f"Shadow vector gap {row.selected_vector.gap} "
+                            f"(class {row.selected_vector.gap_class}); ordered spaces "
+                            f"{row.selected_vector.left_space}/"
+                            f"{row.selected_vector.right_space} "
+                            f"(shape {row.selected_vector.space_shape})"
                         )
                     ),
                     (
-                        "Fresh residual unavailable"
-                        if row.fresh_evidence is None
-                        else (
-                            f"Fresh residual {row.fresh_evidence.correction:+.3%}; "
-                            f"pair support {row.fresh_evidence.pair_supports}; "
-                            f"triple support {row.fresh_evidence.triple_support}"
+                        f"Champion motif lift {decision.base_evidence.total:+.4f}; "
+                        f"shadow motif lift {decision.shadow_evidence.total:+.4f}"
+                    ),
+                    (
+                        f"Shadow components single {decision.shadow_evidence.single:+.4f}, "
+                        f"double {decision.shadow_evidence.double:+.4f}, "
+                        f"triple {decision.shadow_evidence.triple:+.4f}, "
+                        f"transition {decision.shadow_evidence.transition:+.4f}"
+                    ),
+                    (
+                        "Shadow minimum supports "
+                        + ", ".join(
+                            f"{name} {support}"
+                            for name, support in decision.shadow_evidence.supports
                         )
                     ),
                     (
-                        f"Guarded correction {row.correction:+.3%}; "
-                        f"corrected probability {row.corrected_probability:.2%}"
+                        f"Shadow gains lifetime {decision.lifetime_shadow_gain:+d}; "
+                        f"trailing-60 {decision.trailing_60_gain:+d}; "
+                        f"trailing-120 {decision.trailing_120_gain:+d}"
                     ),
                     proposal,
                     decision.status,
                     (
-                        f"Prior strengths {mkgsv_config.single_strength:g} single / "
-                        f"{mkgsv_config.pair_strength:g} pair / "
-                        f"{mkgsv_config.triple_strength:g} triple; "
-                        f"{mkgsv_config.evidence_variant} evidence"
+                        f"Prior {mkgsv_config.prior_strength:g}; "
+                        f"{mkgsv_config.motif_variant}; "
+                        f"influence {mkgsv_config.influence:.2f}"
                     ),
                 )
                 for number, row in mkgsv_rows.items()
@@ -4537,9 +4543,9 @@ class _StrategyState:
                     "mkgsv",
                     "Markov Gap-Space Vector (Experimental)",
                     (
-                        "Guarded Markov 100 boundary correction using binned "
-                        "historical and fresh ordered gap-space residuals. Its "
-                        "v2 promotion gate failed, so it remains experimental."
+                        "Ticket-level gap-space motif research around Markov 100. "
+                        "Its strict v3 promotion gate failed, so production output "
+                        "is exactly the Markov 100 champion."
                     ),
                     mkgsv_scores,
                     gaps,

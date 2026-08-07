@@ -80,6 +80,10 @@ logs/
 # Generated documents, reports, spreadsheets, presentations, and archives
 doc/
 docs/
+# Keep authored strategy documentation while continuing to ignore generated docs.
+!docs/
+docs/*
+!docs/chi-square-frequency-strategy.md
 *.pdf
 *.doc
 *.docx

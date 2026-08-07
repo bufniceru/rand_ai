@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "dataset": "data/lotto_results_2019.yaml",
   "evaluatedDraws": 770,
   "split": {
@@ -7,26 +7,90 @@
     "validation": 200,
     "holdout": 250
   },
-  "selectedConfig": {
-    "single_strength": 32.0,
-    "pair_strength": 128.0,
-    "triple_strength": 512.0,
-    "evidence_variant": "historical",
-    "replacement_margin": 0.0025
+  "selectedMode": "off",
+  "selectedConfig": null,
+  "bestRejectedConfig": {
+    "prior_strength": 24.0,
+    "motif_variant": "singles+doubles+triples",
+    "influence": 0.2
   },
   "stateSupport": {
-    "historicalTripleStates": 391,
-    "historicalTripleExposures": 37381,
-    "historicalTripleMedianSupport": 83.0,
-    "freshTripleStates": 392,
-    "freshTripleExposures": 37730,
-    "freshTripleMedianSupport": 89.5
+    "singleActualStates": 36,
+    "singleActualMedianSupport": 124.0,
+    "singleNullStates": 36,
+    "singleNullMedianSupport": 16067.0,
+    "full_doubleActualStates": 430,
+    "full_doubleActualMedianSupport": 10.0,
+    "full_doubleNullStates": 432,
+    "full_doubleNullMedianSupport": 1260.0,
+    "gap_doubleActualStates": 16,
+    "gap_doubleActualMedianSupport": 270.0,
+    "gap_doubleNullStates": 16,
+    "gap_doubleNullMedianSupport": 34958.0,
+    "space_doubleActualStates": 27,
+    "space_doubleActualMedianSupport": 192.0,
+    "space_doubleNullStates": 27,
+    "space_doubleNullMedianSupport": 25761.0,
+    "gap_tripleActualStates": 64,
+    "gap_tripleActualMedianSupport": 65.5,
+    "gap_tripleNullStates": 64,
+    "gap_tripleNullMedianSupport": 8623.0,
+    "space_tripleActualStates": 81,
+    "space_tripleActualMedianSupport": 57.0,
+    "space_tripleNullStates": 81,
+    "space_tripleNullMedianSupport": 7674.0,
+    "transitionStates": 1295,
+    "transitionMedianSupport": 19.0
+  },
+  "componentAblations": {
+    "singles": {
+      "config": {
+        "prior_strength": 64.0,
+        "motif_variant": "singles",
+        "influence": 0.05
+      },
+      "validationRawHits": 147,
+      "validationRawGain": -1,
+      "validationProposals": 71
+    },
+    "singles+doubles": {
+      "config": {
+        "prior_strength": 24.0,
+        "motif_variant": "singles+doubles",
+        "influence": 0.2
+      },
+      "validationRawHits": 146,
+      "validationRawGain": -2,
+      "validationProposals": 111
+    },
+    "singles+doubles+triples": {
+      "config": {
+        "prior_strength": 24.0,
+        "motif_variant": "singles+doubles+triples",
+        "influence": 0.2
+      },
+      "validationRawHits": 147,
+      "validationRawGain": -1,
+      "validationProposals": 95
+    },
+    "all-with-transitions": {
+      "config": {
+        "prior_strength": 64.0,
+        "motif_variant": "all-with-transitions",
+        "influence": 0.2
+      },
+      "validationRawHits": 146,
+      "validationRawGain": -2,
+      "validationProposals": 83
+    }
   },
   "lifetimeShadow": {
-    "settledResults": 770,
-    "proposalCount": 332,
+    "settledProposals": 372,
+    "proposalCount": 372,
     "activationCount": 1,
-    "trailingGain": -9
+    "lifetimeGain": -10,
+    "trailing60Gain": -4,
+    "trailing120Gain": -11
   },
   "scopes": {
     "validation": {
@@ -34,19 +98,19 @@
         "evaluatedDraws": 200,
         "totalHits": 148,
         "averageHitsPerDraw": 0.74,
-        "zeroHits": 89,
-        "oneHit": 81,
-        "twoOrMoreHits": 30,
-        "brierScore": 0.1075565625400946
+        "zeroHits": 88,
+        "oneHit": 83,
+        "twoOrMoreHits": 29,
+        "brierScore": 0.10756178520398264
       },
-      "mkgsvRawShadow": {
+      "mkgsvRaw": {
         "evaluatedDraws": 200,
-        "totalHits": 146,
-        "averageHitsPerDraw": 0.73,
-        "zeroHits": 90,
-        "oneHit": 76,
-        "twoOrMoreHits": 34,
-        "brierScore": 0.10762693561962267
+        "totalHits": 148,
+        "averageHitsPerDraw": 0.74,
+        "zeroHits": 88,
+        "oneHit": 83,
+        "twoOrMoreHits": 29,
+        "brierScore": 0.10756178520398264
       },
       "markov100Champion": {
         "evaluatedDraws": 200,
@@ -58,128 +122,31 @@
         "brierScore": 0.10756178520398264
       },
       "pairedGatedVsMarkov": {
-        "candidateWins": 1,
-        "ties": 198,
-        "baselineWins": 1,
+        "candidateWins": 0,
+        "ties": 200,
+        "baselineWins": 0,
         "meanHitDifference": 0,
         "meanDifference95Interval": [
-          -0.013894071618163384,
-          0.013894071618163384
+          0.0,
+          0.0
         ]
       },
-      "pairedShadowVsMarkov": {
-        "candidateWins": 12,
-        "ties": 174,
-        "baselineWins": 14,
-        "meanHitDifference": -0.01,
+      "pairedRawVsMarkov": {
+        "candidateWins": 0,
+        "ties": 200,
+        "baselineWins": 0,
+        "meanHitDifference": 0,
         "meanDifference95Interval": [
-          -0.06007651632688905,
-          0.04007651632688904
+          0.0,
+          0.0
         ]
       },
       "gatedCorrectionNetGain": 0,
-      "rawShadowNetGain": -2,
-      "proposalCount": 97,
-      "activePredictionCount": 27,
-      "meanChampionOverlap": 5.945,
-      "replacementCounts": {
-        "1->20": 1,
-        "1->28": 1,
-        "11->26": 1,
-        "11->42": 1,
-        "11->49": 1,
-        "13->14": 1,
-        "13->38": 1,
-        "14->33": 1,
-        "14->39": 1,
-        "16->3": 1,
-        "16->33": 1,
-        "16->36": 1,
-        "17->24": 1,
-        "18->8": 1,
-        "19->42": 1,
-        "19->49": 1,
-        "2->40": 1,
-        "2->44": 1,
-        "2->9": 1,
-        "20->13": 1,
-        "20->24": 1,
-        "20->44": 1,
-        "22->16": 1,
-        "22->2": 1,
-        "22->41": 1,
-        "22->5": 1,
-        "23->18": 1,
-        "23->43": 1,
-        "23->48": 1,
-        "24->20": 1,
-        "25->1": 1,
-        "25->5": 1,
-        "27->34": 1,
-        "27->38": 1,
-        "28->15": 1,
-        "28->18": 1,
-        "28->3": 1,
-        "28->9": 1,
-        "29->26": 1,
-        "29->30": 1,
-        "3->20": 2,
-        "3->39": 1,
-        "3->44": 1,
-        "30->21": 1,
-        "30->3": 1,
-        "31->10": 1,
-        "31->44": 1,
-        "31->49": 1,
-        "31->7": 1,
-        "32->48": 1,
-        "33->12": 1,
-        "33->16": 1,
-        "33->21": 1,
-        "33->25": 1,
-        "34->3": 1,
-        "35->34": 1,
-        "36->29": 1,
-        "36->5": 1,
-        "36->9": 1,
-        "37->15": 1,
-        "37->42": 1,
-        "37->48": 1,
-        "38->30": 1,
-        "38->4": 1,
-        "38->47": 1,
-        "39->19": 1,
-        "39->5": 1,
-        "4->17": 1,
-        "4->31": 1,
-        "4->35": 1,
-        "4->46": 1,
-        "40->8": 1,
-        "41->9": 1,
-        "42->17": 1,
-        "42->20": 1,
-        "42->38": 1,
-        "43->36": 1,
-        "43->47": 1,
-        "44->36": 1,
-        "44->45": 1,
-        "45->10": 1,
-        "46->36": 1,
-        "46->39": 1,
-        "46->48": 1,
-        "46->8": 1,
-        "47->20": 1,
-        "47->6": 1,
-        "48->7": 1,
-        "6->21": 1,
-        "6->34": 1,
-        "6->42": 1,
-        "6->48": 1,
-        "7->4": 1,
-        "8->21": 1,
-        "9->18": 1,
-        "9->47": 1
-      },
+      "rawCorrectionNetGain": 0,
+      "proposalCount": 0,
+      "activePredictionCount": 0,
+      "meanChampionOverlap": 6,
+      "replacementCounts": {},
       "constantProbabilityBrier": 0.10745522698875468,
       "theoreticalRandomHits": 146.93877551020407,
       "relatedBaselines": {
@@ -191,21 +158,21 @@
           "oneHit": 83,
           "twoOrMoreHits": 29
         },
-        "freshness": {
+        "doublet_triplet_markov": {
           "evaluatedDraws": 200,
-          "totalHits": 149,
-          "averageHitsPerDraw": 0.745,
-          "zeroHits": 88,
-          "oneHit": 81,
-          "twoOrMoreHits": 31
+          "totalHits": 165,
+          "averageHitsPerDraw": 0.825,
+          "zeroHits": 85,
+          "oneHit": 74,
+          "twoOrMoreHits": 41
         },
-        "proximity": {
+        "mksp": {
           "evaluatedDraws": 200,
-          "totalHits": 161,
-          "averageHitsPerDraw": 0.805,
-          "zeroHits": 78,
-          "oneHit": 86,
-          "twoOrMoreHits": 36
+          "totalHits": 140,
+          "averageHitsPerDraw": 0.7,
+          "zeroHits": 89,
+          "oneHit": 84,
+          "twoOrMoreHits": 27
         },
         "combined": {
           "evaluatedDraws": 200,
@@ -227,14 +194,14 @@
         "twoOrMoreHits": 40,
         "brierScore": 0.1074706439041613
       },
-      "mkgsvRawShadow": {
+      "mkgsvRaw": {
         "evaluatedDraws": 250,
-        "totalHits": 194,
-        "averageHitsPerDraw": 0.776,
-        "zeroHits": 97,
+        "totalHits": 207,
+        "averageHitsPerDraw": 0.828,
+        "zeroHits": 93,
         "oneHit": 117,
-        "twoOrMoreHits": 36,
-        "brierScore": 0.10751143124861538
+        "twoOrMoreHits": 40,
+        "brierScore": 0.1074706439041613
       },
       "markov100Champion": {
         "evaluatedDraws": 250,
@@ -255,125 +222,22 @@
           0.0
         ]
       },
-      "pairedShadowVsMarkov": {
-        "candidateWins": 6,
-        "ties": 225,
-        "baselineWins": 19,
-        "meanHitDifference": -0.052,
+      "pairedRawVsMarkov": {
+        "candidateWins": 0,
+        "ties": 250,
+        "baselineWins": 0,
+        "meanHitDifference": 0,
         "meanDifference95Interval": [
-          -0.0907439495781685,
-          -0.013256050421831499
+          0.0,
+          0.0
         ]
       },
       "gatedCorrectionNetGain": 0,
-      "rawShadowNetGain": -13,
-      "proposalCount": 107,
+      "rawCorrectionNetGain": 0,
+      "proposalCount": 0,
       "activePredictionCount": 0,
       "meanChampionOverlap": 6,
-      "replacementCounts": {
-        "1->19": 1,
-        "1->24": 1,
-        "11->7": 1,
-        "11->8": 1,
-        "12->15": 2,
-        "12->2": 1,
-        "13->34": 1,
-        "13->9": 1,
-        "14->37": 1,
-        "14->6": 1,
-        "15->34": 1,
-        "15->37": 1,
-        "15->45": 1,
-        "16->10": 1,
-        "16->36": 1,
-        "18->37": 1,
-        "18->40": 1,
-        "19->17": 1,
-        "19->33": 2,
-        "2->23": 1,
-        "2->28": 1,
-        "2->32": 1,
-        "20->19": 1,
-        "20->33": 1,
-        "20->39": 1,
-        "21->11": 1,
-        "21->23": 1,
-        "21->48": 1,
-        "22->23": 1,
-        "22->35": 1,
-        "22->43": 1,
-        "22->44": 1,
-        "22->8": 1,
-        "24->29": 1,
-        "25->9": 1,
-        "26->19": 1,
-        "26->31": 1,
-        "26->34": 1,
-        "27->1": 1,
-        "27->23": 1,
-        "27->33": 1,
-        "27->42": 1,
-        "27->45": 1,
-        "27->7": 2,
-        "28->12": 1,
-        "28->22": 1,
-        "29->21": 1,
-        "29->30": 1,
-        "29->34": 1,
-        "3->22": 1,
-        "3->23": 1,
-        "3->42": 1,
-        "3->46": 1,
-        "34->17": 1,
-        "34->18": 2,
-        "34->5": 1,
-        "36->11": 2,
-        "36->30": 1,
-        "36->32": 1,
-        "36->5": 1,
-        "37->11": 1,
-        "38->1": 1,
-        "38->24": 1,
-        "38->31": 1,
-        "38->44": 1,
-        "4->3": 1,
-        "4->39": 1,
-        "4->8": 1,
-        "40->1": 1,
-        "40->37": 1,
-        "40->48": 1,
-        "40->8": 1,
-        "42->16": 1,
-        "42->17": 1,
-        "42->31": 1,
-        "43->10": 1,
-        "43->33": 1,
-        "44->8": 1,
-        "45->10": 1,
-        "45->24": 1,
-        "45->4": 1,
-        "46->20": 1,
-        "47->1": 1,
-        "47->3": 1,
-        "47->7": 1,
-        "48->30": 1,
-        "48->32": 1,
-        "48->42": 1,
-        "49->23": 1,
-        "49->25": 1,
-        "49->45": 1,
-        "49->8": 1,
-        "5->21": 1,
-        "5->30": 1,
-        "5->39": 1,
-        "5->49": 1,
-        "6->48": 1,
-        "7->33": 1,
-        "7->37": 1,
-        "7->40": 1,
-        "9->10": 1,
-        "9->11": 1
-      },
+      "replacementCounts": {},
       "constantProbabilityBrier": 0.10745522698875468,
       "theoreticalRandomHits": 183.6734693877551,
       "relatedBaselines": {
@@ -385,21 +249,21 @@
           "oneHit": 117,
           "twoOrMoreHits": 40
         },
-        "freshness": {
+        "doublet_triplet_markov": {
           "evaluatedDraws": 250,
-          "totalHits": 191,
-          "averageHitsPerDraw": 0.764,
-          "zeroHits": 102,
-          "oneHit": 109,
-          "twoOrMoreHits": 39
+          "totalHits": 204,
+          "averageHitsPerDraw": 0.816,
+          "zeroHits": 103,
+          "oneHit": 98,
+          "twoOrMoreHits": 49
         },
-        "proximity": {
+        "mksp": {
           "evaluatedDraws": 250,
-          "totalHits": 173,
-          "averageHitsPerDraw": 0.692,
-          "zeroHits": 114,
-          "oneHit": 103,
-          "twoOrMoreHits": 33
+          "totalHits": 194,
+          "averageHitsPerDraw": 0.776,
+          "zeroHits": 105,
+          "oneHit": 99,
+          "twoOrMoreHits": 46
         },
         "combined": {
           "evaluatedDraws": 250,
@@ -415,6 +279,6 @@
   "promotion": {
     "passed": false,
     "defaultEnabled": false,
-    "rule": "Gated MKGSV must beat Markov 100 on validation, be no worse on holdout, and have positive/nonnegative correction gains."
+    "rule": "Raw and gated MKGSV must beat Markov 100 on validation, be no worse on holdout, retain positive/nonnegative raw gains, and propose at least 30 validation replacements."
   }
 }

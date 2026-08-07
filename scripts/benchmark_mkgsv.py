@@ -1,4 +1,4 @@
-"""Benchmark guarded MKGSV v2 against its Markov 100 champion."""
+"""Benchmark MKGSV v3 ticket motifs against the Markov 100 champion."""
 
 from __future__ import annotations
 
@@ -26,7 +26,12 @@ from rand_ai.strategy_prediction import build_prediction_suites
 WARM_UP_DRAWS = 320
 VALIDATION_DRAWS = 200
 HOLDOUT_DRAWS = 250
-RELATED_STRATEGY_IDS = ("markov100", "freshness", "proximity")
+MINIMUM_VALIDATION_PROPOSALS = 30
+RELATED_STRATEGY_IDS = (
+    "markov100",
+    "doublet_triplet_markov",
+    "mksp",
+)
 MARKOV_PRIOR_STRENGTH = 8.0
 MARKOV_DECAY = 0.5 ** (1 / 500)
 MAX_GAP_BUCKET = 35
@@ -36,10 +41,10 @@ MAX_GAP_BUCKET = 35
 class ConfigRun:
     config: MkgsvConfig
     gated_hits: tuple[int, ...]
-    shadow_hits: tuple[int, ...]
+    raw_hits: tuple[int, ...]
     base_hits: tuple[int, ...]
     gated_brier_scores: tuple[float, ...]
-    shadow_brier_scores: tuple[float, ...]
+    raw_brier_scores: tuple[float, ...]
     base_brier_scores: tuple[float, ...]
     champion_overlaps: tuple[int, ...]
     proposals: tuple[bool, ...]
@@ -49,7 +54,7 @@ class ConfigRun:
 
 
 class Markov100Anchor:
-    """Small benchmark mirror of the production Markov 100 state."""
+    """Small benchmark mirror of production Markov 100 state."""
 
     def __init__(self) -> None:
         self.draw_count = 0
@@ -82,7 +87,7 @@ class Markov100Anchor:
         bucket_probabilities = [
             (hits + MARKOV_PRIOR_STRENGTH * BASE_HIT_RATE)
             / (opportunities + MARKOV_PRIOR_STRENGTH)
-            for hits, opportunities in zip(self.hits, self.opportunities)
+            for hits, opportunities in zip(self.hits, self.opportunities, strict=True)
         ]
         return {
             number: bucket_probabilities[min(self.gap(number), MAX_GAP_BUCKET)]
@@ -117,7 +122,7 @@ def hit_summary(hits: Sequence[int]) -> dict[str, int | float]:
 
 
 def paired_summary(candidate: Sequence[int], baseline: Sequence[int]) -> dict[str, Any]:
-    differences = [left - right for left, right in zip(candidate, baseline)]
+    differences = [left - right for left, right in zip(candidate, baseline, strict=True)]
     average = mean(differences) if differences else 0.0
     standard_error = (
         stdev(differences) / len(differences) ** 0.5
@@ -152,14 +157,25 @@ def _brier(probabilities: dict[int, float], actual: set[int]) -> float:
     ) / NUMBER_COUNT
 
 
+def _swapped_probabilities(
+    probabilities: dict[int, float],
+    insider: int | None,
+    outsider: int | None,
+) -> dict[int, float]:
+    result = dict(probabilities)
+    if insider is not None and outsider is not None:
+        result[insider], result[outsider] = result[outsider], result[insider]
+    return result
+
+
 def run_configuration(draws: Sequence[Any], config: MkgsvConfig) -> ConfigRun:
-    model = MkgsvModel(config)
+    model = MkgsvModel(config, promotion_enabled=True)
     anchor = Markov100Anchor()
     gated_hits: list[int] = []
-    shadow_hits: list[int] = []
+    raw_hits: list[int] = []
     base_hits: list[int] = []
     gated_brier_scores: list[float] = []
-    shadow_brier_scores: list[float] = []
+    raw_brier_scores: list[float] = []
     base_brier_scores: list[float] = []
     champion_overlaps: list[int] = []
     proposals: list[bool] = []
@@ -178,12 +194,12 @@ def run_configuration(draws: Sequence[Any], config: MkgsvConfig) -> ConfigRun:
             continue
         actual = {ball.value for ball in draws[index + 1].balls}
         base_ticket = set(decision.base_ticket)
-        shadow_ticket = set(decision.shadow_ticket)
-        output_ticket = set(decision.output_ticket)
+        raw_ticket = set(decision.shadow_ticket)
+        gated_ticket = set(decision.output_ticket)
         base_hits.append(len(actual.intersection(base_ticket)))
-        shadow_hits.append(len(actual.intersection(shadow_ticket)))
-        gated_hits.append(len(actual.intersection(output_ticket)))
-        champion_overlaps.append(len(base_ticket.intersection(output_ticket)))
+        raw_hits.append(len(actual.intersection(raw_ticket)))
+        gated_hits.append(len(actual.intersection(gated_ticket)))
+        champion_overlaps.append(len(base_ticket.intersection(raw_ticket)))
         proposed = decision.proposed_outsider is not None
         proposals.append(proposed)
         active_predictions.append(decision.correction_active)
@@ -192,25 +208,24 @@ def run_configuration(draws: Sequence[Any], config: MkgsvConfig) -> ConfigRun:
             if not proposed
             else f"{decision.proposed_insider}->{decision.proposed_outsider}"
         )
-        corrected_probabilities = {
-            number: row.corrected_probability
-            for number, row in decision.scores.items()
-        }
+        raw_probabilities = _swapped_probabilities(
+            probabilities,
+            decision.proposed_insider,
+            decision.proposed_outsider,
+        )
         gated_probabilities = (
-            corrected_probabilities
-            if decision.correction_active
-            else probabilities
+            raw_probabilities if decision.correction_active else probabilities
         )
         base_brier_scores.append(_brier(probabilities, actual))
-        shadow_brier_scores.append(_brier(corrected_probabilities, actual))
+        raw_brier_scores.append(_brier(raw_probabilities, actual))
         gated_brier_scores.append(_brier(gated_probabilities, actual))
     return ConfigRun(
         config=config,
         gated_hits=tuple(gated_hits),
-        shadow_hits=tuple(shadow_hits),
+        raw_hits=tuple(raw_hits),
         base_hits=tuple(base_hits),
         gated_brier_scores=tuple(gated_brier_scores),
-        shadow_brier_scores=tuple(shadow_brier_scores),
+        raw_brier_scores=tuple(raw_brier_scores),
         base_brier_scores=tuple(base_brier_scores),
         champion_overlaps=tuple(champion_overlaps),
         proposals=tuple(proposals),
@@ -225,45 +240,56 @@ def combined_top_numbers(draw: Draw) -> tuple[int, ...]:
     return () if prediction is None else prediction.top_numbers
 
 
-def select_configuration(runs: Sequence[ConfigRun]) -> ConfigRun:
-    """Select gated validation hits with conservative deterministic ties."""
+def select_configuration(runs: Sequence[ConfigRun]) -> ConfigRun | None:
+    """Reject nonpositive raw gain, then apply deterministic v3 ties."""
+    eligible = [
+        (index, run)
+        for index, run in enumerate(runs)
+        if sum(scope_slice(run.raw_hits, "validation"))
+        > sum(scope_slice(run.base_hits, "validation"))
+    ]
+    if not eligible:
+        return None
     return max(
-        enumerate(runs),
+        eligible,
         key=lambda item: (
+            sum(scope_slice(item[1].raw_hits, "validation")),
             sum(scope_slice(item[1].gated_hits, "validation")),
-            -mean(scope_slice(item[1].gated_brier_scores, "validation")),
+            -mean(scope_slice(item[1].raw_brier_scores, "validation")),
             -sum(scope_slice(item[1].proposals, "validation")),
             sum(scope_slice(item[1].champion_overlaps, "validation")),
-            (
-                item[1].config.single_strength
-                + item[1].config.pair_strength
-                + item[1].config.triple_strength
-            ),
+            item[1].config.prior_strength,
             -item[0],
         ),
     )[1]
 
 
 def passes_promotion(
-    validation_candidate: int,
+    validation_raw: int,
+    validation_gated: int,
     validation_markov: int,
-    holdout_candidate: int,
+    holdout_raw: int,
+    holdout_gated: int,
     holdout_markov: int,
     validation_gain: int,
     holdout_gain: int,
+    validation_proposals: int,
 ) -> bool:
-    """Apply the champion-improvement promotion gate."""
+    """Apply every strict champion-preservation condition."""
     return (
-        validation_candidate > validation_markov
-        and holdout_candidate >= holdout_markov
+        validation_raw > validation_markov
+        and validation_gated > validation_markov
+        and holdout_raw >= holdout_markov
+        and holdout_gated >= holdout_markov
         and validation_gain > 0
         and holdout_gain >= 0
+        and validation_proposals >= MINIMUM_VALIDATION_PROPOSALS
     )
 
 
 def _scope_report(run: ConfigRun, scope: str) -> dict[str, Any]:
     gated_hits = scope_slice(run.gated_hits, scope)
-    shadow_hits = scope_slice(run.shadow_hits, scope)
+    raw_hits = scope_slice(run.raw_hits, scope)
     base_hits = scope_slice(run.base_hits, scope)
     proposals = scope_slice(run.proposals, scope)
     active = scope_slice(run.active_predictions, scope)
@@ -273,18 +299,18 @@ def _scope_report(run: ConfigRun, scope: str) -> dict[str, Any]:
             **hit_summary(gated_hits),
             "brierScore": mean(scope_slice(run.gated_brier_scores, scope)),
         },
-        "mkgsvRawShadow": {
-            **hit_summary(shadow_hits),
-            "brierScore": mean(scope_slice(run.shadow_brier_scores, scope)),
+        "mkgsvRaw": {
+            **hit_summary(raw_hits),
+            "brierScore": mean(scope_slice(run.raw_brier_scores, scope)),
         },
         "markov100Champion": {
             **hit_summary(base_hits),
             "brierScore": mean(scope_slice(run.base_brier_scores, scope)),
         },
         "pairedGatedVsMarkov": paired_summary(gated_hits, base_hits),
-        "pairedShadowVsMarkov": paired_summary(shadow_hits, base_hits),
+        "pairedRawVsMarkov": paired_summary(raw_hits, base_hits),
         "gatedCorrectionNetGain": sum(gated_hits) - sum(base_hits),
-        "rawShadowNetGain": sum(shadow_hits) - sum(base_hits),
+        "rawCorrectionNetGain": sum(raw_hits) - sum(base_hits),
         "proposalCount": sum(proposals),
         "activePredictionCount": sum(active),
         "meanChampionOverlap": mean(scope_slice(run.champion_overlaps, scope)),
@@ -294,6 +320,49 @@ def _scope_report(run: ConfigRun, scope: str) -> dict[str, Any]:
         "constantProbabilityBrier": BASE_HIT_RATE * (1 - BASE_HIT_RATE),
         "theoreticalRandomHits": len(gated_hits) * NUMBERS_PER_DRAW * BASE_HIT_RATE,
     }
+
+
+def _off_run(run: ConfigRun) -> ConfigRun:
+    length = len(run.base_hits)
+    return ConfigRun(
+        config=run.config,
+        gated_hits=run.base_hits,
+        raw_hits=run.raw_hits,
+        base_hits=run.base_hits,
+        gated_brier_scores=run.base_brier_scores,
+        raw_brier_scores=run.raw_brier_scores,
+        base_brier_scores=run.base_brier_scores,
+        champion_overlaps=run.champion_overlaps,
+        proposals=run.proposals,
+        active_predictions=tuple(False for _ in range(length)),
+        replacements=run.replacements,
+        model=run.model,
+    )
+
+
+def _ablation_report(runs: Sequence[ConfigRun]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    variants = dict.fromkeys(run.config.motif_variant for run in runs)
+    for variant in variants:
+        matching = [run for run in runs if run.config.motif_variant == variant]
+        best = max(
+            matching,
+            key=lambda run: (
+                sum(scope_slice(run.raw_hits, "validation")),
+                -mean(scope_slice(run.raw_brier_scores, "validation")),
+                run.config.prior_strength,
+                -run.config.influence,
+            ),
+        )
+        validation_raw = sum(scope_slice(best.raw_hits, "validation"))
+        validation_base = sum(scope_slice(best.base_hits, "validation"))
+        result[variant] = {
+            "config": asdict(best.config),
+            "validationRawHits": validation_raw,
+            "validationRawGain": validation_raw - validation_base,
+            "validationProposals": sum(scope_slice(best.proposals, "validation")),
+        }
+    return result
 
 
 def benchmark(dataset_path: Path) -> dict[str, Any]:
@@ -307,10 +376,17 @@ def benchmark(dataset_path: Path) -> dict[str, Any]:
             f"received {evaluated_count}"
         )
     runs = tuple(
-        run_configuration(draws.draws, config)
-        for config in mkgsv_configurations()
+        run_configuration(draws.draws, config) for config in mkgsv_configurations()
+    )
+    research_best = max(
+        runs,
+        key=lambda run: (
+            sum(scope_slice(run.raw_hits, "validation")),
+            -mean(scope_slice(run.raw_brier_scores, "validation")),
+        ),
     )
     selected = select_configuration(runs)
+    evaluated = _off_run(research_best) if selected is None else selected
 
     suites = build_prediction_suites(
         draws.draws,
@@ -338,13 +414,13 @@ def benchmark(dataset_path: Path) -> dict[str, Any]:
         )
         for index, suite in enumerate(suites)
     )
-    if selected.base_hits != related_hits["markov100"]:
+    if evaluated.base_hits != related_hits["markov100"]:
         raise AssertionError("Benchmark Markov anchor diverged from production Markov 100")
 
     scopes: dict[str, Any] = {}
     for scope in ("validation", "holdout"):
         scopes[scope] = {
-            **_scope_report(selected, scope),
+            **_scope_report(evaluated, scope),
             "relatedBaselines": {
                 strategy_id: hit_summary(scope_slice(hits, scope))
                 for strategy_id, hits in related_hits.items()
@@ -352,16 +428,19 @@ def benchmark(dataset_path: Path) -> dict[str, Any]:
         }
     validation = scopes["validation"]
     holdout = scopes["holdout"]
-    passed = passes_promotion(
+    passed = selected is not None and passes_promotion(
+        validation["mkgsvRaw"]["totalHits"],
         validation["mkgsvGated"]["totalHits"],
         validation["markov100Champion"]["totalHits"],
+        holdout["mkgsvRaw"]["totalHits"],
         holdout["mkgsvGated"]["totalHits"],
         holdout["markov100Champion"]["totalHits"],
-        validation["gatedCorrectionNetGain"],
-        holdout["gatedCorrectionNetGain"],
+        validation["rawCorrectionNetGain"],
+        holdout["rawCorrectionNetGain"],
+        validation["proposalCount"],
     )
     return {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "dataset": dataset_path.as_posix(),
         "evaluatedDraws": evaluated_count,
         "split": {
@@ -369,85 +448,99 @@ def benchmark(dataset_path: Path) -> dict[str, Any]:
             "validation": VALIDATION_DRAWS,
             "holdout": HOLDOUT_DRAWS,
         },
-        "selectedConfig": asdict(selected.config),
-        "stateSupport": selected.model.state_support_distribution(),
+        "selectedMode": "off" if selected is None else "ticket-motif",
+        "selectedConfig": None if selected is None else asdict(selected.config),
+        "bestRejectedConfig": (
+            asdict(research_best.config) if selected is None else None
+        ),
+        "stateSupport": evaluated.model.state_support_distribution(),
+        "componentAblations": _ablation_report(runs),
         "lifetimeShadow": {
-            "settledResults": selected.model.shadow_results,
-            "proposalCount": selected.model.proposal_count,
-            "activationCount": selected.model.activation_count,
-            "trailingGain": sum(selected.model.shadow_deltas),
+            "settledProposals": evaluated.model.shadow_results,
+            "proposalCount": evaluated.model.proposal_count,
+            "activationCount": evaluated.model.activation_count,
+            "lifetimeGain": evaluated.model.lifetime_shadow_gain,
+            "trailing60Gain": sum(evaluated.model.shadow_deltas_60),
+            "trailing120Gain": sum(evaluated.model.shadow_deltas_120),
         },
         "scopes": scopes,
         "promotion": {
             "passed": passed,
             "defaultEnabled": passed,
             "rule": (
-                "Gated MKGSV must beat Markov 100 on validation, be no worse "
-                "on holdout, and have positive/nonnegative correction gains."
+                "Raw and gated MKGSV must beat Markov 100 on validation, be "
+                "no worse on holdout, retain positive/nonnegative raw gains, "
+                "and propose at least 30 validation replacements."
             ),
         },
     }
 
 
 def render_markdown(report: dict[str, Any]) -> str:
-    """Render the stable human-readable benchmark summary."""
+    """Render the stable human-readable v3 benchmark summary."""
     config = report["selectedConfig"]
     validation = report["scopes"]["validation"]
     holdout = report["scopes"]["holdout"]
     promotion = report["promotion"]
+    config_text = (
+        "Correction off; no configuration had positive raw validation gain."
+        if config is None
+        else (
+            f"Prior `{config['prior_strength']:g}`, variant "
+            f"`{config['motif_variant']}`, influence "
+            f"`{config['influence']:.2f}`."
+        )
+    )
     lines = [
-        "# MKGSV v2 promotion report",
+        "# MKGSV v3 promotion report",
         "",
         "Leakage-safe 320/200/250 warm-up, validation, and holdout benchmark.",
         "",
         "## Selected configuration",
         "",
-        (
-            f"Singles `{config['single_strength']:g}`, pairs "
-            f"`{config['pair_strength']:g}`, triples "
-            f"`{config['triple_strength']:g}`, "
-            f"`{config['evidence_variant']}` evidence, replacement margin "
-            f"`{config['replacement_margin']:.4f}`."
-        ),
+        config_text,
         "",
         "## Results",
         "",
-        "| Scope | Gated MKGSV | Raw shadow | Markov 100 | Gated gain | Proposals | Active |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Scope | Gated MKGSV | Raw motif | Markov 100 | Gated gain | Raw gain | Proposals | Active |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for label, scope in (("Validation", validation), ("Holdout", holdout)):
         lines.append(
             f"| {label} | {scope['mkgsvGated']['totalHits']} | "
-            f"{scope['mkgsvRawShadow']['totalHits']} | "
+            f"{scope['mkgsvRaw']['totalHits']} | "
             f"{scope['markov100Champion']['totalHits']} | "
             f"{scope['gatedCorrectionNetGain']:+d} | "
+            f"{scope['rawCorrectionNetGain']:+d} | "
             f"{scope['proposalCount']} | {scope['activePredictionCount']} |"
         )
     lines.extend(
         [
             "",
             (
-                "Validation gated/Markov Brier: "
+                "Validation gated/raw/Markov Brier: "
                 f"`{validation['mkgsvGated']['brierScore']:.6f}` / "
+                f"`{validation['mkgsvRaw']['brierScore']:.6f}` / "
                 f"`{validation['markov100Champion']['brierScore']:.6f}`."
             ),
             (
-                "Holdout gated/Markov Brier: "
+                "Holdout gated/raw/Markov Brier: "
                 f"`{holdout['mkgsvGated']['brierScore']:.6f}` / "
+                f"`{holdout['mkgsvRaw']['brierScore']:.6f}` / "
                 f"`{holdout['markov100Champion']['brierScore']:.6f}`."
             ),
             "",
-            "Complete distributions, paired differences, replacement identities, "
-            "related baselines, and state support are in the JSON report.",
+            "Complete distributions, paired differences, replacements, component "
+            "ablations, null support, and related baselines are in the JSON report.",
             "",
             "## Promotion decision",
             "",
             (
-                "**Passed.** MKGSV v2 may be enabled by default."
+                "**Passed.** MKGSV v3 may be enabled by default with its runtime guard."
                 if promotion["passed"]
                 else (
-                    "**Failed.** MKGSV remains selectable, experimental, and "
-                    "disabled by default."
+                    "**Failed.** MKGSV remains experimental and disabled by default; "
+                    "production output is exactly Markov 100."
                 )
             ),
             "",

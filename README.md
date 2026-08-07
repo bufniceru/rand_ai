@@ -36,6 +36,12 @@ The Electron shell invokes `rand-ai-gui-bridge` with the project virtual
 environment. Set `RAND_AI_PYTHON` to a different Python executable when
 needed.
 
+### Strategy documentation
+
+- [Chi-Square Frequency strategy](docs/chi-square-frequency-strategy.md) —
+  mathematical explanation, Python implementation, worked example, tests, and
+  interpretation limits.
+
 ### Opening a dataset
 
 From the welcome screen or **File > Open YAML or Dataset**, select either:
