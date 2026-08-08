@@ -1,9 +1,17 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import SettingsDialog from "./components/SettingsDialog.vue";
+import AppearanceDialog from "./components/AppearanceDialog.vue";
 import TrustDialog from "./components/TrustDialog.vue";
 import DrawEditorDialogApp from "./DrawEditorDialogApp.vue";
 import { buildFigures } from "./lib/figureBuilders";
+import {
+  beginColorTemplatePreview,
+  cancelColorTemplatePreview,
+  commitColorTemplatePreview,
+  previewColorTemplate,
+  themeRevision,
+} from "./lib/colorTemplates";
 import PossibleDrawDialogApp from "./PossibleDrawDialogApp.vue";
 import AutocorrelationView from "./views/AutocorrelationView.vue";
 import CoOccurrenceView from "./views/CoOccurrenceView.vue";
@@ -26,6 +34,7 @@ import type {
   AnalysisOptions,
   AnalysisPayload,
   AnalysisProgress,
+  ColorTemplate,
   CombinedPredictionDialogData,
   DatasetSelection,
   MenuAction,
@@ -115,6 +124,10 @@ const strategyPlugins = ref<StrategyPlugin[]>([]);
 const recentDatasets = ref<RecentDataset[]>([]);
 const settingsOpen = ref(false);
 const savingSettings = ref(false);
+const appearanceOpen = ref(false);
+const savingAppearance = ref(false);
+const appearanceStartingTemplate = ref<ColorTemplate | null>(null);
+const appearanceError = ref("");
 const updatingStrategySelection = ref(false);
 const lastSeenDrawCountStorageKey = "rand-ai-last-seen-draw-count";
 const storedLastSeenDrawCount = Number(
@@ -156,9 +169,10 @@ let progressCompletionResolver: (() => void) | null = null;
 let reportRefreshPending = false;
 let possibleDrawRequestToken = 0;
 
-const figures = computed(() =>
-  analysis.value ? buildFigures(analysis.value) : {},
-);
+const figures = computed(() => {
+  themeRevision.value;
+  return analysis.value ? buildFigures(analysis.value) : {};
+});
 const enabledViews = computed(() =>
   views.filter(
     (view) =>
@@ -291,7 +305,10 @@ async function applyPredictionStrategySelection(
 }
 
 async function openSettings(): Promise<void> {
-  if (!window.randAiDesktop) return;
+  if (!window.randAiDesktop) {
+    settingsOpen.value = true;
+    return;
+  }
   errorMessage.value = "";
   try {
     acceptStrategyPluginState(
@@ -300,6 +317,37 @@ async function openSettings(): Promise<void> {
     settingsOpen.value = true;
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+function openAppearance(): void {
+  appearanceStartingTemplate.value = beginColorTemplatePreview();
+  appearanceError.value = "";
+  settingsOpen.value = false;
+  appearanceOpen.value = true;
+}
+
+function cancelAppearance(): void {
+  cancelColorTemplatePreview();
+  appearanceOpen.value = false;
+  appearanceStartingTemplate.value = null;
+  appearanceError.value = "";
+}
+
+async function applyAppearance(template: ColorTemplate): Promise<void> {
+  savingAppearance.value = true;
+  appearanceError.value = "";
+  try {
+    const saved = window.randAiDesktop
+      ? await window.randAiDesktop.applyColorTemplate(template)
+      : template;
+    commitColorTemplatePreview(saved);
+    appearanceOpen.value = false;
+    appearanceStartingTemplate.value = null;
+  } catch (error) {
+    appearanceError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    savingAppearance.value = false;
   }
 }
 
@@ -691,6 +739,15 @@ onBeforeUnmount(() => {
           <span>{{ tab.label }}</span>
         </button>
       </nav>
+      <button
+        class="toolbar-settings-button"
+        type="button"
+        :disabled="loading"
+        aria-label="Open application settings"
+        @click="openSettings"
+      >
+        Settings
+      </button>
     </header>
 
     <nav
@@ -1013,7 +1070,18 @@ onBeforeUnmount(() => {
       :max-last-seen-draw-count="maxLastSeenDrawCount"
       :saving="savingSettings"
       @cancel="settingsOpen = false"
+      @appearance="openAppearance"
       @save="saveSettings"
+    />
+
+    <AppearanceDialog
+      v-if="appearanceOpen && appearanceStartingTemplate"
+      :active-template="appearanceStartingTemplate"
+      :saving="savingAppearance"
+      :external-error="appearanceError"
+      @cancel="cancelAppearance"
+      @preview="previewColorTemplate"
+      @apply="applyAppearance"
     />
 
     <footer class="status-bar">

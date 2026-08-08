@@ -5,6 +5,7 @@ import type {
   AutocorrelationModel,
   AutocorrelationNumberSummary,
 } from "../types";
+import { themeColor } from "./colorTemplates";
 
 const numberCount = 49;
 const numbersPerDraw = 6;
@@ -43,6 +44,19 @@ export const autocorrelationBands: AutocorrelationBand[] = [
     color: "#ff6188",
   },
 ];
+
+function refreshAutocorrelationBandColors(): void {
+  const ids = [
+    "predictions.autocorrelationStrongNegative",
+    "predictions.autocorrelationMildNegative",
+    "predictions.autocorrelationNeutral",
+    "predictions.autocorrelationMildPositive",
+    "predictions.autocorrelationStrongPositive",
+  ];
+  autocorrelationBands.forEach((band, index) => {
+    band.color = themeColor(ids[index]!);
+  });
+}
 
 const bandById = new Map(
   autocorrelationBands.map((band) => [band.id, band]),
@@ -137,6 +151,7 @@ function interpretationFor(
 export function buildAutocorrelationModel(
   history: AnalysisHistoryDraw[],
 ): AutocorrelationModel {
+  refreshAutocorrelationBandColors();
   const drawCount = history.length;
   const maxLag = Math.min(maxAnalyzedLag, Math.max(drawCount - 2, 1));
   const expectedOverlap = (numbersPerDraw * numbersPerDraw) / numberCount;

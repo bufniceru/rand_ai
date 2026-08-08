@@ -6,6 +6,7 @@ import type {
   CoOccurrenceNode,
   CoOccurrencePrediction,
 } from "../types";
+import { themeColor } from "./colorTemplates";
 
 const numberCount = 49;
 const numbersPerDraw = 6;
@@ -38,6 +39,18 @@ export const coOccurrenceBands: CoOccurrenceBand[] = [
     color: "#ff6188",
   },
 ];
+
+function refreshCoOccurrenceBandColors(): void {
+  const ids = [
+    "predictions.coOccurrenceLow",
+    "predictions.coOccurrenceNormal",
+    "predictions.coOccurrenceElevated",
+    "predictions.coOccurrenceHigh",
+  ];
+  coOccurrenceBands.forEach((band, index) => {
+    band.color = themeColor(ids[index]!);
+  });
+}
 
 const bandById = new Map(coOccurrenceBands.map((band) => [band.id, band]));
 
@@ -97,6 +110,7 @@ function interpretationFor(edges: CoOccurrenceEdge[]): string {
 export function buildCoOccurrenceModel(
   history: AnalysisHistoryDraw[],
 ): CoOccurrenceModel {
+  refreshCoOccurrenceBandColors();
   const pairKeys = allPairKeys();
   const pairCounts = new Map(pairKeys.map((key) => [key, 0]));
   const appearances = new Map<number, number>();

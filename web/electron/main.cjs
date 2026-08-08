@@ -11,6 +11,7 @@ const gunzip = promisify(zlib.gunzip);
 
 const devServerUrl = process.env.VITE_DEV_SERVER_URL || "";
 const maximumUploadBytes = 100 * 1024 * 1024;
+const maximumColorTemplateBytes = 1024 * 1024;
 const recentDatasetLimit = 10;
 const bridgeProgressPrefix = "RAND_AI_PROGRESS ";
 let mainWindow = null;
@@ -146,6 +147,111 @@ function analysisCachePath() {
 
 function portfolioBacktestCachePath() {
   return path.join(app.getPath("userData"), "portfolio-backtests");
+}
+
+function colorTemplatePreferencesPath() {
+  return path.join(app.getPath("userData"), "active-color-template.json");
+}
+
+function validatedColorTemplate(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("The selected file does not contain a color template.");
+  }
+  if (value.kind !== "rand-ai-color-template") {
+    throw new Error("Template kind must be rand-ai-color-template.");
+  }
+  if (value.schemaVersion !== 1) {
+    throw new Error(
+      `Unsupported color-template schema version: ${String(value.schemaVersion)}.`,
+    );
+  }
+  if (
+    typeof value.name !== "string" ||
+    value.name.trim().length === 0 ||
+    value.name.length > 80
+  ) {
+    throw new Error("Template name must contain 1 to 80 characters.");
+  }
+  if (
+    value.description !== undefined &&
+    (typeof value.description !== "string" || value.description.length > 500)
+  ) {
+    throw new Error("Template description must contain at most 500 characters.");
+  }
+  if (!value.colors || typeof value.colors !== "object" || Array.isArray(value.colors)) {
+    throw new Error("Template colors must be an object.");
+  }
+  const entries = Object.entries(value.colors);
+  if (entries.length === 0 || entries.length > 5000) {
+    throw new Error("Template must contain between 1 and 5,000 color tokens.");
+  }
+  for (const [id, color] of entries) {
+    if (!/^[a-zA-Z0-9_.-]{1,160}$/.test(id)) {
+      throw new Error(`Invalid color token identifier: ${id}`);
+    }
+    if (typeof color !== "string" || !/^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$/.test(color)) {
+      throw new Error(`Color token ${id} must use #RRGGBB or #RRGGBBAA.`);
+    }
+  }
+  const normalized = {
+    kind: "rand-ai-color-template",
+    schemaVersion: 1,
+    name: value.name.trim(),
+    colors: Object.fromEntries(
+      entries.map(([id, color]) => [id, color.toUpperCase()]),
+    ),
+  };
+  if (typeof value.description === "string" && value.description.trim()) {
+    normalized.description = value.description.trim();
+  }
+  for (const key of ["createdWith", "exportedAt"]) {
+    if (typeof value[key] === "string" && value[key].length <= 100) {
+      normalized[key] = value[key];
+    }
+  }
+  return normalized;
+}
+
+function loadStoredColorTemplate() {
+  try {
+    const raw = fs.readFileSync(colorTemplatePreferencesPath(), "utf8");
+    if (Buffer.byteLength(raw, "utf8") > maximumColorTemplateBytes) {
+      throw new Error("Stored color template exceeds 1 MiB.");
+    }
+    return validatedColorTemplate(JSON.parse(raw));
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      console.warn("Could not load the active color template:", error);
+    }
+    return null;
+  }
+}
+
+async function writeJsonAtomically(filePath, value) {
+  const contents = `${JSON.stringify(value, null, 2)}\n`;
+  if (Buffer.byteLength(contents, "utf8") > maximumColorTemplateBytes) {
+    throw new Error("Color template must not exceed 1 MiB.");
+  }
+  await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+  const temporaryPath = `${filePath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  try {
+    await fs.promises.writeFile(temporaryPath, contents, "utf8");
+    try {
+      await fs.promises.rename(temporaryPath, filePath);
+    } catch (error) {
+      if (!["EEXIST", "EPERM"].includes(error?.code)) throw error;
+      await fs.promises.copyFile(temporaryPath, filePath);
+    }
+  } finally {
+    await fs.promises.unlink(temporaryPath).catch(() => undefined);
+  }
+}
+
+function safeColorTemplateStem(name) {
+  return String(name ?? "rand-ai-template")
+    .replace(/\.randai-theme\.json$/i, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "rand-ai-template";
 }
 
 function validatedPortfolioCacheKey(value) {
@@ -784,13 +890,17 @@ function buildApplicationMenu() {
 }
 
 function createWindow() {
+  const storedTemplate = loadStoredColorTemplate();
+  const storedBackground = storedTemplate?.colors?.["application.background"];
   mainWindow = new BrowserWindow({
     title: "Rand AI",
     width: 1480,
     height: 980,
     minWidth: 1080,
     minHeight: 720,
-    backgroundColor: "#eef3f7",
+    backgroundColor: typeof storedBackground === "string"
+      ? storedBackground.slice(0, 7)
+      : "#eef3f7",
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -830,6 +940,56 @@ ipcMain.handle("strategy-plugins:set", (_event, requestedStrategyIds) => {
       .map((plugin) => plugin.id)
       .filter((strategyId) => requested.has(strategyId)),
   );
+});
+
+ipcMain.handle("color-template:get", () => loadStoredColorTemplate());
+
+ipcMain.handle("color-template:apply", async (_event, requestedTemplate) => {
+  const template = validatedColorTemplate(requestedTemplate);
+  await writeJsonAtomically(colorTemplatePreferencesPath(), template);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const background = template.colors["application.background"];
+    if (typeof background === "string") mainWindow.setBackgroundColor(background.slice(0, 7));
+  }
+  return template;
+});
+
+ipcMain.handle("color-template:load", async (event) => {
+  const parent = BrowserWindow.fromWebContents(event.sender) ?? mainWindow;
+  const result = await dialog.showOpenDialog(parent, {
+    title: "Load Rand AI color template",
+    properties: ["openFile"],
+    filters: [
+      { name: "Rand AI color template", extensions: ["randai-theme.json", "json"] },
+      { name: "JSON document", extensions: ["json"] },
+    ],
+  });
+  if (result.canceled || result.filePaths.length === 0) return { canceled: true };
+  const filePath = result.filePaths[0];
+  const stats = await fs.promises.stat(filePath);
+  if (stats.size > maximumColorTemplateBytes) {
+    throw new Error("Color template must not exceed 1 MiB.");
+  }
+  const template = validatedColorTemplate(
+    JSON.parse(await fs.promises.readFile(filePath, "utf8")),
+  );
+  return { canceled: false, path: filePath, template };
+});
+
+ipcMain.handle("color-template:save", async (event, requestedTemplate) => {
+  const parent = BrowserWindow.fromWebContents(event.sender) ?? mainWindow;
+  const template = validatedColorTemplate(requestedTemplate);
+  const result = await dialog.showSaveDialog(parent, {
+    title: "Save Rand AI color template",
+    defaultPath: `${safeColorTemplateStem(template.name)}.randai-theme.json`,
+    filters: [{ name: "Rand AI color template", extensions: ["randai-theme.json", "json"] }],
+  });
+  if (result.canceled || !result.filePath) return { canceled: true };
+  const filePath = result.filePath.toLowerCase().endsWith(".randai-theme.json")
+    ? result.filePath
+    : `${result.filePath.replace(/\.json$/i, "")}.randai-theme.json`;
+  await writeJsonAtomically(filePath, template);
+  return { canceled: false, path: filePath };
 });
 
 ipcMain.handle("dataset:analyze", async (event, request) => {

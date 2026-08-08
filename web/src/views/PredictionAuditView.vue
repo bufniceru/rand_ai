@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { themeColor } from "../lib/colorTemplates";
 import type {
   AnalysisPayload,
   PredictionAuditNumber,
@@ -160,12 +161,12 @@ function yForNumber(number: number): number {
 
 function implicationColor(item: PredictionAuditNumber): string {
   const count = filteredStrategies(item).length;
-  if (selectedStrategyId.value !== "all") return count > 0 ? "#a9dc76" : "#49464a";
-  if (count === 0) return "#49464a";
-  if (count <= 2) return "#78dce8";
-  if (count <= 5) return "#a9dc76";
-  if (count <= 8) return "#ab9df2";
-  return "#ff6188";
+  if (selectedStrategyId.value !== "all") return themeColor(count > 0 ? "predictions.auditMedium" : "predictions.auditNone");
+  if (count === 0) return themeColor("predictions.auditNone");
+  if (count <= 2) return themeColor("predictions.auditLow");
+  if (count <= 5) return themeColor("predictions.auditMedium");
+  if (count <= 8) return themeColor("predictions.auditHigh");
+  return themeColor("predictions.auditExtreme");
 }
 
 function occurrenceTitle(
@@ -247,11 +248,11 @@ function percentage(value: number): string {
           <p>Click any drawn-number dot to inspect its successful strategies.</p>
         </div>
         <div class="audit-color-legend">
-          <span><i style="--audit-color: #49464a" />0</span>
-          <span><i style="--audit-color: #78dce8" />1–2</span>
-          <span><i style="--audit-color: #a9dc76" />3–5</span>
-          <span><i style="--audit-color: #ab9df2" />6–8</span>
-          <span><i style="--audit-color: #ff6188" />9+</span>
+          <span><i :style="{ '--audit-color': themeColor('predictions.auditNone') }" />0</span>
+          <span><i :style="{ '--audit-color': themeColor('predictions.auditLow') }" />1–2</span>
+          <span><i :style="{ '--audit-color': themeColor('predictions.auditMedium') }" />3–5</span>
+          <span><i :style="{ '--audit-color': themeColor('predictions.auditHigh') }" />6–8</span>
+          <span><i :style="{ '--audit-color': themeColor('predictions.auditExtreme') }" />9+</span>
         </div>
       </header>
       <div v-if="visibleRecords.length > 0" class="prediction-audit-chart-scroll">

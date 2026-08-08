@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { buildCoOccurrenceModel } from "../lib/coOccurrence";
+import { themeColor, themeRevision } from "../lib/colorTemplates";
 import type { AnalysisPayload } from "../types";
 
 const props = defineProps<{ analysis: AnalysisPayload }>();
-const model = computed(() =>
-  buildCoOccurrenceModel(props.analysis.analysisHistory),
-);
+const model = computed(() => {
+  themeRevision.value;
+  return buildCoOccurrenceModel(props.analysis.analysisHistory);
+});
 const networkNodes = computed(() => {
   const numbers = new Set<number>();
   for (const edge of model.value.networkEdges) {
@@ -54,7 +56,7 @@ function percent(value: number): string {
 
 function bandColor(bandId: string): string {
   return (
-    model.value.bands.find((band) => band.id === bandId)?.color ?? "#727072"
+    model.value.bands.find((band) => band.id === bandId)?.color ?? themeColor("text.muted")
   );
 }
 </script>
@@ -157,8 +159,8 @@ function bandColor(bandId: string): string {
               :cx="node.x"
               :cy="node.y"
               :r="node.size"
-              fill="#403e41"
-              stroke="#78dce8"
+              :fill="themeColor('charts.paper')"
+              :stroke="themeColor('charts.series1')"
               stroke-width="1.5"
             />
             <text :x="node.x" :y="node.y + 3.5">{{ node.number }}</text>

@@ -14,6 +14,7 @@ import {
 } from "../lib/drawPortfolio";
 import {
   portfolioBacktestCacheKey,
+  portfolioHistoryStatistics,
 } from "../lib/drawPortfolioBacktest";
 import type {
   PortfolioBacktestProgress,
@@ -73,6 +74,9 @@ const visibleAudit = computed(() => {
   const start = (auditPage.value - 1) * auditPageSize;
   return filteredAudit.value.slice(start, start + auditPageSize);
 });
+const simulationStatistics = computed(() =>
+  portfolioHistoryStatistics(simulationResult.value),
+);
 
 function normalizeDrawCount(): number {
   const value = Number.isFinite(requestedDrawCount.value)
@@ -300,6 +304,10 @@ function stepAuditPage(direction: -1 | 1): void {
   );
 }
 
+function showMaximumHitTargets(): void {
+  hitFilter.value = String(simulationStatistics.value.maximumHits);
+}
+
 watch(
   () => [latestSuite.value?.referenceDrawNumber, latestSuite.value?.strategies] as const,
   () => {
@@ -508,9 +516,9 @@ onBeforeUnmount(() => {
           <p class="eyebrow">Leakage-free walk-forward audit</p>
           <h2 id="portfolio-backtest-title">Full-history simulation</h2>
           <p>
-            Rebuild a portfolio before every known target draw and record the best
-            single-ticket result. Historical weights and relationships use only
-            information available at that reference.
+            For every known target, rebuild the requested number of portfolio draws,
+            compare all of them with the actual result, and retain the highest number
+            of correctly predicted values. Historical inputs stop at that reference.
           </p>
         </div>
         <span v-if="simulationFromCache" class="portfolio-cache-badge">
@@ -520,7 +528,7 @@ onBeforeUnmount(() => {
 
       <div class="portfolio-backtest-controls">
         <label>
-          <span>Tickets per historical target</span>
+          <span>Number of draws per historical target</span>
           <input
             v-model.number="simulationPortfolioSize"
             type="number"
@@ -585,6 +593,48 @@ onBeforeUnmount(() => {
             <span>At least one hit</span>
             <strong>{{ percent(simulationResult.buckets[1]?.atLeastRate ?? 0) }}</strong>
           </article>
+        </section>
+
+        <section
+          class="portfolio-maximum-statistics"
+          aria-labelledby="portfolio-maximum-title"
+        >
+          <header>
+            <div>
+              <p class="eyebrow">Historical efficacy</p>
+              <h3 id="portfolio-maximum-title">Maximum predicted numbers</h3>
+              <p>
+                At each target, the best result among
+                {{ simulationStatistics.portfolioSize }} generated draws is retained;
+                the figures below summarize those maxima across the full history.
+              </p>
+            </div>
+            <button type="button" @click="showMaximumHitTargets">
+              Show maximum-hit targets
+            </button>
+          </header>
+          <div>
+            <article class="primary">
+              <span>Historical maximum</span>
+              <strong>{{ simulationStatistics.maximumHits }}/6</strong>
+              <small>correctly predicted numbers in one generated draw</small>
+            </article>
+            <article>
+              <span>Targets reaching maximum</span>
+              <strong>{{ simulationStatistics.maximumHitTargets.toLocaleString() }}</strong>
+              <small>of {{ simulationStatistics.evaluatedTargets.toLocaleString() }}</small>
+            </article>
+            <article>
+              <span>Maximum-hit rate</span>
+              <strong>{{ percent(simulationStatistics.maximumHitRate) }}</strong>
+              <small>historical targets with the overall maximum</small>
+            </article>
+            <article>
+              <span>Average best result</span>
+              <strong>{{ simulationStatistics.averageBestHits.toFixed(3) }}/6</strong>
+              <small>best generated draw per historical target</small>
+            </article>
+          </div>
         </section>
 
         <section class="portfolio-hit-distribution">

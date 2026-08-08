@@ -17,6 +17,15 @@ const NUMBER_COUNT = 49;
 const PAIR_UNIVERSE = 49 * 48 / 2;
 const RANDOM_HITS_PER_DRAW = 36 / 49;
 
+export interface PortfolioHistoryStatistics {
+  evaluatedTargets: number;
+  portfolioSize: number;
+  maximumHits: number;
+  maximumHitTargets: number;
+  maximumHitRate: number;
+  averageBestHits: number;
+}
+
 function compareNumbers(left: readonly number[], right: readonly number[]): number {
   for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
     if (left[index] !== right[index]) return left[index] - right[index];
@@ -104,6 +113,28 @@ function buildBuckets(audit: PortfolioBacktestAuditRow[]) {
       atLeastRate: total > 0 ? atLeastCount / total : 0,
     };
   });
+}
+
+export function portfolioHistoryStatistics(
+  result: Pick<PortfolioBacktestResult, "audit" | "portfolioSize"> | null,
+): PortfolioHistoryStatistics {
+  const audit = result?.audit ?? [];
+  const maximumHits = audit.reduce(
+    (maximum, row) => Math.max(maximum, row.bestHits),
+    0,
+  );
+  const maximumHitTargets = audit.filter(
+    (row) => row.bestHits === maximumHits,
+  ).length;
+  const bestHitTotal = audit.reduce((total, row) => total + row.bestHits, 0);
+  return {
+    evaluatedTargets: audit.length,
+    portfolioSize: result?.portfolioSize ?? 0,
+    maximumHits,
+    maximumHitTargets,
+    maximumHitRate: audit.length > 0 ? maximumHitTargets / audit.length : 0,
+    averageBestHits: audit.length > 0 ? bestHitTotal / audit.length : 0,
+  };
 }
 
 export function portfolioBacktestCacheKey(

@@ -1,9 +1,11 @@
-import type { StrategyId } from "../types";
+import type { HexColor, StrategyId } from "../types";
 import {
   STRATEGY_FAMILIES,
   STRATEGY_FAMILY_BY_ID,
+  configuredStrategyFamilyColor,
   type StrategyFamilyId,
 } from "./strategyFamilies";
+import { registerColorTokens, themeColor } from "./colorTemplates";
 
 export const STRATEGY_TONE_POSITION_BY_ID = {
   freshness: 0,
@@ -62,7 +64,7 @@ function parseHexColor(color: string): [number, number, number] {
   ) as [number, number, number];
 }
 
-function mixHexColors(source: string, target: string, amount: number): string {
+function mixHexColors(source: string, target: string, amount: number): HexColor {
   const sourceChannels = parseHexColor(source);
   const targetChannels = parseHexColor(target);
   const channels = sourceChannels.map((channel, index) =>
@@ -70,16 +72,16 @@ function mixHexColors(source: string, target: string, amount: number): string {
   );
   return `#${channels
     .map((channel) => channel.toString(16).padStart(2, "0"))
-    .join("")}`.toUpperCase();
+    .join("")}`.toUpperCase() as HexColor;
 }
 
 export function strategyFamilyColor(familyId: StrategyFamilyId): string {
-  return familyById.get(familyId)?.color ?? "#727072";
+  return configuredStrategyFamilyColor(familyId);
 }
 
-export function strategyColor(strategyId: StrategyId): string {
+function derivedStrategyColor(strategyId: StrategyId): HexColor {
   const familyId = STRATEGY_FAMILY_BY_ID[strategyId];
-  const baseColor = strategyFamilyColor(familyId);
+  const baseColor = (familyById.get(familyId)?.color ?? "#727072") as HexColor;
   const familySize = familyStrategyCounts[familyId];
   if (familySize <= 1) return baseColor;
 
@@ -96,4 +98,18 @@ export function strategyColor(strategyId: StrategyId): string {
         LIGHT_MIX_COLOR,
         normalizedPosition * MAX_LIGHT_MIX,
       );
+}
+
+registerColorTokens(
+  (Object.keys(STRATEGY_FAMILY_BY_ID) as StrategyId[]).map((strategyId) => ({
+    id: `strategy.${strategyId}`,
+    label: `${strategyId.replaceAll("_", " ")} strategy`,
+    group: "strategies" as const,
+    defaultValue: derivedStrategyColor(strategyId),
+    description: `Individual override for the ${strategyId.replaceAll("_", " ")} strategy.`,
+  })),
+);
+
+export function strategyColor(strategyId: StrategyId): string {
+  return themeColor(`strategy.${strategyId}`, derivedStrategyColor(strategyId));
 }

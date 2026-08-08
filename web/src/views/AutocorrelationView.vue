@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { buildAutocorrelationModel } from "../lib/autocorrelation";
+import { themeColor, themeRevision } from "../lib/colorTemplates";
 import type {
   AnalysisPayload,
   AutocorrelationLagSummary,
@@ -10,9 +11,10 @@ const props = defineProps<{
   analysis: AnalysisPayload;
 }>();
 
-const model = computed(() =>
-  buildAutocorrelationModel(props.analysis.analysisHistory),
-);
+const model = computed(() => {
+  themeRevision.value;
+  return buildAutocorrelationModel(props.analysis.analysisHistory);
+});
 const chartScale = computed(() =>
   Math.max(
     ...model.value.lagSummaries.map((summary) => Math.abs(summary.score)),
@@ -78,7 +80,7 @@ function signed(value: number, digits = 3): string {
 
 function bandColor(bandId: string): string {
   return (
-    model.value.bands.find((band) => band.id === bandId)?.color ?? "#727072"
+    model.value.bands.find((band) => band.id === bandId)?.color ?? themeColor("text.muted")
   );
 }
 

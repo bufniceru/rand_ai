@@ -13,6 +13,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   cancel: [];
+  appearance: [];
   save: [strategyIds: StrategyId[], lastSeenDrawCount: number];
 }>();
 
@@ -140,6 +141,21 @@ onMounted(() => dialog.value?.focus());
             @change="selectedLastSeenDrawCount = normalizedLastSeenDrawCount()"
           >
         </label>
+      </section>
+
+      <section class="settings-display-section settings-appearance-section">
+        <div>
+          <strong>Appearance</strong>
+          <small>Customize every application, chart, strategy, and component color.</small>
+        </div>
+        <button
+          class="button secondary"
+          type="button"
+          :disabled="saving"
+          @click="emit('appearance')"
+        >
+          Color templates…
+        </button>
       </section>
 
       <div class="settings-selection-actions">

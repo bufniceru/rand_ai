@@ -15,6 +15,7 @@ import {
 } from "../lib/familyEfficacy";
 import { groupStrategiesByFamily } from "../lib/strategyFamilies";
 import { strategyColor } from "../lib/strategyColors";
+import { themeColor } from "../lib/colorTemplates";
 import { enabledStrategyPlugins } from "../lib/strategySelection";
 import type { EfficacyChartRow } from "../lib/efficacyChart";
 import type {
@@ -490,7 +491,7 @@ function strategyFullName(strategy: StrategyPrediction): string {
 
 function strategyDisplayColor(strategyId: StrategyId): string {
   return mutedStrategyIds.value.has(strategyId)
-    ? "#ffffff"
+    ? themeColor("text.inverse")
     : strategyColor(strategyId);
 }
 

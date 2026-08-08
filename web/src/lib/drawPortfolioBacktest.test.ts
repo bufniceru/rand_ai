@@ -7,6 +7,7 @@ import type {
 } from "../types";
 import {
   portfolioBacktestCacheKey,
+  portfolioHistoryStatistics,
   runPortfolioBacktest,
 } from "./drawPortfolioBacktest";
 
@@ -93,6 +94,37 @@ describe("portfolio walk-forward backtest", () => {
     expect(portfolioBacktestCacheKey("a".repeat(64), 10)).toBe(
       `${"a".repeat(64)}-v1-p10`,
     );
+  });
+
+  it("summarizes the maximum and average best result across history", () => {
+    const statistics = portfolioHistoryStatistics({
+      portfolioSize: 12,
+      audit: [
+        { ...record(1, [1, 2, 3, 4, 5, 6]), bestTicket: [], bestHits: 2, tiedBestCount: 1 },
+        { ...record(2, [1, 2, 3, 4, 5, 6]), bestTicket: [], bestHits: 4, tiedBestCount: 1 },
+        { ...record(3, [1, 2, 3, 4, 5, 6]), bestTicket: [], bestHits: 4, tiedBestCount: 2 },
+      ],
+    });
+
+    expect(statistics).toEqual({
+      evaluatedTargets: 3,
+      portfolioSize: 12,
+      maximumHits: 4,
+      maximumHitTargets: 2,
+      maximumHitRate: 2 / 3,
+      averageBestHits: 10 / 3,
+    });
+  });
+
+  it("returns zero statistics before a historical simulation exists", () => {
+    expect(portfolioHistoryStatistics(null)).toEqual({
+      evaluatedTargets: 0,
+      portfolioSize: 0,
+      maximumHits: 0,
+      maximumHitTargets: 0,
+      maximumHitRate: 0,
+      averageBestHits: 0,
+    });
   });
 
   it("supports and clamps historical portfolios at 100 tickets", () => {

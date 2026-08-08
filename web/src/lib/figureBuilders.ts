@@ -4,8 +4,13 @@ import type {
   TablePayload,
   TableRow,
 } from "../types";
+import { themeColor } from "./colorTemplates";
 
-const chartColors = ["#78dce8", "#ff6188", "#a9dc76", "#ffd866", "#ab9df2", "#fc9867"];
+function chartColors(): string[] {
+  return [1, 2, 3, 4, 5, 6].map((index) =>
+    themeColor(`charts.series${index}`),
+  );
+}
 
 function table(analysis: AnalysisPayload, name: string): TablePayload {
   const value = analysis.tables[name];
@@ -19,14 +24,14 @@ function numberValue(row: TableRow, key: string): number {
 
 function baseLayout(title: string, xTitle = "", yTitle = ""): Record<string, unknown> {
   return {
-    title: { text: title, x: 0.02, xanchor: "left", font: { size: 18, color: "#fcfcfa" } },
-    paper_bgcolor: "#403e41",
-    plot_bgcolor: "#403e41",
-    font: { family: "Segoe UI, Helvetica Neue, sans-serif", color: "#b7b5b7" },
+    title: { text: title, x: 0.02, xanchor: "left", font: { size: 18, color: themeColor("charts.title") } },
+    paper_bgcolor: themeColor("charts.paper"),
+    plot_bgcolor: themeColor("charts.plot"),
+    font: { family: "Segoe UI, Helvetica Neue, sans-serif", color: themeColor("charts.text") },
     margin: { l: 62, r: 24, t: 62, b: 58 },
-    xaxis: { title: { text: xTitle }, gridcolor: "rgba(252,252,250,.12)", zerolinecolor: "#5b595c" },
-    yaxis: { title: { text: yTitle }, gridcolor: "rgba(252,252,250,.12)", zerolinecolor: "#5b595c" },
-    hoverlabel: { bgcolor: "#221f22", bordercolor: "#ffd866", font: { color: "#fcfcfa" } },
+    xaxis: { title: { text: xTitle }, gridcolor: themeColor("charts.grid"), zerolinecolor: themeColor("charts.zeroLine") },
+    yaxis: { title: { text: yTitle }, gridcolor: themeColor("charts.grid"), zerolinecolor: themeColor("charts.zeroLine") },
+    hoverlabel: { bgcolor: themeColor("charts.hoverBackground"), bordercolor: themeColor("charts.hoverBorder"), font: { color: themeColor("charts.title") } },
     legend: { orientation: "h", y: 1.08, x: 1, xanchor: "right" },
   };
 }
@@ -55,7 +60,7 @@ function heatmap(
         x,
         y,
         z: y.map((row) => x.map((column) => lookup.get(`${row}|${column}`) ?? 0)),
-        colorscale: [[0, "#2d2a2e"], [0.25, "#ab9df2"], [0.5, "#78dce8"], [0.75, "#a9dc76"], [1, "#ffd866"]],
+        colorscale: [[0, themeColor("charts.heatLow")], [0.25, themeColor("charts.heatMidLow")], [0.5, themeColor("charts.heatMid")], [0.75, themeColor("charts.heatMidHigh")], [1, themeColor("charts.heatHigh")]],
         hovertemplate: `${yTitle}: %{y}<br>${xTitle}: %{x}<br>Value: %{z}<extra></extra>`,
       }],
       layout: baseLayout(title, xTitle, yTitle),
@@ -70,7 +75,7 @@ function heatmap(
       x,
       y,
       z: source.rows.map((row) => x.map((column) => numberValue(row, column))),
-      colorscale: [[0, "#ff6188"], [0.5, "#403e41"], [1, "#78dce8"]],
+      colorscale: [[0, themeColor("charts.negative")], [0.5, themeColor("charts.neutral")], [1, themeColor("charts.positive")]],
       zmin: -1,
       zmax: 1,
       hovertemplate: `${yTitle}: %{y}<br>${xTitle}: %{x}<br>Correlation: %{z:.3f}<extra></extra>`,
@@ -93,7 +98,7 @@ function numberFrequencies(analysis: AnalysisPayload): FigureSpec {
         name: "Observed",
         x: rows.map((row) => numberValue(row, "number")),
         y: rows.map((row) => numberValue(row, "count")),
-        marker: { color: "#78dce8" },
+        marker: { color: themeColor("charts.series1") },
         hovertemplate: "Number %{x}<br>Count %{y}<extra></extra>",
       },
       {
@@ -102,7 +107,7 @@ function numberFrequencies(analysis: AnalysisPayload): FigureSpec {
         name: "Expected",
         x: rows.map((row) => numberValue(row, "number")),
         y: rows.map((row) => numberValue(row, "expected_count")),
-        line: { color: "#ff6188", width: 3 },
+        line: { color: themeColor("charts.series2"), width: 3 },
         hovertemplate: "Number %{x}<br>Expected %{y:.2f}<extra></extra>",
       },
     ],
@@ -119,7 +124,7 @@ function drawSumDistribution(analysis: AnalysisPayload): FigureSpec {
       type: "bar",
       x: rows.map((row) => numberValue(row, "value")),
       y: rows.map((row) => numberValue(row, "count")),
-      marker: { color: "#78dce8" },
+      marker: { color: themeColor("charts.series1") },
     }],
     layout: baseLayout("Draw-sum distribution", "Sum of six numbers", "Draws"),
   };
@@ -140,7 +145,7 @@ function composition(analysis: AnalysisPayload): FigureSpec {
         name: label,
         x: values.map((row) => numberValue(row, "value")),
         y: values.map((row) => numberValue(row, "count")),
-        marker: { color: chartColors[index] },
+        marker: { color: chartColors()[index] },
         xaxis: index === 0 ? "x" : `x${index + 1}`,
         yaxis: index === 0 ? "y" : `y${index + 1}`,
         showlegend: false,
@@ -156,7 +161,7 @@ function composition(analysis: AnalysisPayload): FigureSpec {
         xref: "paper",
         yref: "paper",
         showarrow: false,
-        font: { size: 13, color: "#b7b5b7" },
+        font: { size: 13, color: themeColor("charts.text") },
       })),
     },
   };
@@ -179,7 +184,7 @@ function trends(analysis: AnalysisPayload): FigureSpec {
           numberValue(row, "end_draw"),
           numberValue(row, "count"),
         ]),
-        line: { color: chartColors[index % chartColors.length], width: 2 },
+        line: { color: chartColors()[index % chartColors().length], width: 2 },
         hovertemplate:
           "Bin %{x}<br>Rate %{y:.2f}%<br>Draws %{customdata[0]}–%{customdata[1]}<br>Count %{customdata[2]}<extra></extra>",
       };
@@ -199,7 +204,7 @@ function distanceFigure(
       type: "bar",
       x: source.rows.map((row) => numberValue(row, xKey)),
       y: source.rows.map((row) => numberValue(row, yKey)),
-      marker: { color: "#78dce8" },
+      marker: { color: themeColor("charts.series1") },
     }],
     layout: {
       ...baseLayout(title, "Distance (0–43)", "Occurrences"),
@@ -207,7 +212,7 @@ function distanceFigure(
         title: { text: "Distance (0–43)" },
         range: [-0.5, 43.5],
         dtick: 1,
-        gridcolor: "rgba(252,252,250,.12)",
+        gridcolor: themeColor("charts.grid"),
       },
     },
   };
@@ -223,7 +228,7 @@ function spaceBox(analysis: AnalysisPayload): FigureSpec {
       y: rows
         .filter((row) => row.position === position)
         .map((row) => numberValue(row, "space")),
-      marker: { color: chartColors[index % chartColors.length] },
+      marker: { color: chartColors()[index % chartColors().length] },
       boxpoints: false,
     })),
     layout: baseLayout(
@@ -245,7 +250,7 @@ function spaceExtremes(analysis: AnalysisPayload): FigureSpec {
         name: measure,
         x: values.map((row) => numberValue(row, "value")),
         y: values.map((row) => numberValue(row, "count")),
-        marker: { color: chartColors[index] },
+        marker: { color: chartColors()[index] },
       };
     }),
     layout: {
@@ -266,7 +271,7 @@ function matchingPairs(analysis: AnalysisPayload): FigureSpec {
         lookup.get("observed_matching_combination_pairs") ?? 0,
         lookup.get("expected_matching_combination_pairs") ?? 0,
       ],
-      marker: { color: ["#78dce8", "#ff6188"] },
+      marker: { color: [themeColor("charts.series1"), themeColor("charts.series2")] },
     }],
     layout: baseLayout("Matching six-number combination pairs", "", "Matching pairs"),
   };
@@ -292,9 +297,9 @@ function freshnessGapDistribution(analysis: AnalysisPayload): FigureSpec {
       marker: {
         color: rows.map((row) => numberValue(row, "hit_rate")),
         colorscale: [
-          [0, "#403e41"],
-          [0.5, "#78dce8"],
-          [1, "#ffd866"],
+          [0, themeColor("charts.neutral")],
+          [0.5, themeColor("charts.series1")],
+          [1, themeColor("charts.series4")],
         ],
         colorbar: { title: { text: "Hit rate %" } },
       },
@@ -307,7 +312,7 @@ function freshnessGapDistribution(analysis: AnalysisPayload): FigureSpec {
       xaxis: {
         title: { text: "Gap (intervening draws since the previous hit)" },
         dtick: rows.length > 60 ? 5 : 1,
-        gridcolor: "rgba(252,252,250,.12)",
+        gridcolor: themeColor("charts.grid"),
       },
     },
   };

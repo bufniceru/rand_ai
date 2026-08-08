@@ -1,4 +1,5 @@
 import type { StrategyId } from "../types";
+import { registerColorTokens, themeColor } from "./colorTemplates";
 
 export const STRATEGY_FAMILIES = [
   {
@@ -34,6 +35,26 @@ export const STRATEGY_FAMILIES = [
 ] as const;
 
 export type StrategyFamilyId = (typeof STRATEGY_FAMILIES)[number]["id"];
+
+registerColorTokens(
+  STRATEGY_FAMILIES.map((family) => ({
+    id: `strategy.family.${family.id}`,
+    label: `${family.label} family`,
+    group: "strategies" as const,
+    defaultValue: family.color,
+    description: `Default color for the ${family.label} strategy family.`,
+  })),
+);
+
+export function configuredStrategyFamilyColor(
+  familyId: StrategyFamilyId,
+): string {
+  const family = STRATEGY_FAMILIES.find((candidate) => candidate.id === familyId);
+  return themeColor(
+    `strategy.family.${familyId}`,
+    family?.color ?? "#727072",
+  );
+}
 
 export const STRATEGY_FAMILY_BY_ID = {
   proximity: "shape-similarity",
@@ -99,7 +120,7 @@ export function groupStrategiesByFamily<T extends { id: StrategyId }>(
     const family = familyById.get(familyId);
     const groupedStrategies = strategiesByFamily.get(familyId) ?? [];
     return family && groupedStrategies.length > 0
-      ? [{ ...family, strategies: groupedStrategies }]
+      ? [{ ...family, color: configuredStrategyFamilyColor(family.id), strategies: groupedStrategies }]
       : [];
   });
 }

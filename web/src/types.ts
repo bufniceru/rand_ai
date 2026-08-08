@@ -514,6 +514,32 @@ export interface DrawPortfolioPdfRequest {
   suggestedName: string;
 }
 
+export type HexColor = `#${string}`;
+export type ColorTokenId = string;
+
+export interface ColorTemplate {
+  kind: "rand-ai-color-template";
+  schemaVersion: 1;
+  name: string;
+  description?: string;
+  createdWith?: string;
+  exportedAt?: string;
+  colors: Record<ColorTokenId, HexColor>;
+}
+
+export type ColorTemplateDraft = ColorTemplate;
+
+export interface ColorTemplateLoadResult {
+  canceled: boolean;
+  path?: string;
+  template?: unknown;
+}
+
+export interface ColorTemplateSaveResult {
+  canceled: boolean;
+  path?: string;
+}
+
 export type PossibleDrawNumberState = "possible" | "for-sure";
 
 export interface PossibleDrawNumberRequest {
@@ -554,6 +580,12 @@ export interface DesktopApi {
     request: DrawComparisonPdfRequest,
   ): Promise<ExportResult>;
   saveDrawPortfolioPdf(request: DrawPortfolioPdfRequest): Promise<ExportResult>;
+  getColorTemplate(): Promise<unknown | null>;
+  applyColorTemplate(template: ColorTemplate): Promise<ColorTemplate>;
+  loadColorTemplate(): Promise<ColorTemplateLoadResult>;
+  saveColorTemplate(
+    template: ColorTemplate,
+  ): Promise<ColorTemplateSaveResult>;
   printDrawComparison(): Promise<void>;
   showForSureLimitError(number: number): Promise<void>;
   getDrawEditorData(): Promise<DrawEditorData>;

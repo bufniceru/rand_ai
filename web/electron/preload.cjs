@@ -30,6 +30,12 @@ contextBridge.exposeInMainWorld("randAiDesktop", {
     ipcRenderer.invoke("draw-comparison:save-pdf", request),
   saveDrawPortfolioPdf: (request) =>
     ipcRenderer.invoke("draw-portfolio:save-pdf", request),
+  getColorTemplate: () => ipcRenderer.invoke("color-template:get"),
+  applyColorTemplate: (template) =>
+    ipcRenderer.invoke("color-template:apply", template),
+  loadColorTemplate: () => ipcRenderer.invoke("color-template:load"),
+  saveColorTemplate: (template) =>
+    ipcRenderer.invoke("color-template:save", template),
   printDrawComparison: () => ipcRenderer.invoke("draw-comparison:print"),
   showForSureLimitError: (number) =>
     ipcRenderer.invoke("possible-draw:for-sure-limit-error", number),
