@@ -1,4 +1,7 @@
 import type {
+  DrawPortfolioResultMetadata,
+  PossibleDrawConstraints,
+  PossibleDrawNumberState,
   PredictionSuite,
   RelationshipEdge,
   StrategyPrediction,
@@ -11,7 +14,7 @@ const EFFICACY_PRIOR_DRAWS = 24;
 const MIN_POOL_SIZE = 12;
 const MAX_POOL_SIZE = 24;
 const EXCLUDED_STRATEGIES = new Set(["randomness", "fresh_random"]);
-export const PORTFOLIO_ALGORITHM_VERSION = 1;
+export const PORTFOLIO_ALGORITHM_VERSION = 2;
 
 export type RelationshipLiftSource =
   | RelationshipEdge[]
@@ -21,6 +24,7 @@ export interface PortfolioPoolNumber {
   number: number;
   score: number;
   topSixSupport: number;
+  state?: PossibleDrawNumberState;
 }
 
 export interface PortfolioDraw {
@@ -45,6 +49,7 @@ export interface DrawPortfolioResult {
   pool: PortfolioPoolNumber[];
   draws: PortfolioDraw[];
   metrics: PortfolioMetrics;
+  metadata: DrawPortfolioResultMetadata;
 }
 
 interface CandidateDraw {
@@ -118,15 +123,13 @@ export function portfolioPoolSize(drawCount: number): number {
   );
 }
 
-function buildPool(
+function scorePoolNumbers(
   strategies: StrategyPrediction[],
-  drawCount: number,
 ): PortfolioPoolNumber[] {
   const weights = new Map(
     strategies.map((strategy) => [strategy.id, strategyWeight(strategy)]),
   );
   const weightTotal = [...weights.values()].reduce((total, weight) => total + weight, 0);
-  const topSixUnion = new Set(strategies.flatMap((strategy) => strategy.topNumbers));
   const scored = Array.from({ length: NUMBER_COUNT }, (_value, index) => {
     const number = index + 1;
     let weightedScore = 0;
@@ -152,11 +155,87 @@ function buildPool(
       right.topSixSupport - left.topSixSupport ||
       left.number - right.number,
   );
+  return scored;
+}
+
+function buildPool(
+  strategies: StrategyPrediction[],
+  drawCount: number,
+): PortfolioPoolNumber[] {
+  const scored = scorePoolNumbers(strategies);
+  const topSixUnion = new Set(strategies.flatMap((strategy) => strategy.topNumbers));
 
   const targetSize = portfolioPoolSize(drawCount);
   const prioritized = scored.filter((entry) => topSixUnion.has(entry.number));
   const remaining = scored.filter((entry) => !topSixUnion.has(entry.number));
   return [...prioritized, ...remaining].slice(0, targetSize);
+}
+
+function normalizeConstraintNumbers(numbers: readonly number[]): number[] {
+  return [...new Set(numbers)].filter(
+    (number) => Number.isInteger(number) && number >= 1 && number <= NUMBER_COUNT,
+  );
+}
+
+function buildGuidedPool(
+  strategies: StrategyPrediction[],
+  drawCount: number,
+  constraints: PossibleDrawConstraints,
+): {
+  pool: PortfolioPoolNumber[];
+  fixedNumbers: number[];
+  candidateNumbers: number[];
+  excludedNumbers: number[];
+  omittedCandidates: number[];
+} {
+  const scored = scorePoolNumbers(strategies);
+  const fixedNumbers = normalizeConstraintNumbers(constraints.fixedNumbers).slice(
+    0,
+    NUMBERS_PER_DRAW,
+  );
+  const fixed = new Set(fixedNumbers);
+  const candidateNumbers = normalizeConstraintNumbers(constraints.candidateNumbers).filter(
+    (number) => !fixed.has(number),
+  );
+  const candidates = new Set(candidateNumbers);
+  const excludedNumbers = normalizeConstraintNumbers(constraints.excludedNumbers).filter(
+    (number) => !fixed.has(number) && !candidates.has(number),
+  );
+  const excluded = new Set(excludedNumbers);
+  const rankedFixed = scored.filter((entry) => fixed.has(entry.number));
+  const rankedCandidates = scored.filter(
+    (entry) => candidates.has(entry.number) && !excluded.has(entry.number),
+  );
+  const rankedNeutral = scored.filter(
+    (entry) =>
+      !fixed.has(entry.number) &&
+      !candidates.has(entry.number) &&
+      !excluded.has(entry.number),
+  );
+  const targetSize = Math.min(
+    MAX_POOL_SIZE,
+    Math.max(portfolioPoolSize(drawCount), rankedFixed.length + rankedCandidates.length),
+  );
+  const pool = [...rankedFixed, ...rankedCandidates, ...rankedNeutral]
+    .slice(0, targetSize)
+    .map((entry) => ({
+      ...entry,
+      state: fixed.has(entry.number)
+        ? "fixed" as const
+        : candidates.has(entry.number)
+          ? "candidate" as const
+          : "neutral" as const,
+    }));
+  const poolNumbers = new Set(pool.map((entry) => entry.number));
+  return {
+    pool,
+    fixedNumbers,
+    candidateNumbers,
+    excludedNumbers,
+    omittedCandidates: rankedCandidates
+      .filter((entry) => !poolNumbers.has(entry.number))
+      .map((entry) => entry.number),
+  };
 }
 
 function candidateTopologies(poolSize: number): CandidateTopology[] {
@@ -209,6 +288,7 @@ function candidateTopologies(poolSize: number): CandidateTopology[] {
 function enumerateCandidates(
   pool: PortfolioPoolNumber[],
   relationshipSource: RelationshipLiftSource,
+  guided?: { fixedNumbers: number[]; candidateNumbers: number[] },
 ): CandidateDraw[] {
   const relationshipByPair = Array.isArray(relationshipSource)
     ? new Map(
@@ -220,7 +300,25 @@ function enumerateCandidates(
       ? relationshipSource
       : (left: number, right: number) =>
           relationshipByPair?.get(pairKey(left, right)) ?? 0;
-  return candidateTopologies(pool.length).map((topology) => {
+  const fixed = new Set(guided?.fixedNumbers ?? []);
+  const candidates = new Set(guided?.candidateNumbers ?? []);
+  const fixedIndexes = pool
+    .map((entry, index) => fixed.has(entry.number) ? index : -1)
+    .filter((index) => index >= 0);
+  const availableCandidateCount = pool.filter((entry) => candidates.has(entry.number)).length;
+  const requiredCandidateCount = Math.min(
+    availableCandidateCount,
+    NUMBERS_PER_DRAW - fixedIndexes.length,
+  );
+  const topologies = guided
+    ? candidateTopologies(pool.length).filter(
+        (topology) =>
+          fixedIndexes.every((index) => topology.indexes.includes(index)) &&
+          topology.indexes.filter((index) => candidates.has(pool[index].number)).length ===
+            requiredCandidateCount,
+      )
+    : candidateTopologies(pool.length);
+  return topologies.map((topology) => {
     const selected = topology.indexes.map((index) => pool[index]);
     const numbers = selected.map((entry) => entry.number).sort((a, b) => a - b);
     const numberStrength =
@@ -255,6 +353,7 @@ function selectPortfolio(
   candidates: CandidateDraw[],
   pool: PortfolioPoolNumber[],
   drawCount: number,
+  fixedMask = 0,
 ): CandidateDraw[] {
   candidates.sort(
     (left, right) =>
@@ -322,11 +421,13 @@ function selectPortfolio(
           }
         }
       }
-      const maximumOverlap = selected.reduce(
-        (maximum, other) => Math.max(maximum, popcount(candidate.mask & other.mask)),
+      const maximumAvoidableOverlap = selected.reduce(
+        (maximum, other) =>
+          Math.max(maximum, popcount((candidate.mask & other.mask) & ~fixedMask)),
         0,
       );
-      const overlapPenalty = 0.15 * (maximumOverlap / NUMBERS_PER_DRAW) ** 2;
+      const avoidableSlots = Math.max(NUMBERS_PER_DRAW - popcount(fixedMask), 1);
+      const overlapPenalty = 0.15 * (maximumAvoidableOverlap / avoidableSlots) ** 2;
       const utility =
         candidate.quality * 0.6 +
         (newNumberWeight / totalNumberWeight) * 0.15 +
@@ -406,16 +507,73 @@ export function generateDrawPortfolio(
   suite: PredictionSuite,
   relationshipSource: RelationshipLiftSource,
   requestedDrawCount: number,
+  constraints?: PossibleDrawConstraints,
 ): DrawPortfolioResult | null {
   const strategies = suite.strategies.filter(
     (strategy) => !EXCLUDED_STRATEGIES.has(strategy.id),
   );
   if (strategies.length === 0) return null;
   const drawCount = clamp(Math.trunc(requestedDrawCount || 1), 1, 100);
-  const pool = buildPool(strategies, drawCount);
-  const candidates = enumerateCandidates(pool, relationshipSource);
-  const selected = selectPortfolio(candidates, pool, drawCount);
+  const mode = constraints?.mode ?? "classic";
+  const guided = mode === "guided" && constraints
+    ? buildGuidedPool(strategies, drawCount, constraints)
+    : null;
+  const displayFixedNumbers = guided?.fixedNumbers ??
+    normalizeConstraintNumbers(constraints?.fixedNumbers ?? []).slice(0, NUMBERS_PER_DRAW);
+  const displayFixed = new Set(displayFixedNumbers);
+  const displayCandidateNumbers = guided?.candidateNumbers ??
+    normalizeConstraintNumbers(constraints?.candidateNumbers ?? []).filter(
+      (number) => !displayFixed.has(number),
+    );
+  const displayCandidates = new Set(displayCandidateNumbers);
+  const displayExcludedNumbers = guided?.excludedNumbers ??
+    normalizeConstraintNumbers(constraints?.excludedNumbers ?? []).filter(
+      (number) => !displayFixed.has(number) && !displayCandidates.has(number),
+    );
+  const displayExcluded = new Set(displayExcludedNumbers);
+  const classicPool = guided ? [] : buildPool(strategies, drawCount);
+  const pool = guided?.pool ?? (constraints
+    ? classicPool.map((entry) => ({
+        ...entry,
+        state: displayFixed.has(entry.number)
+          ? "fixed" as const
+          : displayCandidates.has(entry.number)
+            ? "candidate" as const
+            : displayExcluded.has(entry.number)
+              ? "excluded" as const
+              : "neutral" as const,
+      }))
+    : classicPool);
+  const candidates = enumerateCandidates(
+    pool,
+    relationshipSource,
+    guided
+      ? {
+          fixedNumbers: guided.fixedNumbers,
+          candidateNumbers: guided.candidateNumbers,
+        }
+      : undefined,
+  );
+  const fixedSet = new Set(guided?.fixedNumbers ?? []);
+  const fixedMask = pool.reduce(
+    (mask, entry, index) => fixedSet.has(entry.number) ? mask | (1 << index) : mask,
+    0,
+  );
+  const selected = selectPortfolio(candidates, pool, drawCount, fixedMask);
   const metrics = buildMetrics(selected, pool);
+  const omittedCandidates = guided?.omittedCandidates ?? [];
+  const constraintLimited = selected.length < drawCount || omittedCandidates.length > 0;
+  const messages: string[] = [];
+  if (omittedCandidates.length > 0) {
+    messages.push(
+      `${omittedCandidates.length} lower-ranked Candidate${omittedCandidates.length === 1 ? " was" : "s were"} omitted by the 24-number pool limit`,
+    );
+  }
+  if (selected.length < drawCount) {
+    messages.push(
+      `the active constraints allow ${candidates.length} unique ticket${candidates.length === 1 ? "" : "s"}, so ${selected.length} of ${drawCount} requested draws were generated`,
+    );
+  }
   return {
     referenceDrawNumber: suite.referenceDrawNumber,
     targetDrawNumber: suite.targetDrawNumber,
@@ -433,5 +591,17 @@ export function generateDrawPortfolio(
       ),
     })),
     metrics,
+    metadata: {
+      mode,
+      requestedDrawCount: drawCount,
+      generatedDrawCount: selected.length,
+      availableUniqueCount: candidates.length,
+      fixedNumbers: displayFixedNumbers,
+      candidateNumbers: displayCandidateNumbers,
+      excludedNumbers: displayExcludedNumbers,
+      omittedCandidates,
+      constraintLimited,
+      constraintMessage: messages.length > 0 ? `${messages.join("; ")}.` : undefined,
+    },
   };
 }

@@ -1143,9 +1143,9 @@ ipcMain.handle("possible-draw:for-sure-limit-error", (event, requestedNumber) =>
   const parent = BrowserWindow.fromWebContents(event.sender) ?? mainWindow;
   return dialog.showMessageBox(parent, {
     type: "error",
-    title: "For Sure limit reached",
-    message: "No more than six numbers can be marked For Sure.",
-    detail: `Number ${requestedNumber} was not added. Remove a For Sure number before trying again.`,
+    title: "Fixed-number limit reached",
+    message: "No more than six numbers can be marked Fixed.",
+    detail: `Number ${requestedNumber} was not marked Fixed. Clear a Fixed number before trying again.`,
   });
 });
 

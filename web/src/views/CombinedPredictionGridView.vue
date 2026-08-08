@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, ref, shallowRef, watch } from "vue";
 import EfficacyComparisonChart from "../components/EfficacyComparisonChart.vue";
 import StrategySelectionPanel from "../components/StrategySelectionPanel.vue";
 import {
@@ -16,10 +16,16 @@ import {
 import { groupStrategiesByFamily } from "../lib/strategyFamilies";
 import { strategyColor } from "../lib/strategyColors";
 import { themeColor } from "../lib/colorTemplates";
+import {
+  cyclePossibleDrawNumberState,
+  getPossibleDrawNumberState,
+  possibleDrawPlanRevision,
+  setPossibleDrawNumberState,
+  togglePossibleDrawExcluded,
+} from "../lib/possibleDrawPlans";
 import { enabledStrategyPlugins } from "../lib/strategySelection";
 import type { EfficacyChartRow } from "../lib/efficacyChart";
 import type {
-  PossibleDrawNumberState,
   PredictionSuite,
   StrategyEfficacy,
   StrategyEfficacyRecord,
@@ -38,7 +44,6 @@ const props = defineProps<{
   embedded?: boolean;
 }>();
 const emit = defineEmits<{
-  sendNumber: [request: { number: number; state: PossibleDrawNumberState }];
   applyStrategies: [strategyIds: StrategyId[]];
 }>();
 
@@ -66,13 +71,14 @@ const efficacyRandomBenchmarks = shallowRef<
 >(new Map());
 const efficacyRetestCount = ref(0);
 const isEfficacyRetesting = ref(false);
-let numberActionTimer: ReturnType<typeof setTimeout> | null = null;
+const numberActionMessage = ref("");
 
 const maximumOffset = computed(() => Math.max(0, props.predictionSuites.length - 1));
 const selectedIndex = computed(() =>
   Math.max(0, props.predictionSuites.length - 1 - referenceOffset.value),
 );
 const selectedPrediction = computed(() => props.predictionSuites[selectedIndex.value] ?? null);
+const isLatestPrediction = computed(() => referenceOffset.value === 0);
 const selectableStrategyPlugins = computed(() =>
   enabledStrategyPlugins(props.strategyPlugins, props.enabledStrategyIds),
 );
@@ -538,38 +544,50 @@ function sectorStyle(cell: (typeof allReportCells.value)[number]): Record<string
   return { background: `conic-gradient(${sectors.join(", ")})` };
 }
 
-function clearNumberActionTimer(): void {
-  if (numberActionTimer !== null) {
-    clearTimeout(numberActionTimer);
-    numberActionTimer = null;
+function handlePredictionClick(event: MouseEvent, number: number): void {
+  if (!isLatestPrediction.value) return;
+  event.preventDefault();
+  applyNumberAction(
+    number,
+    event.altKey ? togglePossibleDrawExcluded(number) : cyclePossibleDrawNumberState(number),
+  );
+}
+
+function applyNumberAction(
+  number: number,
+  result: { ok: boolean; message?: string },
+): void {
+  numberActionMessage.value = result.message ?? "";
+  if (!result.ok && result.message) {
+    void window.randAiDesktop?.showForSureLimitError(number);
   }
 }
 
-function sendNumberToPossibleDraw(
-  number: number,
-  state: PossibleDrawNumberState,
-): void {
-  emit("sendNumber", { number, state });
-}
-
-function handlePredictionClick(event: MouseEvent, number: number): void {
-  if (!event.ctrlKey) return;
+function handlePredictionKeydown(event: KeyboardEvent, number: number): void {
+  if (!isLatestPrediction.value) return;
+  const key = event.key.toLowerCase();
+  let result: { ok: boolean; message?: string } | null = null;
+  if (key === "enter" || key === " ") result = cyclePossibleDrawNumberState(number);
+  if (key === "c") result = setPossibleDrawNumberState(number, "candidate");
+  if (key === "f") result = setPossibleDrawNumberState(number, "fixed");
+  if (key === "x") result = togglePossibleDrawExcluded(number);
+  if (key === "delete" || key === "backspace") {
+    result = setPossibleDrawNumberState(number, "neutral");
+  }
+  if (!result) return;
   event.preventDefault();
-  clearNumberActionTimer();
-  numberActionTimer = setTimeout(() => {
-    sendNumberToPossibleDraw(number, "possible");
-    numberActionTimer = null;
-  }, 350);
+  applyNumberAction(number, result);
 }
 
-function handlePredictionDoubleClick(event: MouseEvent, number: number): void {
-  if (!event.ctrlKey) return;
-  event.preventDefault();
-  clearNumberActionTimer();
-  sendNumberToPossibleDraw(number, "for-sure");
+function possibleDrawState(number: number) {
+  possibleDrawPlanRevision.value;
+  return getPossibleDrawNumberState(number);
 }
 
-onBeforeUnmount(clearNumberActionTimer);
+function possibleDrawStateLabel(number: number): string {
+  const state = possibleDrawState(number);
+  return state === "neutral" ? "Neutral" : state[0].toUpperCase() + state.slice(1);
+}
 </script>
 
 <template>
@@ -905,6 +923,18 @@ onBeforeUnmount(clearNumberActionTimer);
             id="prediction-numbers-grid-panel"
             class="prediction-grid-panel"
           >
+            <div class="possible-draw-state-legend" aria-label="Possible Draw number states">
+              <span class="candidate"><b>C</b> Candidate</span>
+              <span class="fixed"><b aria-hidden="true">&#128274;</b> Fixed</span>
+              <span class="excluded"><b>&times;</b> Excluded</span>
+              <small v-if="isLatestPrediction">
+                Click cycles Neutral → Candidate → Fixed; Alt+click excludes.
+              </small>
+              <small v-else>Historical predictions are read-only.</small>
+            </div>
+            <p v-if="numberActionMessage" class="possible-draw-action-message" role="status">
+              {{ numberActionMessage }}
+            </p>
             <div
               class="all-predictions-grid"
               :class="{ 'is-historical-prediction': actualNumbers.size > 0 }"
@@ -925,13 +955,18 @@ onBeforeUnmount(clearNumberActionTimer);
                   'is-in-selected-coverage-zone':
                     selectedCoverageThreshold !== null &&
                     cell.reports.length >= selectedCoverageThreshold,
+                  'possible-candidate': possibleDrawState(cell.number) === 'candidate',
+                  'possible-fixed': possibleDrawState(cell.number) === 'fixed',
+                  'possible-excluded': possibleDrawState(cell.number) === 'excluded',
+                  'possible-readonly': !isLatestPrediction,
                 }"
                 role="gridcell"
                 tabindex="0"
-                :aria-label="`Prediction number ${cell.number}`"
+                :aria-label="`Prediction number ${cell.number}; Possible Draw state ${possibleDrawStateLabel(cell.number)}${isLatestPrediction ? '' : '; read-only historical prediction'}`"
+                :aria-readonly="!isLatestPrediction"
                 :aria-describedby="`prediction-number-tooltip-${cell.number}`"
                 @click="handlePredictionClick($event, cell.number)"
-                @dblclick="handlePredictionDoubleClick($event, cell.number)"
+                @keydown="handlePredictionKeydown($event, cell.number)"
               >
                 <span
                   class="prediction-cell-color"
@@ -939,6 +974,15 @@ onBeforeUnmount(clearNumberActionTimer);
                   aria-hidden="true"
                 ></span>
                 <strong>{{ cell.number }}</strong>
+                <span
+                  v-if="possibleDrawState(cell.number) !== 'neutral'"
+                  class="prediction-possible-state-badge"
+                  aria-hidden="true"
+                >
+                  {{ possibleDrawState(cell.number) === "candidate"
+                    ? "C"
+                    : possibleDrawState(cell.number) === "fixed" ? "🔒" : "×" }}
+                </span>
                 <aside
                   :id="`prediction-number-tooltip-${cell.number}`"
                   class="prediction-number-tooltip"
@@ -1001,8 +1045,13 @@ onBeforeUnmount(clearNumberActionTimer);
                   </section>
 
                   <footer>
-                    <span><kbd>Ctrl</kbd> + click: Possible</span>
-                    <span><kbd>Ctrl</kbd> + double-click: For sure</span>
+                    <template v-if="isLatestPrediction">
+                      <span>Click / <kbd>Enter</kbd>: cycle state</span>
+                      <span><kbd>C</kbd> Candidate · <kbd>F</kbd> Fixed</span>
+                      <span><kbd>X</kbd> / <kbd>Alt</kbd>+click: Excluded</span>
+                      <span><kbd>Delete</kbd>: clear</span>
+                    </template>
+                    <span v-else>Historical prediction · Possible Draw actions unavailable</span>
                   </footer>
                 </aside>
               </article>

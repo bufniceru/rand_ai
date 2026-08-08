@@ -16,7 +16,15 @@ import {
   portfolioBacktestCacheKey,
   portfolioHistoryStatistics,
 } from "../lib/drawPortfolioBacktest";
+import {
+  activePossibleDrawPlan,
+  activePossibleDrawState,
+  getDrawPortfolioMode,
+  possibleDrawPlanRevision,
+  setDrawPortfolioMode,
+} from "../lib/possibleDrawPlans";
 import type {
+  DrawPortfolioMode,
   PortfolioBacktestProgress,
   PortfolioBacktestResult,
   PredictionSuite,
@@ -24,12 +32,16 @@ import type {
 } from "../types";
 
 const props = defineProps<{
+  datasetId: string;
   predictionSuites: PredictionSuite[];
   relationshipEdges: RelationshipEdge[];
 }>();
 
 const requestedDrawCount = ref(10);
 const result = ref<DrawPortfolioResult | null>(null);
+const portfolioMode = ref<DrawPortfolioMode>(getDrawPortfolioMode(props.datasetId));
+const resultStale = ref(false);
+const staleReason = ref("");
 const generating = ref(false);
 const copyMessage = ref("");
 const pdfSaving = ref(false);
@@ -77,6 +89,23 @@ const visibleAudit = computed(() => {
 const simulationStatistics = computed(() =>
   portfolioHistoryStatistics(simulationResult.value),
 );
+const planState = activePossibleDrawState;
+const activePlanName = computed(() => activePossibleDrawPlan.value?.name ?? "Draw 1");
+
+function markResultStale(reason: string): void {
+  if (!result.value) return;
+  resultStale.value = true;
+  staleReason.value = reason;
+  copyMessage.value = "";
+  pdfMessage.value = "";
+}
+
+function setMode(mode: DrawPortfolioMode): void {
+  if (portfolioMode.value === mode) return;
+  portfolioMode.value = mode;
+  setDrawPortfolioMode(props.datasetId, mode);
+  markResultStale(`Mode changed to ${mode === "guided" ? "Guided" : "Classic"}. Regenerate to apply it.`);
+}
 
 function normalizeDrawCount(): number {
   const value = Number.isFinite(requestedDrawCount.value)
@@ -89,6 +118,7 @@ function normalizeDrawCount(): number {
 async function generate(): Promise<void> {
   const suite = latestSuite.value;
   if (!suite || predictiveStrategyCount.value === 0) return;
+  const drawCount = normalizeDrawCount();
   generating.value = true;
   copyMessage.value = "";
   pdfMessage.value = "";
@@ -99,8 +129,16 @@ async function generate(): Promise<void> {
     result.value = generateDrawPortfolio(
       suite,
       props.relationshipEdges,
-      normalizeDrawCount(),
+      drawCount,
+      {
+        mode: portfolioMode.value,
+        fixedNumbers: planState.value.fixedNumbers,
+        candidateNumbers: planState.value.candidateNumbers,
+        excludedNumbers: planState.value.excludedNumbers,
+      },
     );
+    resultStale.value = false;
+    staleReason.value = "";
     if (!result.value) {
       generationMessage.value = "No predictive strategies are available.";
     }
@@ -114,7 +152,7 @@ async function generate(): Promise<void> {
 }
 
 async function copyAll(): Promise<void> {
-  if (!result.value?.draws.length) return;
+  if (!result.value?.draws.length || resultStale.value) return;
   const text = result.value.draws
     .map((draw) => draw.numbers.join(","))
     .join("\n");
@@ -133,7 +171,7 @@ function suggestedPdfName(): string {
 }
 
 async function savePdf(): Promise<void> {
-  if (!result.value) return;
+  if (!result.value || resultStale.value) return;
   const api = window.randAiDesktop;
   if (!api) {
     pdfMessage.value = "PDF saving is available inside the desktop app.";
@@ -308,10 +346,20 @@ function showMaximumHitTargets(): void {
   hitFilter.value = String(simulationStatistics.value.maximumHits);
 }
 
+function resultNumberState(number: number): "neutral" | "candidate" | "fixed" | "excluded" {
+  if (result.value?.metadata.fixedNumbers.includes(number)) return "fixed";
+  if (result.value?.metadata.candidateNumbers.includes(number)) return "candidate";
+  if (result.value?.metadata.excludedNumbers.includes(number)) return "excluded";
+  return "neutral";
+}
+
 watch(
-  () => [latestSuite.value?.referenceDrawNumber, latestSuite.value?.strategies] as const,
+  () => [props.datasetId, latestSuite.value?.referenceDrawNumber] as const,
   () => {
     result.value = null;
+    resultStale.value = false;
+    staleReason.value = "";
+    portfolioMode.value = getDrawPortfolioMode(props.datasetId);
     copyMessage.value = "";
     pdfMessage.value = "";
     generationMessage.value = "";
@@ -319,8 +367,29 @@ watch(
     simulationResult.value = null;
     simulationFromCache.value = false;
   },
+);
+
+watch(
+  () => latestSuite.value?.strategies,
+  () => markResultStale("Prediction strategies changed. Regenerate to refresh the portfolio."),
   { deep: true },
 );
+
+watch(
+  () => props.relationshipEdges,
+  () => markResultStale("Relationship inputs changed. Regenerate to refresh the portfolio."),
+  { deep: true },
+);
+
+watch(requestedDrawCount, () => {
+  markResultStale("The requested draw count changed. Regenerate to apply it.");
+});
+
+watch(possibleDrawPlanRevision, () => {
+  if (result.value?.metadata.mode === "guided") {
+    markResultStale("The active Possible Draw plan changed. Regenerate the Guided portfolio.");
+  }
+});
 
 watch([simulationResult, hitFilter], () => {
   auditPage.value = 1;
@@ -371,6 +440,29 @@ onBeforeUnmount(() => {
 
     <section v-if="latestSuite && predictiveStrategyCount > 0" class="draw-portfolio-workspace">
       <div class="draw-portfolio-controls">
+        <div class="portfolio-mode-control">
+          <span>Generation mode</span>
+          <div class="portfolio-mode-switch" role="group" aria-label="Draw Portfolio generation mode">
+            <button
+              type="button"
+              :class="{ active: portfolioMode === 'classic' }"
+              :aria-pressed="portfolioMode === 'classic'"
+              @click="setMode('classic')"
+            >Classic</button>
+            <button
+              type="button"
+              :class="{ active: portfolioMode === 'guided' }"
+              :aria-pressed="portfolioMode === 'guided'"
+              @click="setMode('guided')"
+            >Guided</button>
+          </div>
+          <small v-if="portfolioMode === 'classic'">
+            Current algorithm; Possible Draw markings are shown but ignored.
+          </small>
+          <small v-else>
+            Fixed numbers are required, Candidates fill first, and Excluded numbers are removed.
+          </small>
+        </div>
         <label>
           <span>Number of draws</span>
           <input
@@ -387,16 +479,39 @@ onBeforeUnmount(() => {
           {{ generating ? "Generating…" : "Generate portfolio" }}
         </button>
         <p>
-          Randomness and Fresh Random are baseline strategies and do not contribute
-          to portfolio scoring.
+          Active plan <strong>{{ activePlanName }}</strong> ·
+          {{ planState.fixedNumbers.length }} Fixed ·
+          {{ planState.candidateNumbers.length }} Candidates ·
+          {{ planState.excludedNumbers.length }} Excluded.
+          Random baselines do not contribute to scoring.
         </p>
       </div>
+
+      <p v-if="resultStale" class="draw-portfolio-message stale" role="status">
+        <strong>Displayed portfolio is stale.</strong> {{ staleReason }}
+        Copy and PDF export remain disabled until regeneration.
+      </p>
 
       <p v-if="generationMessage" class="draw-portfolio-message error">
         {{ generationMessage }}
       </p>
 
       <template v-if="result">
+        <div class="portfolio-result-mode-line">
+          <span :class="['portfolio-mode-badge', result.metadata.mode]">
+            {{ result.metadata.mode === "guided" ? "Guided" : "Classic" }} result
+          </span>
+          <span>
+            {{ result.metadata.generatedDrawCount }}/{{ result.metadata.requestedDrawCount }} requested draws ·
+            {{ result.metadata.availableUniqueCount.toLocaleString() }} eligible unique tickets
+          </span>
+        </div>
+        <p
+          v-if="result.metadata.constraintMessage"
+          class="draw-portfolio-message constraint"
+        >
+          {{ result.metadata.constraintMessage }}
+        </p>
         <section class="draw-portfolio-summary" aria-label="Portfolio summary">
           <article>
             <span>Generated draws</span>
@@ -439,12 +554,16 @@ onBeforeUnmount(() => {
             <li
               v-for="(entry, index) in result.pool"
               :key="entry.number"
-              :title="`#${index + 1} · ${percent(entry.score)} ensemble strength · Top 6 in ${entry.topSixSupport} strategies`"
+              :class="entry.state ? `possible-${entry.state}` : ''"
+              :title="`#${index + 1} · ${percent(entry.score)} ensemble strength · Top 6 in ${entry.topSixSupport} strategies${entry.state && entry.state !== 'neutral' ? ` · ${entry.state}` : ''}`"
             >
               <span>#{{ index + 1 }}</span>
               <strong>{{ entry.number }}</strong>
               <small>{{ percent(entry.score) }}</small>
               <small>{{ entry.topSixSupport }}× Top 6</small>
+              <b v-if="entry.state === 'candidate'" class="portfolio-state-badge">C</b>
+              <b v-if="entry.state === 'fixed'" class="portfolio-state-badge" aria-label="Fixed">🔒</b>
+              <b v-if="entry.state === 'excluded'" class="portfolio-state-badge" aria-label="Excluded">×</b>
             </li>
           </ol>
         </section>
@@ -456,10 +575,10 @@ onBeforeUnmount(() => {
               <p>Sorted numbers · model-relative score · overlap with another draw</p>
             </div>
             <div class="draw-portfolio-result-actions">
-              <button type="button" @click="copyAll">Copy All</button>
+              <button type="button" :disabled="resultStale" @click="copyAll">Copy All</button>
               <button
                 type="button"
-                :disabled="pdfSaving || generating"
+                :disabled="pdfSaving || generating || resultStale"
                 @click="savePdf"
               >
                 {{ pdfSaving ? "Generating PDF…" : "Save PDF" }}
@@ -472,7 +591,17 @@ onBeforeUnmount(() => {
             <li v-for="(draw, index) in result.draws" :key="draw.numbers.join('-')">
               <span class="draw-portfolio-index">Draw {{ index + 1 }}</span>
               <div class="draw-portfolio-balls">
-                <strong v-for="number in draw.numbers" :key="number">{{ number }}</strong>
+                <strong
+                  v-for="number in draw.numbers"
+                  :key="number"
+                  :class="`possible-${resultNumberState(number)}`"
+                  :title="resultNumberState(number) === 'neutral' ? undefined : resultNumberState(number)"
+                >
+                  {{ number }}
+                  <small v-if="resultNumberState(number) === 'candidate'">C</small>
+                  <small v-if="resultNumberState(number) === 'fixed'" aria-label="Fixed">🔒</small>
+                  <small v-if="resultNumberState(number) === 'excluded'" aria-label="Excluded">×</small>
+                </strong>
               </div>
               <dl>
                 <div>
@@ -519,6 +648,8 @@ onBeforeUnmount(() => {
             For every known target, rebuild the requested number of portfolio draws,
             compare all of them with the actual result, and retain the highest number
             of correctly predicted values. Historical inputs stop at that reference.
+            This audit always uses unconstrained Classic generation; today’s Possible
+            Draw plan is never applied retroactively.
           </p>
         </div>
         <span v-if="simulationFromCache" class="portfolio-cache-badge">

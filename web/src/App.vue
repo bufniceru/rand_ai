@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import SettingsDialog from "./components/SettingsDialog.vue";
 import AppearanceDialog from "./components/AppearanceDialog.vue";
 import TrustDialog from "./components/TrustDialog.vue";
@@ -12,6 +12,7 @@ import {
   previewColorTemplate,
   themeRevision,
 } from "./lib/colorTemplates";
+import { configurePossibleDrawContext } from "./lib/possibleDrawPlans";
 import PossibleDrawDialogApp from "./PossibleDrawDialogApp.vue";
 import AutocorrelationView from "./views/AutocorrelationView.vue";
 import CoOccurrenceView from "./views/CoOccurrenceView.vue";
@@ -38,7 +39,6 @@ import type {
   CombinedPredictionDialogData,
   DatasetSelection,
   MenuAction,
-  PossibleDrawNumberRequest,
   RecentDataset,
   ReportId,
   ReportPluginState,
@@ -143,9 +143,6 @@ const pendingDataset = ref<DatasetSelection | null>(null);
 const activeDataset = ref<DatasetSelection | null>(null);
 const analysis = ref<AnalysisPayload | null>(null);
 const analysisStale = ref(false);
-const possibleDrawNumberRequest = ref<
-  (PossibleDrawNumberRequest & { token: number }) | null
->(null);
 const loading = ref(false);
 const loadingDataset = ref<DatasetSelection | null>(null);
 const loadingProgress = ref(0);
@@ -167,7 +164,6 @@ let progressTimer: ReturnType<typeof setInterval> | null = null;
 let loadingProgressTarget = 1;
 let progressCompletionResolver: (() => void) | null = null;
 let reportRefreshPending = false;
-let possibleDrawRequestToken = 0;
 
 const figures = computed(() => {
   themeRevision.value;
@@ -209,6 +205,18 @@ const combinedPredictionData = computed<CombinedPredictionDialogData | null>(
           possibleDraw: analysis.value.possibleDraw,
         }
       : null,
+);
+watch(
+  combinedPredictionData,
+  (data) => {
+    const latestSuite = data?.predictionSuites.at(-1);
+    if (!data || !latestSuite) return;
+    configurePossibleDrawContext({
+      datasetId: data.dataset.path,
+      targetDrawId: String(latestSuite.targetDrawNumber),
+    });
+  },
+  { immediate: true },
 );
 const maxLastSeenDrawCount = computed(() =>
   Math.max(1, analysis.value?.history.length ?? 250),
@@ -580,17 +588,6 @@ async function exportAnalysis(): Promise<void> {
   }
 }
 
-function handlePossibleDrawNumberRequest(
-  request: PossibleDrawNumberRequest,
-): void {
-  possibleDrawRequestToken += 1;
-  possibleDrawNumberRequest.value = {
-    ...request,
-    token: possibleDrawRequestToken,
-  };
-  selectWorkspaceTab("possible-draw");
-}
-
 function handleDrawHistorySaved(): void {
   analysisStale.value = true;
   statusMessage.value =
@@ -931,7 +928,6 @@ onBeforeUnmount(() => {
         :strategy-selection-busy="updatingStrategySelection || loading"
         embedded
         @apply-strategies="applyPredictionStrategySelection"
-        @send-number="handlePossibleDrawNumberRequest"
       />
     </main>
 
@@ -943,6 +939,7 @@ onBeforeUnmount(() => {
       aria-label="Draw Portfolio"
     >
       <DrawPortfolioView
+        :dataset-id="analysis.dataset.path"
         :prediction-suites="analysis.predictionSuites"
         :relationship-edges="analysis.possibleDraw.relationshipEdges"
       />
@@ -957,7 +954,6 @@ onBeforeUnmount(() => {
     >
       <PossibleDrawDialogApp
         :dialog-data="combinedPredictionData"
-        :number-request="possibleDrawNumberRequest"
         embedded
       />
     </section>

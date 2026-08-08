@@ -540,7 +540,46 @@ export interface ColorTemplateSaveResult {
   path?: string;
 }
 
-export type PossibleDrawNumberState = "possible" | "for-sure";
+export type PossibleDrawNumberState =
+  | "neutral"
+  | "candidate"
+  | "fixed"
+  | "excluded";
+
+export type DrawPortfolioMode = "classic" | "guided";
+
+export interface PossibleDrawPlan {
+  id: string;
+  name: string;
+  fixedNumbers: number[];
+  candidateNumbers: number[];
+  excludedNumbers: number[];
+}
+
+export interface PossibleDrawPlanContext {
+  datasetId: string;
+  targetDrawId: string;
+}
+
+export interface PossibleDrawConstraints {
+  mode: DrawPortfolioMode;
+  fixedNumbers: number[];
+  candidateNumbers: number[];
+  excludedNumbers: number[];
+}
+
+export interface DrawPortfolioResultMetadata {
+  mode: DrawPortfolioMode;
+  requestedDrawCount: number;
+  generatedDrawCount: number;
+  availableUniqueCount: number;
+  fixedNumbers: number[];
+  candidateNumbers: number[];
+  excludedNumbers: number[];
+  omittedCandidates: number[];
+  constraintLimited: boolean;
+  constraintMessage?: string;
+}
 
 export interface PossibleDrawNumberRequest {
   number: number;

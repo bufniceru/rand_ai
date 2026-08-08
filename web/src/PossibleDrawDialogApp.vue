@@ -1,22 +1,27 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { strategyColor } from "./lib/strategyColors";
+import {
+  activePossibleDrawPlan,
+  activePossibleDrawPlanId,
+  createPossibleDrawPlan,
+  cyclePossibleDrawNumberState,
+  deletePossibleDrawPlan,
+  getPossibleDrawNumberState,
+  possibleDrawPlans,
+  replacePossibleDrawNumbers,
+  resetPossibleDrawPlan,
+  selectPossibleDrawPlan,
+  setPossibleDrawNumberState,
+  togglePossibleDrawExcluded,
+} from "./lib/possibleDrawPlans";
 import type {
   CombinedPredictionDialogData,
-  PossibleDrawNumberRequest,
   RelationshipEdge,
   StrategyId,
   StrategyNumberPrediction,
   StrategyPrediction,
 } from "./types";
-
-interface DrawPlan {
-  id: string;
-  name: string;
-  selected: number[];
-  dropped: number[];
-  uncertain: number[];
-}
 
 interface RelatedSuggestion {
   number: number;
@@ -41,21 +46,27 @@ interface WorkflowCandidate {
 const props = defineProps<{
   dialogData: CombinedPredictionDialogData;
   embedded?: boolean;
-  numberRequest?: (PossibleDrawNumberRequest & { token: number }) | null;
 }>();
 
-const storageKey = "rand-ai.possible-draw.plans.v2";
-const plans = ref<DrawPlan[]>([]);
-const activePlanId = ref("");
-const selectedNumbers = ref<number[]>([]);
-const droppedNumbers = ref<number[]>([]);
-const uncertainNumbers = ref<number[]>([]);
+const plans = possibleDrawPlans;
+const activePlanId = activePossibleDrawPlanId;
+const selectedNumbers = computed({
+  get: () => activePossibleDrawPlan.value?.fixedNumbers ?? [],
+  set: (numbers: number[]) => replacePossibleDrawNumbers("fixedNumbers", numbers),
+});
+const droppedNumbers = computed({
+  get: () => activePossibleDrawPlan.value?.excludedNumbers ?? [],
+  set: (numbers: number[]) => replacePossibleDrawNumbers("excludedNumbers", numbers),
+});
+const uncertainNumbers = computed({
+  get: () => activePossibleDrawPlan.value?.candidateNumbers ?? [],
+  set: (numbers: number[]) => replacePossibleDrawNumbers("candidateNumbers", numbers),
+});
 const focusedNumber = ref<number | null>(null);
 const showLastDraw = ref(false);
 const showLastSeen = ref(true);
 const lastSeenIndex = ref(0);
 const errorMessage = ref("");
-let clickTimer: ReturnType<typeof setTimeout> | null = null;
 
 const latestSuite = computed(() => props.dialogData.predictionSuites.at(-1) ?? null);
 const strategies = computed(() => latestSuite.value?.strategies ?? []);
@@ -70,7 +81,6 @@ const lastDrawSet = computed(
 );
 const lastSeenRows = computed(() => props.dialogData.possibleDraw.lastSeenRows);
 const highlightedLastSeen = computed(() => lastSeenRows.value[lastSeenIndex.value] ?? null);
-const activePlan = computed(() => plans.value.find((plan) => plan.id === activePlanId.value));
 
 const orderedStrategies = computed(() => {
   const fallbackOrder: StrategyId[] = [
@@ -204,6 +214,8 @@ const workflowCandidates = computed<WorkflowCandidate[]>(() => {
 
   return candidates.sort(
     (left, right) =>
+      Number(uncertainSet.value.has(right.number)) -
+        Number(uncertainSet.value.has(left.number)) ||
       right.combinedScore - left.combinedScore ||
       right.topSixSupport - left.topSixSupport ||
       left.number - right.number,
@@ -290,152 +302,76 @@ const relatedSuggestions = computed<RelatedSuggestion[]>(() => {
 });
 const strongestRelated = computed(() => relatedSuggestions.value[0] ?? null);
 
-function newPlan(name = `Draw ${plans.value.length + 1}`): DrawPlan {
-  return {
-    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    name,
-    selected: [],
-    dropped: [],
-    uncertain: [],
-  };
-}
-
-function savePlans(): void {
-  const active = activePlan.value;
-  if (active) {
-    active.selected = [...selectedNumbers.value];
-    active.dropped = [...droppedNumbers.value];
-    active.uncertain = [...uncertainNumbers.value];
-  }
-  window.localStorage.setItem(
-    storageKey,
-    JSON.stringify({ activePlanId: activePlanId.value, plans: plans.value }),
-  );
-}
-
-function loadPlan(plan: DrawPlan): void {
-  activePlanId.value = plan.id;
-  selectedNumbers.value = [...plan.selected];
-  droppedNumbers.value = [...plan.dropped];
-  uncertainNumbers.value = [...plan.uncertain];
+function switchPlan(planId: string): void {
+  selectPossibleDrawPlan(planId);
   focusedNumber.value = null;
 }
 
-function switchPlan(planId: string): void {
-  savePlans();
-  const plan = plans.value.find((candidate) => candidate.id === planId);
-  if (plan) loadPlan(plan);
-}
-
 function createPlan(): void {
-  savePlans();
-  const plan = newPlan();
-  plans.value = [...plans.value, plan];
-  loadPlan(plan);
-  savePlans();
+  createPossibleDrawPlan();
+  focusedNumber.value = null;
 }
 
 function deletePlan(): void {
-  if (plans.value.length === 1) {
-    resetPlan();
-    return;
-  }
-  const index = plans.value.findIndex((plan) => plan.id === activePlanId.value);
-  plans.value = plans.value.filter((plan) => plan.id !== activePlanId.value);
-  loadPlan(plans.value[Math.min(Math.max(index, 0), plans.value.length - 1)]);
-  savePlans();
-}
-
-function clearClickTimer(): void {
-  if (clickTimer !== null) {
-    clearTimeout(clickTimer);
-    clickTimer = null;
-  }
+  deletePossibleDrawPlan();
+  focusedNumber.value = null;
 }
 
 function toggleSelected(number: number): void {
-  if (droppedSet.value.has(number)) return;
-  if (selectedSet.value.has(number)) {
-    selectedNumbers.value = selectedNumbers.value.filter((item) => item !== number);
-  } else if (selectedNumbers.value.length < 6) {
-    selectedNumbers.value = [...selectedNumbers.value, number];
-    uncertainNumbers.value = uncertainNumbers.value.filter((item) => item !== number);
-  } else {
-    void window.randAiDesktop?.showForSureLimitError(number);
-  }
-}
-
-function applyPredictionNumber(request: PossibleDrawNumberRequest): void {
-  const number = request.number;
-  if (!Number.isInteger(number) || number < 1 || number > 49) return;
-  clearClickTimer();
-  focusedNumber.value = number;
-  droppedNumbers.value = droppedNumbers.value.filter((item) => item !== number);
-
-  if (request.state === "possible") {
-    selectedNumbers.value = selectedNumbers.value.filter((item) => item !== number);
-    if (!uncertainSet.value.has(number)) {
-      uncertainNumbers.value = [...uncertainNumbers.value, number].sort(
-        (left, right) => left - right,
-      );
-    }
-    return;
-  }
-
-  if (selectedSet.value.has(number)) return;
-  if (selectedNumbers.value.length >= 6) {
-    void window.randAiDesktop?.showForSureLimitError(number);
-    return;
-  }
-  uncertainNumbers.value = uncertainNumbers.value.filter((item) => item !== number);
-  selectedNumbers.value = [...selectedNumbers.value, number];
+  const result = setPossibleDrawNumberState(
+    number,
+    selectedSet.value.has(number) ? "neutral" : "fixed",
+  );
+  applyStateResult(number, result);
 }
 
 function handleClick(event: MouseEvent, number: number): void {
-  clearClickTimer();
   focusedNumber.value = number;
-  if (event.ctrlKey && event.altKey) return;
-  clickTimer = setTimeout(() => {
-    toggleSelected(number);
-    clickTimer = null;
-  }, 220);
+  applyStateResult(
+    number,
+    event.altKey ? togglePossibleDrawExcluded(number) : cyclePossibleDrawNumberState(number),
+  );
 }
 
-function handleDoubleClick(event: MouseEvent, number: number): void {
-  clearClickTimer();
+function applyStateResult(
+  number: number,
+  result: { ok: boolean; message?: string },
+): void {
+  errorMessage.value = result.message ?? "";
+  if (!result.ok) {
+    void window.randAiDesktop?.showForSureLimitError(number);
+  }
+}
+
+function handleNumberKeydown(event: KeyboardEvent, number: number): void {
+  const key = event.key.toLowerCase();
+  let result: { ok: boolean; message?: string } | null = null;
+  if (key === "enter" || key === " ") result = cyclePossibleDrawNumberState(number);
+  if (key === "c") result = setPossibleDrawNumberState(number, "candidate");
+  if (key === "f") result = setPossibleDrawNumberState(number, "fixed");
+  if (key === "x") result = togglePossibleDrawExcluded(number);
+  if (key === "delete" || key === "backspace") {
+    result = setPossibleDrawNumberState(number, "neutral");
+  }
+  if (!result) return;
+  event.preventDefault();
   focusedNumber.value = number;
-  if (event.ctrlKey) {
-    if (droppedSet.value.has(number)) return;
-    uncertainNumbers.value = uncertainSet.value.has(number)
-      ? uncertainNumbers.value.filter((item) => item !== number)
-      : [...uncertainNumbers.value, number].sort((left, right) => left - right);
-    return;
-  }
-  if (droppedSet.value.has(number)) {
-    droppedNumbers.value = droppedNumbers.value.filter((item) => item !== number);
-  } else {
-    droppedNumbers.value = [...droppedNumbers.value, number].sort((left, right) => left - right);
-    selectedNumbers.value = selectedNumbers.value.filter((item) => item !== number);
-    uncertainNumbers.value = uncertainNumbers.value.filter((item) => item !== number);
-  }
+  applyStateResult(number, result);
 }
 
 function addRelated(number: number): void {
-  clearClickTimer();
   focusedNumber.value = number;
   toggleSelected(number);
 }
 
 function chooseWorkflowNumber(number: number): void {
-  clearClickTimer();
   focusedNumber.value = number;
   if (!selectedSet.value.has(number)) toggleSelected(number);
 }
 
 function removeWorkflowNumber(number: number): void {
-  clearClickTimer();
   focusedNumber.value = number;
-  selectedNumbers.value = selectedNumbers.value.filter((item) => item !== number);
+  setPossibleDrawNumberState(number, "neutral");
 }
 
 function undoLastWorkflowNumber(): void {
@@ -448,11 +384,12 @@ function selectionStep(number: number): number {
   return selectedNumbers.value.indexOf(number) + 1;
 }
 
+function numberState(number: number) {
+  return getPossibleDrawNumberState(number);
+}
+
 function resetPlan(): void {
-  clearClickTimer();
-  selectedNumbers.value = [];
-  droppedNumbers.value = [];
-  uncertainNumbers.value = [];
+  resetPossibleDrawPlan();
 }
 
 function stepLastSeen(direction: -1 | 1): void {
@@ -522,43 +459,11 @@ function acceptData(data: CombinedPredictionDialogData): void {
 }
 
 watch(
-  [selectedNumbers, droppedNumbers, uncertainNumbers],
-  () => {
-    if (plans.value.length) savePlans();
-  },
-  { deep: true },
-);
-
-watch(
   () => props.dialogData,
   (data) => acceptData(data),
   { immediate: true },
 );
 
-watch(
-  () => props.numberRequest?.token,
-  () => {
-    if (props.numberRequest) applyPredictionNumber(props.numberRequest);
-  },
-);
-
-onMounted(() => {
-  try {
-    const stored = JSON.parse(window.localStorage.getItem(storageKey) ?? "null") as
-      | { activePlanId: string; plans: DrawPlan[] }
-      | null;
-    plans.value = stored?.plans?.length ? stored.plans : [newPlan("Draw 1")];
-    loadPlan(plans.value.find((plan) => plan.id === stored?.activePlanId) ?? plans.value[0]);
-  } catch {
-    plans.value = [newPlan("Draw 1")];
-    loadPlan(plans.value[0]);
-  }
-  if (props.numberRequest) applyPredictionNumber(props.numberRequest);
-});
-
-onBeforeUnmount(() => {
-  clearClickTimer();
-});
 </script>
 
 <template>
@@ -714,29 +619,41 @@ onBeforeUnmount(() => {
               class="draw-cell"
               :class="{
                 available: !droppedSet.has(number),
-                selected: selectedSet.has(number),
-                dropped: droppedSet.has(number),
-                uncertain: uncertainSet.has(number),
+                fixed: selectedSet.has(number),
+                excluded: droppedSet.has(number),
+                candidate: uncertainSet.has(number),
                 focused: focusedNumber === number,
                 lastDraw: showLastDraw && lastDrawSet.has(number),
                 lastSeen: showLastSeen && highlightedLastSeen?.number === number,
                 recommended: topWorkflowCandidateSet.has(number) && !workflowComplete,
               }"
-              :aria-pressed="selectedSet.has(number)"
-              :title="selectedSet.has(number)
-                ? `Number ${number}: workflow pick ${selectionStep(number)}`
-                : `Number ${number}: click to choose next, double-click to exclude, Ctrl+double-click for Possible`"
+              :aria-label="`Number ${number}; ${numberState(number)} Possible Draw state`"
+              :aria-pressed="numberState(number) !== 'neutral'"
+              :title="`Number ${number}: ${numberState(number)}. Click cycles Neutral, Candidate, and Fixed; Alt+click or X toggles Excluded.`"
               @click="handleClick($event, number)"
-              @dblclick="handleDoubleClick($event, number)"
+              @keydown="handleNumberKeydown($event, number)"
             >
               {{ number }}
               <small v-if="selectedSet.has(number)" class="selection-order">
                 {{ selectionStep(number) }}
               </small>
+              <small
+                v-if="numberState(number) !== 'neutral'"
+                class="possible-state-badge"
+                aria-hidden="true"
+              >{{ numberState(number) === "candidate" ? "C" : numberState(number) === "fixed" ? "🔒" : "×" }}</small>
             </button>
           </div>
           <p class="possible-help">
-            For Sure: click, maximum six · Exclude: double-click · Possible: Ctrl+double-click, no six-number limit
+            Click / Enter: Neutral → Candidate → Fixed · C: Candidate · F: Fixed (maximum six) · X or Alt+click: Excluded · Delete: clear
+          </p>
+          <div class="possible-draw-state-legend" aria-label="Possible Draw number states">
+            <span class="candidate"><b>C</b> Candidate</span>
+            <span class="fixed"><b aria-hidden="true">&#128274;</b> Fixed</span>
+            <span class="excluded"><b>&times;</b> Excluded</span>
+          </div>
+          <p v-if="errorMessage" class="possible-draw-action-message" role="status">
+            {{ errorMessage }}
           </p>
         </section>
 
