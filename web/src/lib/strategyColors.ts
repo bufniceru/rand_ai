@@ -8,8 +8,9 @@ import {
 export const STRATEGY_TONE_POSITION_BY_ID = {
   freshness: 0,
   chi_square: 1,
-  entropy: 2,
-  bayesian: 3,
+  categorical_chi_square: 2,
+  entropy: 3,
+  bayesian: 4,
   proximity: 0,
   emd: 1,
   predictive_grid: 2,

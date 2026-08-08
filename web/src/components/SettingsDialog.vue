@@ -29,6 +29,8 @@ const strategyDescriptions: Record<StrategyId, string> = {
   randomness: "Deterministic random comparison baseline.",
   fresh_random: "Seeded random ranking guided 35% by freshness.",
   chi_square: "Signed frequency deviation from uniform random expectation.",
+  categorical_chi_square:
+    "Per-number exact gap and left/right-space probability with hierarchical chi-square backoff.",
   entropy: "Gap-entropy history with overdue adjustment.",
   markov100: "Recency-weighted gap-state Markov model.",
   mkgsv:

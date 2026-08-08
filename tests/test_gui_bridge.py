@@ -138,6 +138,7 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
         "Rand",
         "FRnd",
         "Chi²",
+        "Cat χ²",
         "Entr",
         "Mark",
         "MKFR",
@@ -154,6 +155,13 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
         "RCOV",
         "Chained Strategy",
     ]
+    categorical = next(
+        strategy
+        for strategy in latest_suite["strategies"]
+        if strategy["id"] == "categorical_chi_square"
+    )
+    assert categorical["numbers"][0]["details"][0].startswith("Exact state gap")
+    assert "Estimated probability" in categorical["numbers"][0]["details"][1]
     assert all(
         len(strategy["numbers"]) == 49
         and len(strategy["topNumbers"]) == 6

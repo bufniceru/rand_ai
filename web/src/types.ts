@@ -24,6 +24,7 @@ export type StrategyId =
   | "randomness"
   | "fresh_random"
   | "chi_square"
+  | "categorical_chi_square"
   | "entropy"
   | "markov100"
   | "mkgsv"

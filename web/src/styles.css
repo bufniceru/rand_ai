@@ -32,7 +32,8 @@ body,
 }
 
 body {
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 button,
@@ -2444,6 +2445,22 @@ tbody tr:nth-child(even) {
 .prediction-tooltip-metrics strong {
   color: var(--monokai-fg);
   font-size: 16px;
+}
+
+.prediction-tooltip-details {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 9px 10px 9px 27px;
+  border: 1px solid var(--monokai-border);
+  border-radius: 4px;
+  color: var(--monokai-muted);
+  background: color-mix(in srgb, var(--monokai-surface) 78%, transparent);
+  font-size: 12px;
+}
+
+.prediction-tooltip-details li::marker {
+  color: var(--monokai-cyan);
 }
 
 .prediction-number-tooltip .prediction-tooltip-outcome {

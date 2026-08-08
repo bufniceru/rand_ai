@@ -74,7 +74,7 @@ const activePlan = computed(() => plans.value.find((plan) => plan.id === activeP
 
 const orderedStrategies = computed(() => {
   const fallbackOrder: StrategyId[] = [
-    "freshness", "proximity", "emd", "chi_square", "entropy", "markov100", "mkgsv",
+    "freshness", "proximity", "emd", "chi_square", "categorical_chi_square", "entropy", "markov100", "mkgsv",
     "mkfr", "mksp", "mknp", "mkrd", "bayesian", "predictive_grid", "co_occurrence",
     "doublet_triplet_markov", "mixed", "svc", "tbl",
     "cis", "fresh_random", "randomness",
@@ -488,6 +488,7 @@ function strategyFullName(strategy: StrategyPrediction): string {
     proximity: "Proximity",
     emd: "Earth Mover's Distance",
     chi_square: "Chi-Square",
+    categorical_chi_square: "Categorical Chi-square",
     entropy: "Entropy",
     markov100: "Markov 100",
     mkgsv: "Markov Gap-Space Vector (Experimental)",

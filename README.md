@@ -41,6 +41,9 @@ needed.
 - [Chi-Square Frequency strategy](docs/chi-square-frequency-strategy.md) —
   mathematical explanation, Python implementation, worked example, tests, and
   interpretation limits.
+- [Exact-State Categorical Chi-Square strategy](docs/categorical-chi-square-strategy.md)
+  — per-number gap and retained left/right-space dependency probabilities with
+  hierarchical sparse-state backoff.
 
 ### Opening a dataset
 
