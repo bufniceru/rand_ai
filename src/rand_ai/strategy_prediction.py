@@ -13,6 +13,7 @@ import numpy as np
 from sklearn.linear_model import SGDClassifier
 from sklearn.tree import DecisionTreeRegressor
 
+from rand_ai.categorical_chi_square import CategoricalChiSquareModel
 from rand_ai.draw import Draw
 from rand_ai.mkgsv import MkgsvModel
 from rand_ai.prediction import CombinedPrediction
@@ -177,6 +178,7 @@ _BASE_STRATEGY_IDS = (
     "randomness",
     "fresh_random",
     "chi_square",
+    "categorical_chi_square",
     "entropy",
     "markov100",
     "mkgsv",
@@ -298,6 +300,7 @@ _STRATEGY_DEPENDENCIES = {
             "lag_logistic",
             "sparse_neural_ticket",
             "decision_tree_selector",
+            "categorical_chi_square",
         }
     ),
     "chained": set(_CHAIN_EXPERT_IDS),
@@ -692,6 +695,11 @@ class _StrategyState:
         self.draw_count = 0
         self.appearances = [0] * (_NUMBER_COUNT + 1)
         self.last_seen: list[int | None] = [None] * (_NUMBER_COUNT + 1)
+        self.categorical_chi_square = (
+            CategoricalChiSquareModel()
+            if "categorical_chi_square" in self.enabled_strategy_ids
+            else None
+        )
         self.occurrences: list[list[int]] = [[] for _ in range(_NUMBER_COUNT + 1)]
         self.recent_draws: deque[set[int]] = deque(maxlen=100)
         self.pair_counts: dict[tuple[int, int], int] = {}
@@ -1990,6 +1998,8 @@ class _StrategyState:
 
     def train(self, drawn: set[int]) -> None:
         """Learn the current draw using only the state available before it."""
+        if self.categorical_chi_square is not None:
+            self.categorical_chi_square.learn(drawn)
         if (
             "doublet_triplet_markov" in self.enabled_strategy_ids
             and self.previous_draw
@@ -2257,6 +2267,8 @@ class _StrategyState:
             )
         if self.mkgsv is not None:
             self.mkgsv.remember(drawn)
+        if self.categorical_chi_square is not None:
+            self.categorical_chi_square.remember(drawn)
         self.draw_count += 1
 
     @staticmethod
@@ -4451,6 +4463,27 @@ class _StrategyState:
                     chi_square_scores,
                     gaps,
                     chi_square_details,
+                )
+
+        if self.categorical_chi_square is not None:
+            categorical_scores, categorical_details = (
+                self.categorical_chi_square.scores_and_details()
+            )
+            rankings["categorical_chi_square"] = _ranking_from_scores(
+                categorical_scores,
+                gaps,
+            )
+            if "categorical_chi_square" in requested:
+                built["categorical_chi_square"] = _strategy(
+                    "categorical_chi_square",
+                    "Cat χ²",
+                    (
+                        "Per-number exact gap and left/right-space dependency "
+                        "probability with hierarchical chi-square backoff."
+                    ),
+                    categorical_scores,
+                    gaps,
+                    categorical_details,
                 )
 
         if "markov100" in enabled:

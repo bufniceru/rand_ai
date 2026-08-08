@@ -463,6 +463,7 @@ function strategyFullName(strategy: StrategyPrediction): string {
     randomness: "Random baseline",
     fresh_random: "Fresh Random",
     chi_square: "Chi-square Frequency",
+    categorical_chi_square: "Categorical Chi-square",
     entropy: "Entropy",
     markov100: "Markov 100",
     mkgsv: "Markov Gap-Space Vector (Experimental)",
@@ -963,6 +964,19 @@ onBeforeUnmount(clearNumberActionTimer);
                       <strong>{{ scoreLabel(cell.strategyEntry) }}</strong>
                     </div>
                   </div>
+
+                  <ul
+                    v-if="cell.strategyEntry?.details.length"
+                    class="prediction-tooltip-details"
+                    aria-label="Selected strategy calculation details"
+                  >
+                    <li
+                      v-for="detail in cell.strategyEntry.details"
+                      :key="detail"
+                    >
+                      {{ detail }}
+                    </li>
+                  </ul>
 
                   <p v-if="actualNumbers.has(cell.number)" class="prediction-tooltip-outcome">
                     Drawn in target draw {{ selectedPrediction?.targetDrawNumber }}

@@ -42,6 +42,7 @@ export const STRATEGY_FAMILY_BY_ID = {
   randomness: "random-baselines",
   fresh_random: "random-baselines",
   chi_square: "frequency-recency",
+  categorical_chi_square: "frequency-recency",
   entropy: "frequency-recency",
   markov100: "markov-sequence",
   mkgsv: "markov-sequence",

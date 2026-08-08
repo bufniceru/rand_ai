@@ -67,6 +67,7 @@ const strategyPlugins = [
   { id: "randomness", label: "Random baseline" },
   { id: "fresh_random", label: "Fresh Random" },
   { id: "chi_square", label: "Chi-square Frequency" },
+  { id: "categorical_chi_square", label: "Categorical Chi-square" },
   { id: "entropy", label: "Entropy" },
   { id: "markov100", label: "Markov 100" },
   { id: "mkgsv", label: "Markov Gap-Space Vector (Experimental)" },
