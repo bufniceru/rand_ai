@@ -6483,6 +6483,7 @@ tbody tr:nth-child(even) {
 .draw-portfolio-controls label {
   display: grid;
   gap: 5px;
+  align-self: start;
   font-weight: 800;
 }
 
@@ -6968,7 +6969,7 @@ tbody tr:nth-child(even) {
 .portfolio-mode-control {
   display: grid;
   gap: 5px;
-  align-self: stretch;
+  align-self: start;
   font-weight: 800;
 }
 
