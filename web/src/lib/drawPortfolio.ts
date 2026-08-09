@@ -13,8 +13,9 @@ const RANDOM_HITS_PER_DRAW = 36 / 49;
 const EFFICACY_PRIOR_DRAWS = 24;
 const MIN_POOL_SIZE = 12;
 const MAX_POOL_SIZE = 24;
+const CANDIDATE_PRIORITY_BONUS = 0.1;
 const EXCLUDED_STRATEGIES = new Set(["randomness", "fresh_random"]);
-export const PORTFOLIO_ALGORITHM_VERSION = 2;
+export const PORTFOLIO_ALGORITHM_VERSION = 3;
 
 export type RelationshipLiftSource =
   | RelationshipEdge[]
@@ -305,17 +306,10 @@ function enumerateCandidates(
   const fixedIndexes = pool
     .map((entry, index) => fixed.has(entry.number) ? index : -1)
     .filter((index) => index >= 0);
-  const availableCandidateCount = pool.filter((entry) => candidates.has(entry.number)).length;
-  const requiredCandidateCount = Math.min(
-    availableCandidateCount,
-    NUMBERS_PER_DRAW - fixedIndexes.length,
-  );
   const topologies = guided
     ? candidateTopologies(pool.length).filter(
         (topology) =>
-          fixedIndexes.every((index) => topology.indexes.includes(index)) &&
-          topology.indexes.filter((index) => candidates.has(pool[index].number)).length ===
-            requiredCandidateCount,
+          fixedIndexes.every((index) => topology.indexes.includes(index)),
       )
     : candidateTopologies(pool.length);
   return topologies.map((topology) => {
@@ -323,6 +317,9 @@ function enumerateCandidates(
     const numbers = selected.map((entry) => entry.number).sort((a, b) => a - b);
     const numberStrength =
       selected.reduce((total, entry) => total + entry.score, 0) /
+      NUMBERS_PER_DRAW;
+    const candidatePriority =
+      selected.filter((entry) => candidates.has(entry.number)).length /
       NUMBERS_PER_DRAW;
     let relationshipStrength = 0;
     let relationshipCount = 0;
@@ -344,7 +341,8 @@ function enumerateCandidates(
       numbers,
       quality:
         numberStrength * 0.8 +
-        (relationshipCount > 0 ? relationshipStrength / relationshipCount : 0) * 0.2,
+        (relationshipCount > 0 ? relationshipStrength / relationshipCount : 0) * 0.2 +
+        candidatePriority * CANDIDATE_PRIORITY_BONUS,
     };
   });
 }

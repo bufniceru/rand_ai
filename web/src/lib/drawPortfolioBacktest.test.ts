@@ -92,7 +92,7 @@ describe("portfolio walk-forward backtest", () => {
 
   it("creates stable versioned persistent-cache keys", () => {
     expect(portfolioBacktestCacheKey("a".repeat(64), 10)).toBe(
-      `${"a".repeat(64)}-v2-p10`,
+      `${"a".repeat(64)}-v3-p10`,
     );
   });
 

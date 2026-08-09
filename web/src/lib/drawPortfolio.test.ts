@@ -162,7 +162,8 @@ describe("draw portfolio generation", () => {
     expect(fromProvider).toEqual(fromEdges);
   });
 
-  it("requires Fixed numbers and fills Guided ticket positions with Candidates first", () => {
+  it("requires Fixed numbers, excludes Excluded numbers, and only prioritizes Candidates", () => {
+    const candidateNumbers = [2, 42, 43];
     const result = generateDrawPortfolio(
       suite([strategy("freshness", 0), strategy("entropy", 9)]),
       [],
@@ -170,7 +171,7 @@ describe("draw portfolio generation", () => {
       {
         mode: "guided",
         fixedNumbers: [40, 41],
-        candidateNumbers: [42, 43, 44],
+        candidateNumbers,
         excludedNumbers: [1],
       },
     );
@@ -178,9 +179,19 @@ describe("draw portfolio generation", () => {
     expect(result?.metadata.mode).toBe("guided");
     expect(result?.draws).toHaveLength(10);
     for (const draw of result?.draws ?? []) {
-      expect(draw.numbers).toEqual(expect.arrayContaining([40, 41, 42, 43, 44]));
+      expect(draw.numbers).toEqual(expect.arrayContaining([40, 41]));
       expect(draw.numbers).not.toContain(1);
     }
+    expect(
+      result?.draws.some(
+        (draw) => draw.numbers.filter((number) => candidateNumbers.includes(number)).length < 3,
+      ),
+    ).toBe(true);
+    expect(
+      result?.draws.some(
+        (draw) => draw.numbers.some((number) => candidateNumbers.includes(number)),
+      ),
+    ).toBe(true);
   });
 
   it("keeps Classic generation unchanged while exposing plan markers", () => {
@@ -202,7 +213,7 @@ describe("draw portfolio generation", () => {
     expect(markedClassic?.metadata.excludedNumbers).toEqual([1]);
   });
 
-  it("uses only Candidates in every non-Fixed slot when enough are available", () => {
+  it("does not require Candidates in every non-Fixed slot", () => {
     const candidateNumbers = [20, 21, 22, 23, 24, 25, 26];
     const result = generateDrawPortfolio(
       suite([strategy("freshness", 0)]),
@@ -216,10 +227,34 @@ describe("draw portfolio generation", () => {
       },
     );
 
-    for (const draw of result?.draws ?? []) {
+    const candidateCounts = (result?.draws ?? []).map((draw) => {
       expect(draw.numbers).toContain(49);
-      expect(draw.numbers.filter((number) => candidateNumbers.includes(number))).toHaveLength(5);
-    }
+      return draw.numbers.filter((number) => candidateNumbers.includes(number)).length;
+    });
+    expect(candidateCounts.some((count) => count < 5)).toBe(true);
+    expect(candidateCounts.some((count) => count > 0)).toBe(true);
+  });
+
+  it("increases a Candidate's selection priority without changing the eligible pool", () => {
+    const predictionSuite = suite([strategy("freshness", 0)]);
+    const constraints = {
+      mode: "guided" as const,
+      fixedNumbers: [49],
+      candidateNumbers: [] as number[],
+      excludedNumbers: [],
+    };
+    const neutral = generateDrawPortfolio(predictionSuite, [], 20, constraints);
+    const prioritized = generateDrawPortfolio(predictionSuite, [], 20, {
+      ...constraints,
+      candidateNumbers: [18],
+    });
+    const appearances = (result: typeof neutral) =>
+      result?.draws.filter((draw) => draw.numbers.includes(18)).length ?? 0;
+
+    expect(prioritized?.pool.map((entry) => entry.number).sort((left, right) => left - right))
+      .toEqual(neutral?.pool.map((entry) => entry.number).sort((left, right) => left - right));
+    expect(appearances(prioritized)).toBeGreaterThan(appearances(neutral));
+    expect(appearances(prioritized)).toBeLessThan(prioritized?.draws.length ?? 0);
   });
 
   it("returns the single available unique ticket when all six numbers are Fixed", () => {
