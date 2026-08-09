@@ -17,7 +17,6 @@ import {
   portfolioHistoryStatistics,
 } from "../lib/drawPortfolioBacktest";
 import {
-  activePossibleDrawPlan,
   activePossibleDrawState,
   getDrawPortfolioMode,
   possibleDrawPlanRevision,
@@ -90,7 +89,6 @@ const simulationStatistics = computed(() =>
   portfolioHistoryStatistics(simulationResult.value),
 );
 const planState = activePossibleDrawState;
-const activePlanName = computed(() => activePossibleDrawPlan.value?.name ?? "Draw 1");
 
 function markResultStale(reason: string): void {
   if (!result.value) return;
@@ -441,7 +439,6 @@ onBeforeUnmount(() => {
     <section v-if="latestSuite && predictiveStrategyCount > 0" class="draw-portfolio-workspace">
       <div class="draw-portfolio-controls">
         <div class="portfolio-mode-control">
-          <span>Generation mode</span>
           <div class="portfolio-mode-switch" role="group" aria-label="Draw Portfolio generation mode">
             <button
               type="button"
@@ -456,35 +453,22 @@ onBeforeUnmount(() => {
               @click="setMode('guided')"
             >Guided</button>
           </div>
-          <small v-if="portfolioMode === 'classic'">
-            Current algorithm; Possible Draw markings are shown but ignored.
-          </small>
-          <small v-else>
-            Fixed numbers are required, Candidates fill first, and Excluded numbers are removed.
-          </small>
         </div>
         <label>
-          <span>Number of draws</span>
           <input
             v-model.number="requestedDrawCount"
             type="number"
             min="1"
             max="100"
+            aria-label="Number of draws"
+            title="Number of draws"
             :disabled="generating"
             @change="normalizeDrawCount"
           >
-          <small>From 1 to 100 · default 10</small>
         </label>
         <button type="button" :disabled="generating" @click="generate">
           {{ generating ? "Generating…" : "Generate portfolio" }}
         </button>
-        <p>
-          Active plan <strong>{{ activePlanName }}</strong> ·
-          {{ planState.fixedNumbers.length }} Fixed ·
-          {{ planState.candidateNumbers.length }} Candidates ·
-          {{ planState.excludedNumbers.length }} Excluded.
-          Random baselines do not contribute to scoring.
-        </p>
       </div>
 
       <p v-if="resultStale" class="draw-portfolio-message stale" role="status">
@@ -618,10 +602,6 @@ onBeforeUnmount(() => {
         </section>
       </template>
 
-      <section v-else-if="!generating" class="draw-portfolio-empty">
-        <strong>Choose how many draws to generate</strong>
-        <p>The adaptive pool and portfolio metrics will appear here.</p>
-      </section>
     </section>
 
     <section v-else class="draw-portfolio-empty unavailable">

@@ -6470,8 +6470,8 @@ tbody tr:nth-child(even) {
 
 .draw-portfolio-controls {
   display: grid;
-  grid-template-columns: minmax(270px, 330px) minmax(190px, 240px) auto minmax(260px, 1fr);
-  align-items: end;
+  grid-template-columns: minmax(270px, 330px) minmax(190px, 240px) auto;
+  align-items: center;
   gap: 14px;
   padding: 16px;
   border: 1px solid #cadbe4;
@@ -6483,7 +6483,6 @@ tbody tr:nth-child(even) {
 .draw-portfolio-controls label {
   display: grid;
   gap: 5px;
-  align-self: start;
   font-weight: 800;
 }
 
@@ -6969,7 +6968,6 @@ tbody tr:nth-child(even) {
 .portfolio-mode-control {
   display: grid;
   gap: 5px;
-  align-self: start;
   font-weight: 800;
 }
 
