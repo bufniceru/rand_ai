@@ -4560,6 +4560,15 @@ tbody tr:nth-child(even) {
   text-anchor: middle;
 }
 
+.top-number-circle.matched {
+  cursor: pointer;
+  fill: #2fa84f;
+}
+
+.top-number-circle-label.compact {
+  font-size: 11px;
+}
+
 .top-gap-ribbon {
   fill: #0b2f5e;
 }

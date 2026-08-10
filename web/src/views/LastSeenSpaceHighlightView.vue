@@ -10,7 +10,7 @@ const props = defineProps<{
   referenceDrawOffset: number;
 }>();
 
-const svgWidth = 1680;
+const baseSvgWidth = 1680;
 const chartLeft = 70;
 const chartTop = 30;
 const chartBottom = 45;
@@ -18,7 +18,8 @@ const chartRight = 30;
 const rowHeight = 30;
 const pointRadius = 13.5;
 const occurrenceStripWidth = (pointRadius * 2) / 3;
-const plotWidth = svgWidth - chartLeft - chartRight;
+const basePlotWidth = baseSvgWidth - chartLeft - chartRight;
+const horizontalUnitSpacing = basePlotWidth / 48;
 
 const selectedSpace = ref<number | null>(null);
 let longPressTimer: ReturnType<typeof setTimeout> | null = null;
@@ -40,6 +41,10 @@ const gapScaleModel = computed(() =>
 const horizontalAxisMax = computed(() =>
   Math.max(model.value.maxSpace, gapScaleModel.value.maxGap),
 );
+const chartPlotWidth = computed(() =>
+  Math.max(basePlotWidth, horizontalAxisMax.value * horizontalUnitSpacing),
+);
+const svgWidth = computed(() => chartLeft + chartPlotWidth.value + chartRight);
 const chartHeight = computed(() =>
   Math.max(320, chartTop + model.value.drawCount * rowHeight + chartBottom),
 );
@@ -151,8 +156,7 @@ const referencePrecedentStrips = computed(() => {
 });
 
 function xForSpace(space: number): number {
-  if (horizontalAxisMax.value <= 0) return chartLeft + plotWidth / 2;
-  return chartLeft + (space / horizontalAxisMax.value) * plotWidth;
+  return chartLeft + space * horizontalUnitSpacing;
 }
 
 function yForDraw(drawIndex: number): number {
@@ -191,21 +195,20 @@ onBeforeUnmount(clearLongPressTimer);
   <section class="workspace-view last-seen-view space-highlight-view">
     <div class="highlight-chart-scroll">
       <svg :width="svgWidth" height="42" class="highlight-chart-header" role="presentation">
-        <rect
-          :x="xForSpace(0) - 15"
-          y="6"
-          :width="plotWidth + 30"
-          height="30"
-          class="top-number-strip"
-          rx="8"
-        />
-        <text
-          v-for="space in spaceUnits"
-          :key="`header-space-${space}`"
-          :x="xForSpace(space)"
-          y="27"
-          class="tick-label top-x-tick"
-        >{{ space }}</text>
+        <g v-for="space in spaceUnits" :key="`header-space-${space}`">
+          <circle
+            :cx="xForSpace(space)"
+            cy="21"
+            :r="pointRadius"
+            class="top-number-circle"
+          />
+          <text
+            :class="{ compact: space >= 100 }"
+            :x="xForSpace(space)"
+            y="26"
+            class="top-number-circle-label"
+          >{{ space }}</text>
+        </g>
       </svg>
       <svg
         :height="chartHeight"
@@ -237,7 +240,7 @@ onBeforeUnmount(clearLongPressTimer);
           v-if="model.referenceDrawIndex !== null"
           :x="xForSpace(0) - 11"
           :y="yForDraw(model.referenceDrawIndex) - 14"
-          :width="plotWidth + 22"
+          :width="chartPlotWidth + 22"
           height="28"
           class="current-reference-ribbon"
         />

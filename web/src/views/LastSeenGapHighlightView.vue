@@ -9,7 +9,7 @@ const props = defineProps<{
   referenceDrawOffset: number;
 }>();
 
-const svgWidth = 1680;
+const baseSvgWidth = 1680;
 const chartLeft = 70;
 const chartTop = 30;
 const chartBottom = 45;
@@ -17,10 +17,8 @@ const chartRight = 30;
 const rowHeight = 30;
 const pointRadius = 13.5;
 const occurrenceStripWidth = (pointRadius * 2) / 3;
-const topGapRibbonY = 6;
-const topGapRibbonHeight = 30;
-const topGapRibbonMatchWidth = 18;
-const plotWidth = svgWidth - chartLeft - chartRight;
+const basePlotWidth = baseSvgWidth - chartLeft - chartRight;
+const horizontalUnitSpacing = basePlotWidth / 48;
 
 const selectedGap = ref<number | null>(null);
 const gapNumbersPopup = ref<{ gap: number; numbers: number[] } | null>(null);
@@ -33,6 +31,10 @@ const model = computed(() =>
     props.referenceDrawOffset,
   ),
 );
+const chartPlotWidth = computed(() =>
+  Math.max(basePlotWidth, model.value.maxGap * horizontalUnitSpacing),
+);
+const svgWidth = computed(() => chartLeft + chartPlotWidth.value + chartRight);
 const chartHeight = computed(() =>
   Math.max(320, chartTop + model.value.drawCount * rowHeight + chartBottom),
 );
@@ -138,8 +140,7 @@ const referencePrecedentStrips = computed(() => {
 });
 
 function xForGap(gap: number): number {
-  if (model.value.maxGap <= 0) return chartLeft + plotWidth / 2;
-  return chartLeft + (gap / model.value.maxGap) * plotWidth;
+  return chartLeft + gap * horizontalUnitSpacing;
 }
 
 function yForDraw(drawIndex: number): number {
@@ -189,42 +190,24 @@ onBeforeUnmount(clearLongPressTimer);
   <section class="workspace-view last-seen-view gap-highlight-view">
     <div class="highlight-chart-scroll">
       <svg :width="svgWidth" height="42" class="highlight-chart-header" role="presentation">
-        <rect
-          :x="chartLeft - 15"
-          :y="topGapRibbonY"
-          :width="plotWidth + 30"
-          :height="topGapRibbonHeight"
-          class="top-gap-ribbon"
-          rx="8"
-        />
-
-        <line
+        <g
           v-for="gap in gapUnits"
-          :key="`ribbon-${gap}`"
-          :class="{ major: gap % 5 === 0 }"
-          class="top-gap-ribbon-stripe"
-          :x1="xForGap(gap)"
-          :x2="xForGap(gap)"
-          :y1="topGapRibbonY + 3"
-          :y2="topGapRibbonY + topGapRibbonHeight - 3"
-        />
-        <g v-for="gap in gapUnits" :key="`header-gap-${gap}`">
-          <rect
-            v-if="referenceDrawGaps.has(gap)"
-            :x="xForGap(gap) - topGapRibbonMatchWidth / 2"
-            :y="topGapRibbonY + 3"
-            :width="topGapRibbonMatchWidth"
-            :height="topGapRibbonHeight - 6"
-            class="top-gap-ribbon-match"
-            rx="6"
-            @click="openGapNumbersPopup($event, gap)"
+          :key="`header-gap-${gap}`"
+          class="gap-ribbon-label"
+          @click="openGapNumbersPopup($event, gap)"
+        >
+          <circle
+            :class="{ matched: referenceDrawGaps.has(gap) }"
+            :cx="xForGap(gap)"
+            cy="21"
+            :r="pointRadius"
+            class="top-number-circle"
           />
           <text
-            :class="{ matched: referenceDrawGaps.has(gap) }"
+            :class="{ compact: gap >= 100 }"
             :x="xForGap(gap)"
-            :y="topGapRibbonY + 21"
-            class="tick-label top-x-tick gap-ribbon-label"
-            @click="openGapNumbersPopup($event, gap)"
+            y="26"
+            class="top-number-circle-label"
           >
             {{ gap }}
             <title>Ctrl+Click to show numbers with gap {{ gap }}</title>
@@ -255,7 +238,7 @@ onBeforeUnmount(clearLongPressTimer);
           v-if="model.referenceDrawIndex !== null"
           :x="chartLeft - 11"
           :y="yForDraw(model.referenceDrawIndex) - 14"
-          :width="plotWidth + 22"
+          :width="chartPlotWidth + 22"
           height="28"
           class="current-reference-ribbon"
         />
@@ -265,7 +248,7 @@ onBeforeUnmount(clearLongPressTimer);
             :class="{ major: (model.drawCount - drawIndex) % 5 === 0 }"
             class="horizontal-guide"
             :x1="chartLeft"
-            :x2="chartLeft + plotWidth"
+            :x2="chartLeft + chartPlotWidth"
             :y1="yForDraw(drawIndex)"
             :y2="yForDraw(drawIndex)"
           />
