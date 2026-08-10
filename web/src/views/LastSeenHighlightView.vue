@@ -154,21 +154,19 @@ function showPoint(
   <section class="workspace-view last-seen-view last-seen-number-view">
     <div class="highlight-chart-scroll">
       <svg :width="svgWidth" height="42" class="highlight-chart-header" role="presentation">
-        <rect
-          :x="xForNumber(1) - 15"
-          y="6"
-          :width="plotWidth + 30"
-          height="30"
-          class="top-number-strip"
-          rx="8"
-        />
-        <text
-          v-for="number in 49"
-          :key="`header-${number}`"
-          :x="xForNumber(number)"
-          y="27"
-          class="tick-label top-x-tick"
-        >{{ number }}</text>
+        <g v-for="number in 49" :key="`header-${number}`">
+          <circle
+            :cx="xForNumber(number)"
+            cy="21"
+            :r="pointRadius"
+            class="top-number-circle"
+          />
+          <text
+            :x="xForNumber(number)"
+            y="26"
+            class="top-number-circle-label"
+          >{{ number }}</text>
+        </g>
       </svg>
       <svg :height="chartHeight" :width="svgWidth" class="highlight-chart" role="img">
         <text class="axis-label" :x="svgWidth / 2" :y="chartHeight - 10">Number</text>

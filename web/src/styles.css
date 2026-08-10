@@ -4548,6 +4548,18 @@ tbody tr:nth-child(even) {
   fill: #123b72;
 }
 
+.top-number-circle {
+  fill: #2e63c5;
+}
+
+.top-number-circle-label {
+  pointer-events: none;
+  font-size: 15px;
+  font-weight: 700;
+  fill: #ffe25d;
+  text-anchor: middle;
+}
+
 .top-gap-ribbon {
   fill: #0b2f5e;
 }
