@@ -52,6 +52,11 @@ const strategyNames: Record<StrategyId, string> = {
   sparse_neural_ticket: "Sparse Neural Ticket (Experimental)",
   cis: "Collective Intelligence Strategy",
   decision_tree_selector: "Decision Tree Selector",
+  border_group_statistical: "Border Group Statistical",
+  border_group_markov: "Border Group Markov",
+  border_group_bayesian: "Border Group Bayesian",
+  border_group_ml: "Border Group ML",
+  border_group_hybrid: "Border Group Hybrid",
   residual_coverage: "Residual Coverage",
   chained: "Chained Strategy",
 };

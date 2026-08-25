@@ -8,13 +8,20 @@ const props = defineProps<{
   enabledStrategyIds: StrategyId[];
   lastSeenDrawCount: number;
   maxLastSeenDrawCount: number;
+  borderSpace: number;
+  targetGroupCount: number | null;
   saving: boolean;
 }>();
 
 const emit = defineEmits<{
   cancel: [];
   appearance: [];
-  save: [strategyIds: StrategyId[], lastSeenDrawCount: number];
+  save: [
+    strategyIds: StrategyId[],
+    lastSeenDrawCount: number,
+    borderSpace: number,
+    targetGroupCount: number | null,
+  ];
 }>();
 
 const dialog = ref<HTMLElement | null>(null);
@@ -22,6 +29,9 @@ const selectedStrategyIds = ref<Set<StrategyId>>(
   new Set(props.enabledStrategyIds),
 );
 const selectedLastSeenDrawCount = ref(props.lastSeenDrawCount);
+const selectedBorderSpace = ref(props.borderSpace);
+const selectedTargetGroupCount = ref<number | null>(props.targetGroupCount);
+const groupCountChoices = [1, 2, 3, 4, 5, 6];
 
 const strategyDescriptions: Record<StrategyId, string> = {
   proximity: "Nearest-neighbor spacing profile.",
@@ -57,6 +67,16 @@ const strategyDescriptions: Record<StrategyId, string> = {
   cis: "Online learner combining ten strategy experts.",
   decision_tree_selector:
     "Leakage-safe decision tree selecting one stable expert for the next draw.",
+  border_group_statistical:
+    "Smoothed historical frequencies of circular border-group signatures.",
+  border_group_markov:
+    "Next-signature transitions with statistical backoff.",
+  border_group_bayesian:
+    "Bayesian posterior over signatures from recent circular-group context.",
+  border_group_ml:
+    "Online multinomial model of recent spaces, signatures, and trends.",
+  border_group_hybrid:
+    "Walk-forward log-loss-weighted blend of all border-group models.",
   residual_coverage:
     "Diversity-first complement covering numbers outside every base Top-6.",
   chained:
@@ -95,6 +115,31 @@ function normalizedLastSeenDrawCount(): number {
   );
 }
 
+function normalizedBorderSpace(): number {
+  return Math.min(
+    Math.max(Math.trunc(selectedBorderSpace.value || 0), 0),
+    43,
+  );
+}
+
+function groupCountFeasible(groupCount: number): boolean {
+  return groupCount === 1 || groupCount * (normalizedBorderSpace() + 1) <= 43;
+}
+
+function normalizedTargetGroupCount(): number | null {
+  const value = selectedTargetGroupCount.value;
+  return value !== null && Number.isInteger(value) && groupCountFeasible(value)
+    ? value
+    : null;
+}
+
+function applyBorderSpace(): void {
+  selectedBorderSpace.value = normalizedBorderSpace();
+  if (normalizedTargetGroupCount() === null) {
+    selectedTargetGroupCount.value = null;
+  }
+}
+
 onMounted(() => dialog.value?.focus());
 </script>
 
@@ -118,8 +163,8 @@ onMounted(() => dialog.value?.focus());
           <p class="eyebrow">Application settings</p>
           <h2 id="settings-title">Settings</h2>
           <p>
-            Configure the Last Seen displays and choose which prediction
-            strategies are calculated.
+            Configure shared analysis behavior, Last Seen displays, and the
+            prediction strategies that are calculated.
           </p>
         </div>
         <strong>{{ selectedCount }} of {{ plugins.length }} enabled</strong>
@@ -141,6 +186,43 @@ onMounted(() => dialog.value?.focus());
             @change="selectedLastSeenDrawCount = normalizedLastSeenDrawCount()"
           >
         </label>
+      </section>
+
+      <section class="settings-display-section">
+        <div>
+          <strong>Border groups</strong>
+          <small>
+            Spaces up to this inclusive value connect numbers; larger spaces
+            separate groups. This affects analysis, predictions, exports, and portfolios.
+          </small>
+        </div>
+        <div class="settings-border-fields">
+          <label class="settings-number-field">
+            <span>Border space</span>
+            <input
+              v-model.number="selectedBorderSpace"
+              min="0"
+              max="43"
+              type="number"
+              :disabled="saving"
+              @change="applyBorderSpace"
+            >
+          </label>
+          <label class="settings-number-field">
+            <span>Predicted groups</span>
+            <select v-model="selectedTargetGroupCount" :disabled="saving">
+              <option :value="null">Automatic</option>
+              <option
+                v-for="groupCount in groupCountChoices"
+                :key="groupCount"
+                :value="groupCount"
+                :disabled="!groupCountFeasible(groupCount)"
+              >
+                {{ groupCount }} {{ groupCount === 1 ? "group" : "groups" }}
+              </option>
+            </select>
+          </label>
+        </div>
       </section>
 
       <section class="settings-display-section settings-appearance-section">
@@ -217,8 +299,8 @@ onMounted(() => dialog.value?.focus());
       </div>
 
       <p class="settings-dialog-note">
-        Draw-count changes apply immediately. Strategy changes reanalyze the
-        active dataset so prediction windows use the new selection.
+        Draw-count changes apply immediately. Border-space and strategy changes
+        reanalyze the active dataset using the new settings.
       </p>
 
       <footer class="dialog-actions">
@@ -234,7 +316,13 @@ onMounted(() => dialog.value?.focus());
           class="button primary"
           type="button"
           :disabled="saving"
-          @click="emit('save', selectedIdsInPluginOrder, normalizedLastSeenDrawCount())"
+          @click="emit(
+            'save',
+            selectedIdsInPluginOrder,
+            normalizedLastSeenDrawCount(),
+            normalizedBorderSpace(),
+            normalizedTargetGroupCount(),
+          )"
         >
           {{ saving ? "Saving…" : "Save settings" }}
         </button>

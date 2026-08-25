@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type {
   PredictionSuite,
   RelationshipEdge,
+  SpaceGroupAnalysis,
   StrategyId,
   StrategyPrediction,
 } from "../types";
@@ -293,5 +294,44 @@ describe("draw portfolio generation", () => {
     expect(result?.pool.some((entry) => entry.number === 49)).toBe(true);
     expect(result?.metadata.omittedCandidates).toHaveLength(7);
     expect(result?.metadata.constraintLimited).toBe(true);
+  });
+
+  it("applies the selected border-group forecast as portfolio guidance", () => {
+    const analysis: SpaceGroupAnalysis = {
+      borderSpace: 7,
+      targetGroupCount: null,
+      smallSpaceDefinition: "space <= 7",
+      largeSpaceDefinition: "space > 7",
+      bestModelId: "border_group_statistical",
+      provisional: false,
+      forecasts: [{
+        modelId: "border_group_statistical",
+        name: "Border Group Statistical",
+        topSignature: "6",
+        topGroupCount: 1,
+        topProbability: 0.8,
+        probabilities: [
+          { signature: "6", groupCount: 1, probability: 0.8 },
+          { signature: "3+3", groupCount: 2, probability: 0.2 },
+        ],
+      }],
+      hybridWeights: {},
+      signatureChiSquare: 0,
+      signatureChiSquarePValue: 1,
+      transitionMutualInformation: 0,
+      transitionPermutationPValue: 1,
+    };
+    const result = generateDrawPortfolio(
+      suite([strategy("freshness", 0), strategy("entropy", 9)]),
+      [],
+      5,
+      undefined,
+      { borderSpace: 7, analysis },
+    );
+
+    expect(result?.metadata.borderSpace).toBe(7);
+    expect(result?.metadata.groupModelId).toBe("border_group_statistical");
+    expect(result?.metadata.provisionalGroupModel).toBe(false);
+    expect(result?.draws).toHaveLength(5);
   });
 });

@@ -4,6 +4,8 @@ import type {
   PossibleDrawNumberState,
   PredictionSuite,
   RelationshipEdge,
+  SpaceGroupAnalysis,
+  SpaceGroupForecast,
   StrategyPrediction,
 } from "../types";
 
@@ -159,6 +161,11 @@ function scorePoolNumbers(
   return scored;
 }
 
+export interface BorderGroupGuidance {
+  borderSpace: number;
+  analysis: SpaceGroupAnalysis;
+}
+
 function buildPool(
   strategies: StrategyPrediction[],
   drawCount: number,
@@ -290,6 +297,7 @@ function enumerateCandidates(
   pool: PortfolioPoolNumber[],
   relationshipSource: RelationshipLiftSource,
   guided?: { fixedNumbers: number[]; candidateNumbers: number[] },
+  groupGuidance?: BorderGroupGuidance,
 ): CandidateDraw[] {
   const relationshipByPair = Array.isArray(relationshipSource)
     ? new Map(
@@ -336,15 +344,61 @@ function enumerateCandidates(
         relationshipCount += 1;
       }
     }
+    const baseQuality =
+      numberStrength * 0.8 +
+      (relationshipCount > 0 ? relationshipStrength / relationshipCount : 0) * 0.2 +
+      candidatePriority * CANDIDATE_PRIORITY_BONUS;
+    const groupStrength = groupGuidance
+      ? normalizedGroupProbability(numbers, groupGuidance)
+      : null;
     return {
       ...topology,
       numbers,
-      quality:
-        numberStrength * 0.8 +
-        (relationshipCount > 0 ? relationshipStrength / relationshipCount : 0) * 0.2 +
-        candidatePriority * CANDIDATE_PRIORITY_BONUS,
+      quality: groupStrength === null
+        ? baseQuality
+        : baseQuality * 0.8 + groupStrength * 0.2,
     };
   });
+}
+
+function groupSignature(numbers: readonly number[], borderSpace: number): string {
+  const ordered = [...numbers].sort((left, right) => left - right);
+  const spaces = [
+    ordered[0] - 1 + NUMBER_COUNT - ordered.at(-1)!,
+    ...ordered.slice(1).map((number, index) => number - ordered[index] - 1),
+  ];
+  const separators = spaces
+    .map((space, index) => space > borderSpace ? index : -1)
+    .filter((index) => index >= 0);
+  if (separators.length === 0) return String(NUMBERS_PER_DRAW);
+  return separators
+    .map((start, index) => {
+      const next = separators[(index + 1) % separators.length];
+      return (next - start + NUMBERS_PER_DRAW) % NUMBERS_PER_DRAW || NUMBERS_PER_DRAW;
+    })
+    .sort((left, right) => right - left)
+    .join("+");
+}
+
+function selectedGroupForecast(guidance: BorderGroupGuidance): SpaceGroupForecast | null {
+  const preferred = guidance.analysis.provisional
+    ? "border_group_hybrid"
+    : guidance.analysis.bestModelId ?? "border_group_hybrid";
+  return guidance.analysis.forecasts.find((forecast) => forecast.modelId === preferred)
+    ?? guidance.analysis.forecasts.find((forecast) => forecast.modelId === "border_group_hybrid")
+    ?? null;
+}
+
+function normalizedGroupProbability(
+  numbers: readonly number[],
+  guidance: BorderGroupGuidance,
+): number {
+  const forecast = selectedGroupForecast(guidance);
+  if (!forecast) return 0;
+  const signature = groupSignature(numbers, guidance.borderSpace);
+  const probability = forecast.probabilities.find((entry) => entry.signature === signature)?.probability ?? 0;
+  const maximum = Math.max(...forecast.probabilities.map((entry) => entry.probability), Number.EPSILON);
+  return probability / maximum;
 }
 
 function selectPortfolio(
@@ -506,6 +560,7 @@ export function generateDrawPortfolio(
   relationshipSource: RelationshipLiftSource,
   requestedDrawCount: number,
   constraints?: PossibleDrawConstraints,
+  groupGuidance?: BorderGroupGuidance,
 ): DrawPortfolioResult | null {
   const strategies = suite.strategies.filter(
     (strategy) => !EXCLUDED_STRATEGIES.has(strategy.id),
@@ -551,6 +606,7 @@ export function generateDrawPortfolio(
           candidateNumbers: guided.candidateNumbers,
         }
       : undefined,
+    groupGuidance,
   );
   const fixedSet = new Set(guided?.fixedNumbers ?? []);
   const fixedMask = pool.reduce(
@@ -600,6 +656,9 @@ export function generateDrawPortfolio(
       omittedCandidates,
       constraintLimited,
       constraintMessage: messages.length > 0 ? `${messages.join("; ")}.` : undefined,
+      borderSpace: groupGuidance?.borderSpace,
+      groupModelId: groupGuidance ? selectedGroupForecast(groupGuidance)?.modelId : undefined,
+      provisionalGroupModel: groupGuidance?.analysis.provisional,
     },
   };
 }

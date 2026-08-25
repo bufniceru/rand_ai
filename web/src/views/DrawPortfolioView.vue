@@ -28,12 +28,16 @@ import type {
   PortfolioBacktestResult,
   PredictionSuite,
   RelationshipEdge,
+  SpaceGroupAnalysis,
 } from "../types";
 
 const props = defineProps<{
   datasetId: string;
   predictionSuites: PredictionSuite[];
   relationshipEdges: RelationshipEdge[];
+  borderSpace: number;
+  targetGroupCount: number | null;
+  spaceGroupAnalysis: SpaceGroupAnalysis | null;
 }>();
 
 const requestedDrawCount = ref(10);
@@ -134,6 +138,9 @@ async function generate(): Promise<void> {
         candidateNumbers: planState.value.candidateNumbers,
         excludedNumbers: planState.value.excludedNumbers,
       },
+      props.spaceGroupAnalysis
+        ? { borderSpace: props.borderSpace, analysis: props.spaceGroupAnalysis }
+        : undefined,
     );
     resultStale.value = false;
     staleReason.value = "";
@@ -255,6 +262,8 @@ async function runHistoricalSimulation(): Promise<void> {
   try {
     const data = await api.getPortfolioBacktestData({
       strategyIds: suite.strategies.map((strategy) => strategy.id),
+      borderSpace: props.borderSpace,
+      targetGroupCount: props.targetGroupCount,
     });
     if (token !== simulationToken || !simulationRunning.value) return;
     const cacheKey = portfolioBacktestCacheKey(data.cacheKey, portfolioSize);

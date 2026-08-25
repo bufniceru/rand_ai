@@ -30,6 +30,7 @@ import PredictionAuditView from "./views/PredictionAuditView.vue";
 import RandomnessView from "./views/RandomnessView.vue";
 import RelationshipsView from "./views/RelationshipsView.vue";
 import SpacesView from "./views/SpacesView.vue";
+import SpaceGroupsView from "./views/SpaceGroupsView.vue";
 import StrategyEffectivenessView from "./views/StrategyEffectivenessView.vue";
 import type {
   AnalysisOptions,
@@ -53,6 +54,7 @@ const views: { id: ViewId; label: string; shortLabel: string }[] = [
   { id: "overview", label: "Overview", shortLabel: "Overview" },
   { id: "numbers", label: "Numbers", shortLabel: "Numbers" },
   { id: "spaces", label: "Spaces", shortLabel: "Spaces" },
+  { id: "space-groups", label: "Border Groups", shortLabel: "Border Groups" },
   { id: "relationships", label: "Relationships", shortLabel: "Relationships" },
   { id: "randomness", label: "Randomness", shortLabel: "Randomness" },
   {
@@ -130,6 +132,8 @@ const appearanceStartingTemplate = ref<ColorTemplate | null>(null);
 const appearanceError = ref("");
 const updatingStrategySelection = ref(false);
 const lastSeenDrawCountStorageKey = "rand-ai-last-seen-draw-count";
+const borderSpaceStorageKey = "rand-ai-border-space";
+const targetGroupCountStorageKey = "rand-ai-target-group-count";
 const storedLastSeenDrawCount = Number(
   window.localStorage.getItem(lastSeenDrawCountStorageKey) ?? "50",
 );
@@ -138,6 +142,22 @@ const lastSeenDrawCount = ref(
     ? Math.max(1, Math.trunc(storedLastSeenDrawCount))
     : 50,
 );
+const storedBorderSpace = Number(
+  window.localStorage.getItem(borderSpaceStorageKey) ?? "7",
+);
+const initialBorderSpace = Number.isFinite(storedBorderSpace)
+  ? Math.min(Math.max(Math.trunc(storedBorderSpace), 0), 43)
+  : 7;
+const storedTargetGroupCount = Number(
+  window.localStorage.getItem(targetGroupCountStorageKey),
+);
+const initialTargetGroupCount = (
+  Number.isInteger(storedTargetGroupCount) &&
+  storedTargetGroupCount >= 1 &&
+  storedTargetGroupCount <= 6 &&
+  (storedTargetGroupCount === 1 ||
+    storedTargetGroupCount * (initialBorderSpace + 1) <= 43)
+) ? storedTargetGroupCount : null;
 const lastSeenReferenceOffset = ref(0);
 const pendingDataset = ref<DatasetSelection | null>(null);
 const activeDataset = ref<DatasetSelection | null>(null);
@@ -155,6 +175,8 @@ const options = reactive<AnalysisOptions>({
   selectedNumbers: [1, 2, 3, 4, 5, 6],
   trendBins: 100,
   correlationMethod: "pearson",
+  borderSpace: initialBorderSpace,
+  targetGroupCount: initialTargetGroupCount,
   enabledReports: [],
   enabledStrategies: [],
 });
@@ -362,6 +384,8 @@ async function applyAppearance(template: ColorTemplate): Promise<void> {
 async function saveSettings(
   strategyIds: StrategyId[],
   requestedLastSeenDrawCount: number,
+  requestedBorderSpace: number,
+  requestedTargetGroupCount: number | null,
 ): Promise<void> {
   if (!window.randAiDesktop) return;
   savingSettings.value = true;
@@ -380,12 +404,38 @@ async function saveSettings(
       lastSeenDrawCountStorageKey,
       String(nextLastSeenDrawCount),
     );
+    const nextBorderSpace = Math.min(
+      Math.max(Math.trunc(requestedBorderSpace || 0), 0),
+      43,
+    );
+    const borderSpaceChanged = nextBorderSpace !== options.borderSpace;
+    const requestedTarget = Number(requestedTargetGroupCount);
+    const nextTargetGroupCount = (
+      requestedTargetGroupCount !== null &&
+      Number.isInteger(requestedTarget) &&
+      requestedTarget >= 1 &&
+      requestedTarget <= 6 &&
+      (requestedTarget === 1 || requestedTarget * (nextBorderSpace + 1) <= 43)
+    ) ? requestedTarget : null;
+    const targetGroupCountChanged =
+      nextTargetGroupCount !== options.targetGroupCount;
+    options.borderSpace = nextBorderSpace;
+    options.targetGroupCount = nextTargetGroupCount;
+    window.localStorage.setItem(borderSpaceStorageKey, String(nextBorderSpace));
+    window.localStorage.setItem(
+      targetGroupCountStorageKey,
+      nextTargetGroupCount === null ? "automatic" : String(nextTargetGroupCount),
+    );
     if (strategySelectionChanged(strategyIds)) {
       await updateStrategySelection(strategyIds, () => {
         settingsOpen.value = false;
       });
     } else {
       settingsOpen.value = false;
+      if ((borderSpaceChanged || targetGroupCountChanged) && activeDataset.value) {
+        if (loading.value) reportRefreshPending = true;
+        else await analyzeDataset(activeDataset.value, normalizeOptions());
+      }
     }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
@@ -407,6 +457,8 @@ function normalizeOptions(): AnalysisOptions {
     selectedNumbers,
     trendBins: Math.min(Math.max(Math.trunc(options.trendBins), 1), maximumBins),
     correlationMethod: options.correlationMethod,
+    borderSpace: Math.min(Math.max(Math.trunc(options.borderSpace), 0), 43),
+    targetGroupCount: options.targetGroupCount,
     enabledReports: [...enabledReportIds.value],
     enabledStrategies: [...enabledStrategyIds.value],
   };
@@ -506,6 +558,8 @@ async function analyzeDataset(
     options.selectedNumbers = [...payload.options.selectedNumbers];
     options.trendBins = payload.options.trendBins;
     options.correlationMethod = payload.options.correlationMethod;
+    options.borderSpace = payload.options.borderSpace;
+    options.targetGroupCount = payload.options.targetGroupCount;
     ensureActiveView();
     pendingDataset.value = null;
     loadingProgressTarget = 100;
@@ -826,6 +880,11 @@ onBeforeUnmount(() => {
           :analysis="analysis"
           :figures="figures"
         />
+        <SpaceGroupsView
+          v-else-if="activeView === 'space-groups' && analysis.options.enabledReports.includes('space-groups')"
+          :analysis="analysis"
+          :figures="figures"
+        />
         <RelationshipsView
           v-else-if="activeView === 'relationships' && analysis.options.enabledReports.includes('relationships')"
           :analysis="analysis"
@@ -942,6 +1001,9 @@ onBeforeUnmount(() => {
         :dataset-id="analysis.dataset.path"
         :prediction-suites="analysis.predictionSuites"
         :relationship-edges="analysis.possibleDraw.relationshipEdges"
+        :border-space="analysis.options.borderSpace"
+        :target-group-count="analysis.options.targetGroupCount"
+        :space-group-analysis="analysis.spaceGroups"
       />
     </section>
 
@@ -1064,6 +1126,8 @@ onBeforeUnmount(() => {
       :enabled-strategy-ids="enabledStrategyIds"
       :last-seen-draw-count="lastSeenDrawCount"
       :max-last-seen-draw-count="maxLastSeenDrawCount"
+      :border-space="options.borderSpace"
+      :target-group-count="options.targetGroupCount"
       :saving="savingSettings"
       @cancel="settingsOpen = false"
       @appearance="openAppearance"

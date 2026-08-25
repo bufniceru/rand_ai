@@ -22,6 +22,14 @@ from rand_ai.sparse_neural_ticket import (
     history_fingerprint,
     load_sparse_neural_ticket,
 )
+from rand_ai.space_groups import (
+    DEFAULT_BORDER_SPACE,
+    MODEL_IDS as BORDER_GROUP_MODEL_IDS,
+    MODEL_NAMES as BORDER_GROUP_MODEL_NAMES,
+    SpaceGroupForecaster,
+    profile_for_numbers,
+    validate_border_space,
+)
 
 _NUMBER_COUNT = 49
 _NUMBERS_PER_DRAW = 6
@@ -198,6 +206,7 @@ _BASE_STRATEGY_IDS = (
     "sparse_neural_ticket",
     "cis",
     "decision_tree_selector",
+    *BORDER_GROUP_MODEL_IDS,
 )
 _CHAIN_EXPERT_IDS = (
     "freshness",
@@ -680,6 +689,8 @@ class _StrategyState:
         self,
         enabled_strategy_ids: Collection[str] = STRATEGY_IDS,
         total_draw_count: int = 1,
+        border_space: int = DEFAULT_BORDER_SPACE,
+        target_group_count: int | None = None,
     ) -> None:
         self.requested_strategy_ids = frozenset(enabled_strategy_ids)
         active_strategy_ids = set(self.requested_strategy_ids)
@@ -692,9 +703,15 @@ class _StrategyState:
                     unresolved_strategy_ids.append(dependency_id)
         self.enabled_strategy_ids = frozenset(active_strategy_ids)
         self.total_draw_count = max(total_draw_count, 1)
+        self.border_space = validate_border_space(border_space)
         self.draw_count = 0
         self.appearances = [0] * (_NUMBER_COUNT + 1)
         self.last_seen: list[int | None] = [None] * (_NUMBER_COUNT + 1)
+        self.border_groups = (
+            SpaceGroupForecaster(self.border_space, target_group_count)
+            if self.enabled_strategy_ids.intersection(BORDER_GROUP_MODEL_IDS)
+            else None
+        )
         self.categorical_chi_square = (
             CategoricalChiSquareModel()
             if "categorical_chi_square" in self.enabled_strategy_ids
@@ -1998,6 +2015,10 @@ class _StrategyState:
 
     def train(self, drawn: set[int]) -> None:
         """Learn the current draw using only the state available before it."""
+        if self.border_groups is not None:
+            self.border_groups.observe(
+                profile_for_numbers(drawn, self.border_space)
+            )
         if self.categorical_chi_square is not None:
             self.categorical_chi_square.learn(drawn)
         if (
@@ -4989,6 +5010,44 @@ class _StrategyState:
                     decision_tree_details,
                 )
 
+        if self.border_groups is not None:
+            border_forecasts = self.border_groups.forecast()
+            descriptions = {
+                "border_group_statistical": (
+                    "Dirichlet-smoothed historical border-group signature model."
+                ),
+                "border_group_markov": (
+                    "First-order border-group signature transitions with statistical backoff."
+                ),
+                "border_group_bayesian": (
+                    "Bayesian border-group context posterior with categorical smoothing."
+                ),
+                "border_group_ml": (
+                    "Online multinomial border-group model with leakage-safe rolling features."
+                ),
+                "border_group_hybrid": (
+                    "Log-loss-weighted blend of statistical, Markov, Bayesian, and ML group forecasts."
+                ),
+            }
+            for strategy_id in BORDER_GROUP_MODEL_IDS:
+                if strategy_id not in enabled:
+                    continue
+                border_scores, border_details = self.border_groups.number_scores(
+                    border_forecasts[strategy_id]
+                )
+                rankings[strategy_id] = _ranking_from_scores(
+                    border_scores, gaps
+                )
+                if strategy_id in requested:
+                    built[strategy_id] = _strategy(
+                        strategy_id,
+                        BORDER_GROUP_MODEL_NAMES[strategy_id],
+                        descriptions[strategy_id],
+                        border_scores,
+                        gaps,
+                        border_details,
+                    )
+
         if "residual_coverage" in enabled:
             displayed_rankings = {
                 strategy_id: (
@@ -5050,6 +5109,8 @@ def build_prediction_suites(
     *,
     history_start: int = 0,
     enabled_strategy_ids: Collection[str] = STRATEGY_IDS,
+    border_space: int = DEFAULT_BORDER_SPACE,
+    target_group_count: int | None = None,
     progress: PredictionProgress | None = None,
     efficacy_record: EfficacyRecordCallback | None = None,
     evaluated_suite: PredictionSuiteCallback | None = None,
@@ -5064,7 +5125,12 @@ def build_prediction_suites(
     selected = tuple(
         strategy_id for strategy_id in STRATEGY_IDS if strategy_id in requested
     )
-    state = _StrategyState(selected, total_draw_count=len(draws))
+    state = _StrategyState(
+        selected,
+        total_draw_count=len(draws),
+        border_space=border_space,
+        target_group_count=target_group_count,
+    )
     efficacy = _EfficacyTracker()
     suites: list[PredictionSuite] = []
     total = len(draws)

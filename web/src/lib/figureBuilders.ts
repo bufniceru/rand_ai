@@ -318,6 +318,123 @@ function freshnessGapDistribution(analysis: AnalysisPayload): FigureSpec {
   };
 }
 
+function borderGroupFigures(analysis: AnalysisPayload): Record<string, FigureSpec> {
+  const countRows = table(analysis, "space_group_count_distribution").rows;
+  const signatureRows = table(analysis, "space_group_signature_distribution").rows;
+  const historyRows = table(analysis, "space_group_history").rows;
+  const sensitivityRows = table(analysis, "space_group_threshold_sensitivity").rows;
+  const metricRows = table(analysis, "space_group_model_metrics").rows.filter(
+    (row) => row.log_loss !== null,
+  );
+  return {
+    border_group_counts: {
+      data: [
+        {
+          type: "bar",
+          name: "Observed",
+          x: countRows.map((row) => numberValue(row, "group_count")),
+          y: countRows.map((row) => numberValue(row, "percentage")),
+          marker: { color: themeColor("charts.series1") },
+        },
+        {
+          type: "bar",
+          name: "Exact random null",
+          x: countRows.map((row) => numberValue(row, "group_count")),
+          y: countRows.map((row) => numberValue(row, "null_probability")),
+          marker: { color: themeColor("charts.series2") },
+        },
+      ],
+      layout: { ...baseLayout("Group-count distribution", "Groups", "Draws (%)"), barmode: "group" },
+    },
+    border_group_signatures: {
+      data: [
+        {
+          type: "bar",
+          name: "Observed",
+          x: signatureRows.map((row) => String(row.signature)),
+          y: signatureRows.map((row) => numberValue(row, "percentage")),
+          marker: { color: themeColor("charts.series3") },
+        },
+        {
+          type: "scatter",
+          mode: "lines+markers",
+          name: "Exact random null",
+          x: signatureRows.map((row) => String(row.signature)),
+          y: signatureRows.map((row) => numberValue(row, "null_probability")),
+          line: { color: themeColor("charts.series2"), width: 2 },
+        },
+      ],
+      layout: baseLayout("Canonical group signatures", "Group sizes", "Draws (%)"),
+    },
+    border_group_history: {
+      data: [
+        {
+          type: "scatter",
+          mode: "markers",
+          name: "Draw group count",
+          x: historyRows.map((row) => numberValue(row, "draw_number")),
+          y: historyRows.map((row) => numberValue(row, "group_count")),
+          marker: { color: themeColor("charts.series1"), size: 5 },
+        },
+        {
+          type: "scatter",
+          mode: "lines",
+          name: "Rolling 25",
+          x: historyRows.map((row) => numberValue(row, "draw_number")),
+          y: historyRows.map((row) => numberValue(row, "rolling_25_group_count")),
+          line: { color: themeColor("charts.series4"), width: 2 },
+        },
+        {
+          type: "scatter",
+          mode: "lines",
+          name: "Rolling 100",
+          x: historyRows.map((row) => numberValue(row, "draw_number")),
+          y: historyRows.map((row) => numberValue(row, "rolling_100_group_count")),
+          line: { color: themeColor("charts.series5"), width: 2 },
+        },
+      ],
+      layout: baseLayout("Border groups through history", "Draw", "Group count"),
+    },
+    border_group_transitions: heatmap(
+      table(analysis, "space_group_transitions"),
+      "Signature transition lift",
+      "Next signature",
+      "Current signature",
+      "lift",
+    ),
+    border_group_sensitivity: {
+      data: [
+        {
+          type: "scatter",
+          mode: "lines",
+          name: "Observed 1–3 groups",
+          x: sensitivityRows.map((row) => numberValue(row, "border_space")),
+          y: sensitivityRows.map((row) => numberValue(row, "one_to_three_percentage")),
+          line: { color: themeColor("charts.series1"), width: 2 },
+        },
+        {
+          type: "scatter",
+          mode: "lines",
+          name: "Exact random null",
+          x: sensitivityRows.map((row) => numberValue(row, "border_space")),
+          y: sensitivityRows.map((row) => numberValue(row, "null_one_to_three_percentage")),
+          line: { color: themeColor("charts.series2"), width: 2, dash: "dot" },
+        },
+      ],
+      layout: baseLayout("Border sensitivity", "Inclusive border space", "Draws with 1–3 groups (%)"),
+    },
+    border_group_models: {
+      data: [{
+        type: "bar",
+        x: metricRows.map((row) => String(row.name)),
+        y: metricRows.map((row) => numberValue(row, "log_loss")),
+        marker: { color: metricRows.map((_row, index) => chartColors()[index % chartColors().length]) },
+      }],
+      layout: baseLayout("Walk-forward structure log loss (lower is better)", "Model", "Log loss"),
+    },
+  };
+}
+
 export function buildFigures(analysis: AnalysisPayload): Record<string, FigureSpec> {
   const enabled = new Set(analysis.options.enabledReports);
   const figures: Record<string, FigureSpec> = {};
@@ -375,6 +492,10 @@ export function buildFigures(analysis: AnalysisPayload): Record<string, FigureSp
         "count",
       );
     }
+  }
+
+  if (enabled.has("space-groups")) {
+    Object.assign(figures, borderGroupFigures(analysis));
   }
 
   if (enabled.has("relationships")) {

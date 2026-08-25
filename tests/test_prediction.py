@@ -63,4 +63,4 @@ def test_trusted_import_precomputes_predictions_and_empty_collection_is_safe() -
 
     assert restored[0].prediction is not None
     with pytest.raises(AttributeError):
-        restored[0].prediction = None
+        setattr(restored[0], "prediction", None)

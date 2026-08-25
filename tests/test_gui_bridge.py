@@ -96,6 +96,8 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
         "selectedNumbers": [1, 5],
         "trendBins": 2,
         "correlationMethod": "spearman",
+        "borderSpace": 7,
+        "targetGroupCount": None,
         "enabledReports": list(DEFAULT_REPORT_IDS),
         "enabledStrategies": list(DEFAULT_STRATEGY_IDS),
     }
@@ -152,6 +154,11 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
         "SVC",
         "TBL",
         "CIS",
+        "Border Group Statistical",
+        "Border Group Markov",
+        "Border Group Bayesian",
+        "Border Group ML",
+        "Border Group Hybrid",
         "RCOV",
         "Chained Strategy",
     ]
@@ -454,10 +461,19 @@ def test_strategy_cache_reuses_report_independent_analysis(
         strategy_ids: Sequence[str],
         history_start: int,
         progress: gui_bridge.ProgressCallback | None,
+        border_space: int = 7,
+        target_group_count: int | None = None,
     ) -> gui_bridge.StrategyAnalysisArtifacts:
         nonlocal calls
         calls += 1
-        return original(draws, strategy_ids, history_start, progress)
+        return original(
+            draws,
+            strategy_ids,
+            history_start,
+            progress,
+            border_space,
+            target_group_count,
+        )
 
     monkeypatch.setattr(gui_bridge, "_build_strategy_analysis", counted_build)
     first_progress: list[tuple[int, str]] = []
@@ -497,6 +513,8 @@ def test_strategy_cache_reuses_report_independent_analysis(
         "datasetFingerprint": gui_bridge._dataset_fingerprint(_draws()),
         "strategyIds": ["freshness"],
         "historyLimit": gui_bridge.MAX_HISTORY_WINDOW,
+        "borderSpace": 7,
+        "targetGroupCount": None,
     }
     assert cached["createdAt"].endswith("+00:00")
     assert len(cached["analysis"]["portfolioBacktestHistory"]) == 2
@@ -551,25 +569,44 @@ def test_strategy_cache_refresh_and_inputs_invalidate_entries(
         strategy_ids: Sequence[str],
         history_start: int,
         progress: gui_bridge.ProgressCallback | None,
+        border_space: int = 7,
+        target_group_count: int | None = None,
     ) -> gui_bridge.StrategyAnalysisArtifacts:
         nonlocal calls
         calls += 1
-        return original(draws, strategy_ids, history_start, progress)
+        return original(
+            draws,
+            strategy_ids,
+            history_start,
+            progress,
+            border_space,
+            target_group_count,
+        )
 
     monkeypatch.setattr(gui_bridge, "_build_strategy_analysis", counted_build)
 
-    def analyze(*, refresh: bool = False, strategies: tuple[str, ...] = ("freshness",)) -> None:
+    def analyze(
+        *,
+        refresh: bool = False,
+        strategies: tuple[str, ...] = ("freshness",),
+        border_space: int = 7,
+        target_group_count: int | None = None,
+    ) -> None:
         analyze_file(
             source_path,
             enabled_reports=("predictions",),
             enabled_strategies=strategies,
             strategy_cache_dir=cache_dir,
             refresh_strategy_cache=refresh,
+            border_space=border_space,
+            target_group_count=target_group_count,
         )
 
     analyze()
     analyze(refresh=True)
     analyze(strategies=("freshness", "entropy"))
+    analyze(border_space=8)
+    analyze(target_group_count=3)
     changed = _draws()
     changed.add(Draw(7, 14, 21, 28, 35, 42))
     changed.save_pickle(source_path)
@@ -581,8 +618,8 @@ def test_strategy_cache_refresh_and_inputs_invalidate_entries(
     )
     analyze()
 
-    assert calls == 5
-    assert len(list(cache_dir.glob("*.json.gz"))) == 4
+    assert calls == 7
+    assert len(list(cache_dir.glob("*.json.gz"))) == 6
 
 
 def test_strategy_cache_recovers_from_corrupt_and_invalid_files(
@@ -599,10 +636,19 @@ def test_strategy_cache_recovers_from_corrupt_and_invalid_files(
         strategy_ids: Sequence[str],
         history_start: int,
         progress: gui_bridge.ProgressCallback | None,
+        border_space: int = 7,
+        target_group_count: int | None = None,
     ) -> gui_bridge.StrategyAnalysisArtifacts:
         nonlocal calls
         calls += 1
-        return original(draws, strategy_ids, history_start, progress)
+        return original(
+            draws,
+            strategy_ids,
+            history_start,
+            progress,
+            border_space,
+            target_group_count,
+        )
 
     monkeypatch.setattr(gui_bridge, "_build_strategy_analysis", counted_build)
 
@@ -717,7 +763,7 @@ def test_analyzes_and_exports_trusted_file(tmp_path: Path) -> None:
     assert payload["dataset"]["name"] == "draws.pkl"
     percents = [percent for percent, _message in progress_events]
     assert percents[0:3] == [4, 7, 8]
-    assert percents[-7:] == [61, 62, 72, 78, 82, 85, 93]
+    assert percents[-7:] == [62, 72, 78, 82, 83, 85, 93]
     assert percents == sorted(percents)
     with ZipFile(output_path) as archive:
         names = set(archive.namelist())
