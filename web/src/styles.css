@@ -1055,6 +1055,15 @@ tbody tr:nth-child(even) {
   width: 100%;
 }
 
+.settings-display-section > .settings-border-fields {
+  display: flex;
+  gap: 12px;
+}
+
+.settings-number-field select {
+  width: 100%;
+}
+
 .strategy-settings-families {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

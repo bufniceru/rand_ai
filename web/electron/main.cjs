@@ -697,7 +697,7 @@ function optionArguments(options = {}) {
   const selectedNumbers = Array.isArray(options.selectedNumbers)
     ? options.selectedNumbers.join(",")
     : "1,2,3,4,5,6";
-  return [
+  const arguments = [
     "--selected-numbers",
     selectedNumbers,
     "--trend-bins",
@@ -711,6 +711,10 @@ function optionArguments(options = {}) {
     "--strategies",
     enabledStrategiesList().join(","),
   ];
+  if (Number.isInteger(options.targetGroupCount)) {
+    arguments.push("--target-group-count", String(options.targetGroupCount));
+  }
+  return arguments;
 }
 
 function buildApplicationMenu() {
@@ -1087,8 +1091,7 @@ ipcMain.handle("portfolio-backtest:data", async (event, request) => {
   const strategyIds = strategyPlugins
     .map((plugin) => plugin.id)
     .filter((strategyId) => requested.has(strategyId));
-  return runBridge(
-    [
+  const bridgeArguments = [
       "portfolio-backtest-data",
       "--input",
       activeDatasetPath,
@@ -1098,7 +1101,15 @@ ipcMain.handle("portfolio-backtest:data", async (event, request) => {
       analysisCachePath(),
       "--border-space",
       String(request?.borderSpace ?? 7),
-    ],
+    ];
+  if (Number.isInteger(request?.targetGroupCount)) {
+    bridgeArguments.push(
+      "--target-group-count",
+      String(request.targetGroupCount),
+    );
+  }
+  return runBridge(
+    bridgeArguments,
     true,
     (progress) => {
       if (!event.sender.isDestroyed()) {

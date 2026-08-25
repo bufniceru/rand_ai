@@ -9,13 +9,19 @@ const props = defineProps<{
   lastSeenDrawCount: number;
   maxLastSeenDrawCount: number;
   borderSpace: number;
+  targetGroupCount: number | null;
   saving: boolean;
 }>();
 
 const emit = defineEmits<{
   cancel: [];
   appearance: [];
-  save: [strategyIds: StrategyId[], lastSeenDrawCount: number, borderSpace: number];
+  save: [
+    strategyIds: StrategyId[],
+    lastSeenDrawCount: number,
+    borderSpace: number,
+    targetGroupCount: number | null,
+  ];
 }>();
 
 const dialog = ref<HTMLElement | null>(null);
@@ -24,6 +30,8 @@ const selectedStrategyIds = ref<Set<StrategyId>>(
 );
 const selectedLastSeenDrawCount = ref(props.lastSeenDrawCount);
 const selectedBorderSpace = ref(props.borderSpace);
+const selectedTargetGroupCount = ref<number | null>(props.targetGroupCount);
+const groupCountChoices = [1, 2, 3, 4, 5, 6];
 
 const strategyDescriptions: Record<StrategyId, string> = {
   proximity: "Nearest-neighbor spacing profile.",
@@ -114,6 +122,24 @@ function normalizedBorderSpace(): number {
   );
 }
 
+function groupCountFeasible(groupCount: number): boolean {
+  return groupCount === 1 || groupCount * (normalizedBorderSpace() + 1) <= 43;
+}
+
+function normalizedTargetGroupCount(): number | null {
+  const value = selectedTargetGroupCount.value;
+  return value !== null && Number.isInteger(value) && groupCountFeasible(value)
+    ? value
+    : null;
+}
+
+function applyBorderSpace(): void {
+  selectedBorderSpace.value = normalizedBorderSpace();
+  if (normalizedTargetGroupCount() === null) {
+    selectedTargetGroupCount.value = null;
+  }
+}
+
 onMounted(() => dialog.value?.focus());
 </script>
 
@@ -170,17 +196,33 @@ onMounted(() => dialog.value?.focus());
             separate groups. This affects analysis, predictions, exports, and portfolios.
           </small>
         </div>
-        <label class="settings-number-field">
-          <span>Border space</span>
-          <input
-            v-model.number="selectedBorderSpace"
-            min="0"
-            max="43"
-            type="number"
-            :disabled="saving"
-            @change="selectedBorderSpace = normalizedBorderSpace()"
-          >
-        </label>
+        <div class="settings-border-fields">
+          <label class="settings-number-field">
+            <span>Border space</span>
+            <input
+              v-model.number="selectedBorderSpace"
+              min="0"
+              max="43"
+              type="number"
+              :disabled="saving"
+              @change="applyBorderSpace"
+            >
+          </label>
+          <label class="settings-number-field">
+            <span>Predicted groups</span>
+            <select v-model="selectedTargetGroupCount" :disabled="saving">
+              <option :value="null">Automatic</option>
+              <option
+                v-for="groupCount in groupCountChoices"
+                :key="groupCount"
+                :value="groupCount"
+                :disabled="!groupCountFeasible(groupCount)"
+              >
+                {{ groupCount }} {{ groupCount === 1 ? "group" : "groups" }}
+              </option>
+            </select>
+          </label>
+        </div>
       </section>
 
       <section class="settings-display-section settings-appearance-section">
@@ -279,6 +321,7 @@ onMounted(() => dialog.value?.focus());
             selectedIdsInPluginOrder,
             normalizedLastSeenDrawCount(),
             normalizedBorderSpace(),
+            normalizedTargetGroupCount(),
           )"
         >
           {{ saving ? "Saving…" : "Save settings" }}

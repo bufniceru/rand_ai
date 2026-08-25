@@ -34,7 +34,10 @@ const bestName = computed(() =>
       <article>
         <span>Border</span>
         <strong>{{ model.borderSpace }}</strong>
-        <small>Inclusive small-space limit</small>
+        <small>
+          Inclusive limit · Target:
+          {{ model.targetGroupCount === null ? "Automatic" : `${model.targetGroupCount} groups` }}
+        </small>
       </article>
       <article>
         <span>Recommended model</span>

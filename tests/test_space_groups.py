@@ -23,6 +23,7 @@ from rand_ai.space_groups import (
     spaces_for_numbers,
     transition_diagnostics,
     validate_border_space,
+    validate_target_group_count,
     walk_forward_models,
 )
 from rand_ai.statistics import DrawsStatistics
@@ -43,6 +44,8 @@ def profiles(count: int = 8) -> list[groups.SpaceGroupProfile]:
 def test_validates_border_and_six_number_spaces() -> None:
     assert validate_border_space(0) == 0
     assert validate_border_space(43) == 43
+    assert validate_target_group_count(None) is None
+    assert validate_target_group_count(3) == 3
     assert spaces_for_numbers({1, 2, 8, 17, 31, 49}) == (0, 0, 5, 8, 13, 17)
     assert profile_for_numbers({1, 2, 8, 17, 31, 49}, 7).spaces == (
         0,
@@ -55,6 +58,9 @@ def test_validates_border_and_six_number_spaces() -> None:
     for value in (-1, 44, True, 7.0):
         with pytest.raises(ValueError, match="border_space"):
             validate_border_space(cast(int, value))
+    for value in (0, 7, True, 3.0):
+        with pytest.raises(ValueError, match="target_group_count"):
+            validate_target_group_count(cast(int, value))
     for values in ({1, 2}, {0, 1, 2, 3, 4, 5}, {1, 2, 3, 4, 5, 50}):
         with pytest.raises(ValueError, match="six unique"):
             spaces_for_numbers(values)
@@ -192,6 +198,31 @@ def test_hybrid_uses_trailing_losses_and_number_fallback() -> None:
     assert weights["border_group_statistical"] > weights["border_group_ml"]
 
 
+def test_manual_target_conditions_every_forecast_and_rejects_impossible_count() -> None:
+    forecaster = SpaceGroupForecaster(5, target_group_count=3)
+    for profile in profiles(6):
+        forecaster.observe(profile_from_spaces(profile.spaces, 5))
+        forecasts = forecaster.forecast()
+    for probabilities in forecasts.values():
+        assert sum(probabilities) == pytest.approx(1)
+        assert all(
+            probability == 0 or len(signature) == 3
+            for signature, probability in zip(
+                SIGNATURES, probabilities, strict=True
+            )
+        )
+    conditioned = groups.condition_signature_probabilities((0.0,) * 11, 3)
+    assert sum(conditioned) == pytest.approx(1)
+    assert all(
+        probability == 0 or len(signature) == 3
+        for signature, probability in zip(SIGNATURES, conditioned, strict=True)
+    )
+    with pytest.raises(ValueError, match="impossible"):
+        SpaceGroupForecaster(7, target_group_count=6)
+    with pytest.raises(ValueError, match="all 11"):
+        groups.condition_signature_probabilities((1.0,), 3)
+
+
 def test_forecast_helpers_cover_sparse_and_trending_history() -> None:
     assert groups._normalize((0.0, 0.0)) == (0.5, 0.5)
     assert [groups._space_bucket(value) for value in (7, 11, 15, 16)] == [0, 1, 2, 3]
@@ -255,6 +286,7 @@ def test_short_walk_forward_is_provisional_and_statistics_exports_tables() -> No
     assert tables["space_group_history"].iloc[0]["date"] == "2026-01-01"
     assert len(tables["space_group_threshold_sensitivity"]) == 44
     assert payload["borderSpace"] == 7
+    assert payload["targetGroupCount"] is None
     assert payload["bestModelId"] is None
     assert payload["provisional"] is True
     forecasts = payload["forecasts"]

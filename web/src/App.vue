@@ -133,6 +133,7 @@ const appearanceError = ref("");
 const updatingStrategySelection = ref(false);
 const lastSeenDrawCountStorageKey = "rand-ai-last-seen-draw-count";
 const borderSpaceStorageKey = "rand-ai-border-space";
+const targetGroupCountStorageKey = "rand-ai-target-group-count";
 const storedLastSeenDrawCount = Number(
   window.localStorage.getItem(lastSeenDrawCountStorageKey) ?? "50",
 );
@@ -147,6 +148,16 @@ const storedBorderSpace = Number(
 const initialBorderSpace = Number.isFinite(storedBorderSpace)
   ? Math.min(Math.max(Math.trunc(storedBorderSpace), 0), 43)
   : 7;
+const storedTargetGroupCount = Number(
+  window.localStorage.getItem(targetGroupCountStorageKey),
+);
+const initialTargetGroupCount = (
+  Number.isInteger(storedTargetGroupCount) &&
+  storedTargetGroupCount >= 1 &&
+  storedTargetGroupCount <= 6 &&
+  (storedTargetGroupCount === 1 ||
+    storedTargetGroupCount * (initialBorderSpace + 1) <= 43)
+) ? storedTargetGroupCount : null;
 const lastSeenReferenceOffset = ref(0);
 const pendingDataset = ref<DatasetSelection | null>(null);
 const activeDataset = ref<DatasetSelection | null>(null);
@@ -165,6 +176,7 @@ const options = reactive<AnalysisOptions>({
   trendBins: 100,
   correlationMethod: "pearson",
   borderSpace: initialBorderSpace,
+  targetGroupCount: initialTargetGroupCount,
   enabledReports: [],
   enabledStrategies: [],
 });
@@ -373,6 +385,7 @@ async function saveSettings(
   strategyIds: StrategyId[],
   requestedLastSeenDrawCount: number,
   requestedBorderSpace: number,
+  requestedTargetGroupCount: number | null,
 ): Promise<void> {
   if (!window.randAiDesktop) return;
   savingSettings.value = true;
@@ -396,15 +409,30 @@ async function saveSettings(
       43,
     );
     const borderSpaceChanged = nextBorderSpace !== options.borderSpace;
+    const requestedTarget = Number(requestedTargetGroupCount);
+    const nextTargetGroupCount = (
+      requestedTargetGroupCount !== null &&
+      Number.isInteger(requestedTarget) &&
+      requestedTarget >= 1 &&
+      requestedTarget <= 6 &&
+      (requestedTarget === 1 || requestedTarget * (nextBorderSpace + 1) <= 43)
+    ) ? requestedTarget : null;
+    const targetGroupCountChanged =
+      nextTargetGroupCount !== options.targetGroupCount;
     options.borderSpace = nextBorderSpace;
+    options.targetGroupCount = nextTargetGroupCount;
     window.localStorage.setItem(borderSpaceStorageKey, String(nextBorderSpace));
+    window.localStorage.setItem(
+      targetGroupCountStorageKey,
+      nextTargetGroupCount === null ? "automatic" : String(nextTargetGroupCount),
+    );
     if (strategySelectionChanged(strategyIds)) {
       await updateStrategySelection(strategyIds, () => {
         settingsOpen.value = false;
       });
     } else {
       settingsOpen.value = false;
-      if (borderSpaceChanged && activeDataset.value) {
+      if ((borderSpaceChanged || targetGroupCountChanged) && activeDataset.value) {
         if (loading.value) reportRefreshPending = true;
         else await analyzeDataset(activeDataset.value, normalizeOptions());
       }
@@ -430,6 +458,7 @@ function normalizeOptions(): AnalysisOptions {
     trendBins: Math.min(Math.max(Math.trunc(options.trendBins), 1), maximumBins),
     correlationMethod: options.correlationMethod,
     borderSpace: Math.min(Math.max(Math.trunc(options.borderSpace), 0), 43),
+    targetGroupCount: options.targetGroupCount,
     enabledReports: [...enabledReportIds.value],
     enabledStrategies: [...enabledStrategyIds.value],
   };
@@ -530,6 +559,7 @@ async function analyzeDataset(
     options.trendBins = payload.options.trendBins;
     options.correlationMethod = payload.options.correlationMethod;
     options.borderSpace = payload.options.borderSpace;
+    options.targetGroupCount = payload.options.targetGroupCount;
     ensureActiveView();
     pendingDataset.value = null;
     loadingProgressTarget = 100;
@@ -972,6 +1002,7 @@ onBeforeUnmount(() => {
         :prediction-suites="analysis.predictionSuites"
         :relationship-edges="analysis.possibleDraw.relationshipEdges"
         :border-space="analysis.options.borderSpace"
+        :target-group-count="analysis.options.targetGroupCount"
         :space-group-analysis="analysis.spaceGroups"
       />
     </section>
@@ -1096,6 +1127,7 @@ onBeforeUnmount(() => {
       :last-seen-draw-count="lastSeenDrawCount"
       :max-last-seen-draw-count="maxLastSeenDrawCount"
       :border-space="options.borderSpace"
+      :target-group-count="options.targetGroupCount"
       :saving="savingSettings"
       @cancel="settingsOpen = false"
       @appearance="openAppearance"

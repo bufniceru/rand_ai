@@ -19,6 +19,8 @@ SPACE_TOTAL = NUMBER_COUNT - NUMBERS_PER_DRAW
 DEFAULT_BORDER_SPACE = 7
 MIN_BORDER_SPACE = 0
 MAX_BORDER_SPACE = SPACE_TOTAL
+MIN_TARGET_GROUP_COUNT = 1
+MAX_TARGET_GROUP_COUNT = NUMBERS_PER_DRAW
 MODEL_EVALUATION_WARMUP = 100
 ML_WARMUP = 50
 
@@ -61,6 +63,20 @@ def validate_border_space(value: int) -> int:
     if type(value) is not int or not MIN_BORDER_SPACE <= value <= MAX_BORDER_SPACE:
         raise ValueError(
             f"border_space must be between {MIN_BORDER_SPACE} and {MAX_BORDER_SPACE}"
+        )
+    return value
+
+
+def validate_target_group_count(value: int | None) -> int | None:
+    """Return a valid optional manual next-draw group-count constraint."""
+    if value is None:
+        return None
+    if (
+        type(value) is not int
+        or not MIN_TARGET_GROUP_COUNT <= value <= MAX_TARGET_GROUP_COUNT
+    ):
+        raise ValueError(
+            "target_group_count must be None or an integer between 1 and 6"
         )
     return value
 
@@ -269,6 +285,29 @@ def _normalize(values: Sequence[float]) -> tuple[float, ...]:
     return tuple(value / total for value in values)
 
 
+def condition_signature_probabilities(
+    probabilities: Sequence[float], target_group_count: int | None
+) -> tuple[float, ...]:
+    """Condition a signature forecast on an optional exact group count."""
+    target = validate_target_group_count(target_group_count)
+    if len(probabilities) != len(SIGNATURES):
+        raise ValueError("probabilities must contain all 11 signatures")
+    values = tuple(float(value) for value in probabilities)
+    if target is None:
+        return _normalize(values)
+    masked = tuple(
+        value if len(signature) == target else 0.0
+        for signature, value in zip(SIGNATURES, values, strict=True)
+    )
+    if sum(masked) > 0:
+        return _normalize(masked)
+    matching = sum(len(signature) == target for signature in SIGNATURES)
+    return tuple(
+        1 / matching if len(signature) == target else 0.0
+        for signature in SIGNATURES
+    )
+
+
 @lru_cache(maxsize=(MAX_BORDER_SPACE + 1) * len(SIGNATURES))
 def _fallback_shapes(
     signature_index: int, border_space: int
@@ -330,11 +369,26 @@ def _trend_category(profiles: Sequence[SpaceGroupProfile]) -> int:
 class SpaceGroupForecaster:
     """Maintain five online, next-signature probability forecasts."""
 
-    def __init__(self, border_space: int = DEFAULT_BORDER_SPACE) -> None:
+    def __init__(
+        self,
+        border_space: int = DEFAULT_BORDER_SPACE,
+        target_group_count: int | None = None,
+    ) -> None:
         self.border_space = validate_border_space(border_space)
+        self.target_group_count = validate_target_group_count(target_group_count)
         self.feasible_signatures = tuple(
             count > 0 for count in exact_null_signature_counts(self.border_space)
         )
+        if self.target_group_count is not None and not any(
+            feasible and len(signature) == self.target_group_count
+            for signature, feasible in zip(
+                SIGNATURES, self.feasible_signatures, strict=True
+            )
+        ):
+            raise ValueError(
+                f"{self.target_group_count} groups are impossible with border space "
+                f"{self.border_space}"
+            )
         self.profiles: list[SpaceGroupProfile] = []
         self.signature_counts = [0] * len(SIGNATURES)
         self.transition_counts = [
@@ -514,7 +568,10 @@ class SpaceGroupForecaster:
         """Build and retain all next-draw forecasts from current state only."""
         baseline = self._statistical()
         if not self.profiles:
-            forecasts = {model_id: baseline for model_id in MODEL_IDS}
+            conditioned = condition_signature_probabilities(
+                baseline, self.target_group_count
+            )
+            forecasts = {model_id: conditioned for model_id in MODEL_IDS}
             return forecasts
         bayes_features = self._bayes_features()
         ml_features = self._ml_features()
@@ -535,6 +592,12 @@ class SpaceGroupForecaster:
             )
         else:
             forecasts["border_group_ml"] = baseline
+        forecasts = {
+            model_id: condition_signature_probabilities(
+                probabilities, self.target_group_count
+            )
+            for model_id, probabilities in forecasts.items()
+        }
         weights = self._hybrid_weights()
         forecasts["border_group_hybrid"] = tuple(
             sum(weights[model_id] * forecasts[model_id][index] for model_id in COMPONENT_MODEL_IDS)
@@ -575,6 +638,11 @@ class SpaceGroupForecaster:
         details: dict[int, tuple[str, ...]] = {
             number: (
                 f"Border space {self.border_space}",
+                (
+                    "Model-selected group count"
+                    if self.target_group_count is None
+                    else f"Manual target {self.target_group_count} groups"
+                ),
                 f"Decoded marginal {marginals[number]:.2%}",
                 "Leading signatures "
                 + ", ".join(
@@ -718,14 +786,18 @@ def _metrics(
 
 
 def walk_forward_models(
-    profiles: Sequence[SpaceGroupProfile], border_space: int
+    profiles: Sequence[SpaceGroupProfile],
+    border_space: int,
+    target_group_count: int | None = None,
 ) -> WalkForwardResult:
     """Evaluate all approaches chronologically and forecast the next signature."""
-    forecaster = SpaceGroupForecaster(border_space)
+    forecaster = SpaceGroupForecaster(border_space, target_group_count)
     evaluations: dict[str, list[tuple[Sequence[float], int]]] = {
         model_id: [] for model_id in (*MODEL_IDS, "random_null")
     }
-    null = exact_null_probabilities(border_space)
+    null = condition_signature_probabilities(
+        exact_null_probabilities(border_space), target_group_count
+    )
     for profile in profiles:
         result = forecaster.observe(profile)
         if result is not None:
@@ -735,9 +807,7 @@ def walk_forward_models(
                     evaluations[model_id].append((forecasts[model_id], actual))
                 evaluations["random_null"].append((null, actual))
         forecaster.forecast()
-    latest = forecaster.forecast() if profiles else {
-        model_id: exact_null_probabilities(border_space) for model_id in MODEL_IDS
-    }
+    latest = forecaster.forecast()
     metrics = [_metrics(model_id, evaluations[model_id]) for model_id in (*MODEL_IDS, "random_null")]
     candidates = [metric for metric in metrics if metric.model_id in MODEL_IDS and metric.log_loss is not None]
     best = min(candidates, key=lambda metric: (metric.log_loss, metric.brier_score)) if candidates else None

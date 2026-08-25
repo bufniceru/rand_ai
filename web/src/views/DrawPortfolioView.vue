@@ -36,6 +36,7 @@ const props = defineProps<{
   predictionSuites: PredictionSuite[];
   relationshipEdges: RelationshipEdge[];
   borderSpace: number;
+  targetGroupCount: number | null;
   spaceGroupAnalysis: SpaceGroupAnalysis | null;
 }>();
 
@@ -262,6 +263,7 @@ async function runHistoricalSimulation(): Promise<void> {
     const data = await api.getPortfolioBacktestData({
       strategyIds: suite.strategies.map((strategy) => strategy.id),
       borderSpace: props.borderSpace,
+      targetGroupCount: props.targetGroupCount,
     });
     if (token !== simulationToken || !simulationRunning.value) return;
     const cacheKey = portfolioBacktestCacheKey(data.cacheKey, portfolioSize);

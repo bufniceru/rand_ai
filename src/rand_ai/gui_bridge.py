@@ -24,7 +24,11 @@ from rand_ai.lotto_results import (
     upsert_lotto_result,
 )
 from rand_ai.statistics import CorrelationMethod, DrawsStatistics
-from rand_ai.space_groups import DEFAULT_BORDER_SPACE, validate_border_space
+from rand_ai.space_groups import (
+    DEFAULT_BORDER_SPACE,
+    validate_border_space,
+    validate_target_group_count,
+)
 from rand_ai.strategy_prediction import (
     PredictionSuite,
     STRATEGY_IDS,
@@ -69,7 +73,7 @@ DEFAULT_STRATEGY_IDS = tuple(
     }
 )
 MAX_HISTORY_WINDOW = 250
-STRATEGY_CACHE_SCHEMA_VERSION = 13
+STRATEGY_CACHE_SCHEMA_VERSION = 14
 STRATEGY_CACHE_MAX_ENTRIES = 20
 STRATEGY_CACHE_MAX_BYTES = 1024 * 1024 * 1024
 PROGRESS_PREFIX = "RAND_AI_PROGRESS "
@@ -91,6 +95,7 @@ def _strategy_cache_identity(
     draws: Draws,
     strategy_ids: Sequence[str],
     border_space: int = DEFAULT_BORDER_SPACE,
+    target_group_count: int | None = None,
 ) -> dict[str, Any]:
     """Describe every input that changes cached walk-forward results."""
     return {
@@ -98,6 +103,7 @@ def _strategy_cache_identity(
         "datasetFingerprint": _dataset_fingerprint(draws),
         "strategyIds": list(strategy_ids),
         "borderSpace": validate_border_space(border_space),
+        "targetGroupCount": validate_target_group_count(target_group_count),
         "historyLimit": MAX_HISTORY_WINDOW,
     }
 
@@ -506,6 +512,7 @@ def _build_strategy_analysis(
     history_start: int,
     progress: ProgressCallback | None,
     border_space: int = DEFAULT_BORDER_SPACE,
+    target_group_count: int | None = None,
 ) -> StrategyAnalysisArtifacts:
     """Calculate the report-independent walk-forward strategy artifacts."""
     efficacy_records: list[StrategyEfficacyRecord] = []
@@ -547,6 +554,7 @@ def _build_strategy_analysis(
         history_start=history_start,
         enabled_strategy_ids=strategy_ids,
         border_space=border_space,
+        target_group_count=target_group_count,
         progress=_prediction_progress(
             progress,
             31,
@@ -577,9 +585,12 @@ def _strategy_analysis(
     cache_dir: Path | None,
     refresh_cache: bool,
     border_space: int = DEFAULT_BORDER_SPACE,
+    target_group_count: int | None = None,
 ) -> StrategyAnalysisArtifacts:
     """Load cached strategy artifacts or calculate and persist them."""
-    identity = _strategy_cache_identity(draws, strategy_ids, border_space)
+    identity = _strategy_cache_identity(
+        draws, strategy_ids, border_space, target_group_count
+    )
     cached = (
         None
         if cache_dir is None or refresh_cache or not strategy_ids
@@ -601,6 +612,7 @@ def _strategy_analysis(
         history_start,
         progress,
         border_space,
+        target_group_count,
     )
     if cache_dir is not None and strategy_ids:
         _write_strategy_cache(cache_dir, identity, analysis)
@@ -676,6 +688,7 @@ def build_analysis_payload(
     trend_bins: int = 100,
     correlation_method: CorrelationMethod = "pearson",
     border_space: int = DEFAULT_BORDER_SPACE,
+    target_group_count: int | None = None,
     enabled_reports: Collection[str] = DEFAULT_REPORT_IDS,
     enabled_strategies: Collection[str] = DEFAULT_STRATEGY_IDS,
     progress: ProgressCallback | None = None,
@@ -684,6 +697,7 @@ def build_analysis_payload(
 ) -> dict[str, Any]:
     """Build the complete serializable payload consumed by the Vue dashboard."""
     border_space = validate_border_space(border_space)
+    target_group_count = validate_target_group_count(target_group_count)
     report_ids = tuple(
         report_id for report_id in REPORT_IDS if report_id in enabled_reports
     )
@@ -740,6 +754,7 @@ def build_analysis_payload(
             strategy_cache_dir,
             refresh_strategy_cache,
             border_space,
+            target_group_count,
         )
     _report_progress(progress, 61, "Validating draw history and analysis options")
     statistics = DrawsStatistics(draws, trend_bins=trend_bins)
@@ -755,7 +770,7 @@ def build_analysis_payload(
     if "space-groups" in report_set:
         _report_progress(progress, 83, "Analyzing border-space groups")
         group_tables, space_group_payload = statistics.space_group_analysis(
-            border_space
+            border_space, target_group_count
         )
         tables.update(group_tables)
     _report_progress(progress, 85, "Preparing recent history for highlight views")
@@ -826,6 +841,7 @@ def build_analysis_payload(
             "trendBins": min(trend_bins, statistics.draw_count),
             "correlationMethod": correlation_method,
             "borderSpace": border_space,
+            "targetGroupCount": target_group_count,
             "enabledReports": list(report_ids),
             "enabledStrategies": list(strategy_ids),
         },
@@ -902,6 +918,7 @@ def analyze_file(
     trend_bins: int = 100,
     correlation_method: CorrelationMethod = "pearson",
     border_space: int = DEFAULT_BORDER_SPACE,
+    target_group_count: int | None = None,
     enabled_reports: Collection[str] = DEFAULT_REPORT_IDS,
     enabled_strategies: Collection[str] = DEFAULT_STRATEGY_IDS,
     progress: ProgressCallback | None = None,
@@ -919,6 +936,7 @@ def analyze_file(
         trend_bins=trend_bins,
         correlation_method=correlation_method,
         border_space=border_space,
+        target_group_count=target_group_count,
         enabled_reports=enabled_reports,
         enabled_strategies=enabled_strategies,
         progress=progress,
@@ -932,6 +950,7 @@ def portfolio_backtest_data(
     *,
     enabled_strategies: Collection[str] = DEFAULT_STRATEGY_IDS,
     border_space: int = DEFAULT_BORDER_SPACE,
+    target_group_count: int | None = None,
     progress: ProgressCallback | None = None,
     strategy_cache_dir: Path | None = None,
 ) -> dict[str, Any]:
@@ -944,7 +963,10 @@ def portfolio_backtest_data(
         if strategy_id in enabled_strategies
     )
     border_space = validate_border_space(border_space)
-    identity = _strategy_cache_identity(draws, strategy_ids, border_space)
+    target_group_count = validate_target_group_count(target_group_count)
+    identity = _strategy_cache_identity(
+        draws, strategy_ids, border_space, target_group_count
+    )
     cached = (
         _read_strategy_cache(strategy_cache_dir, identity)
         if strategy_cache_dir is not None and strategy_ids
@@ -969,6 +991,7 @@ def portfolio_backtest_data(
             strategy_cache_dir,
             False,
             border_space,
+            target_group_count,
         )
     else:
         _report_progress(progress, 60, "Loaded compact full-history strategy rankings")
@@ -996,6 +1019,7 @@ def write_export_archive(
     trend_bins: int = 100,
     correlation_method: CorrelationMethod = "pearson",
     border_space: int = DEFAULT_BORDER_SPACE,
+    target_group_count: int | None = None,
     enabled_reports: Collection[str] = DEFAULT_REPORT_IDS,
     enabled_strategies: Collection[str] = DEFAULT_STRATEGY_IDS,
 ) -> None:
@@ -1013,8 +1037,11 @@ def write_export_archive(
         report_ids,
     )
     border_space = validate_border_space(border_space)
+    target_group_count = validate_target_group_count(target_group_count)
     if "space-groups" in report_ids:
-        group_tables, _payload = statistics.space_group_analysis(border_space)
+        group_tables, _payload = statistics.space_group_analysis(
+            border_space, target_group_count
+        )
         tables.update(group_tables)
     metadata = {
         "source": str(source_path.resolve()),
@@ -1023,6 +1050,7 @@ def write_export_archive(
         "trendBins": min(trend_bins, statistics.draw_count),
         "correlationMethod": correlation_method,
         "borderSpace": border_space,
+        "targetGroupCount": target_group_count,
         "enabledReports": list(report_ids),
         "enabledStrategies": [
             strategy_id
@@ -1066,6 +1094,11 @@ def _argument_parser() -> argparse.ArgumentParser:
             choices=range(44),
         )
         command_parser.add_argument(
+            "--target-group-count",
+            type=int,
+            choices=range(1, 7),
+        )
+        command_parser.add_argument(
             "--reports",
             default=",".join(DEFAULT_REPORT_IDS),
             type=parse_report_ids,
@@ -1106,6 +1139,11 @@ def _argument_parser() -> argparse.ArgumentParser:
         default=DEFAULT_BORDER_SPACE,
         type=int,
         choices=range(44),
+    )
+    portfolio_parser.add_argument(
+        "--target-group-count",
+        type=int,
+        choices=range(1, 7),
     )
     return parser
 
@@ -1158,6 +1196,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
             progress=_write_progress,
             strategy_cache_dir=options.cache_dir,
             border_space=options.border_space,
+            target_group_count=options.target_group_count,
         )
         _write_progress(97, "Transferring full-history portfolio inputs")
         json.dump(payload, sys.stdout, separators=(",", ":"))
@@ -1173,6 +1212,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
             trend_bins=options.trend_bins,
             correlation_method=correlation_method,
             border_space=options.border_space,
+            target_group_count=options.target_group_count,
             enabled_reports=enabled_reports,
             enabled_strategies=enabled_strategies,
             progress=_write_progress,
@@ -1189,6 +1229,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
         trend_bins=options.trend_bins,
         correlation_method=correlation_method,
         border_space=options.border_space,
+        target_group_count=options.target_group_count,
         enabled_reports=enabled_reports,
         enabled_strategies=enabled_strategies,
     )

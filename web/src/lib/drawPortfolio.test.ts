@@ -299,6 +299,7 @@ describe("draw portfolio generation", () => {
   it("applies the selected border-group forecast as portfolio guidance", () => {
     const analysis: SpaceGroupAnalysis = {
       borderSpace: 7,
+      targetGroupCount: null,
       smallSpaceDefinition: "space <= 7",
       largeSpaceDefinition: "space > 7",
       bestModelId: "border_group_statistical",

@@ -690,6 +690,7 @@ class _StrategyState:
         enabled_strategy_ids: Collection[str] = STRATEGY_IDS,
         total_draw_count: int = 1,
         border_space: int = DEFAULT_BORDER_SPACE,
+        target_group_count: int | None = None,
     ) -> None:
         self.requested_strategy_ids = frozenset(enabled_strategy_ids)
         active_strategy_ids = set(self.requested_strategy_ids)
@@ -707,7 +708,7 @@ class _StrategyState:
         self.appearances = [0] * (_NUMBER_COUNT + 1)
         self.last_seen: list[int | None] = [None] * (_NUMBER_COUNT + 1)
         self.border_groups = (
-            SpaceGroupForecaster(self.border_space)
+            SpaceGroupForecaster(self.border_space, target_group_count)
             if self.enabled_strategy_ids.intersection(BORDER_GROUP_MODEL_IDS)
             else None
         )
@@ -5109,6 +5110,7 @@ def build_prediction_suites(
     history_start: int = 0,
     enabled_strategy_ids: Collection[str] = STRATEGY_IDS,
     border_space: int = DEFAULT_BORDER_SPACE,
+    target_group_count: int | None = None,
     progress: PredictionProgress | None = None,
     efficacy_record: EfficacyRecordCallback | None = None,
     evaluated_suite: PredictionSuiteCallback | None = None,
@@ -5127,6 +5129,7 @@ def build_prediction_suites(
         selected,
         total_draw_count=len(draws),
         border_space=border_space,
+        target_group_count=target_group_count,
     )
     efficacy = _EfficacyTracker()
     suites: list[PredictionSuite] = []

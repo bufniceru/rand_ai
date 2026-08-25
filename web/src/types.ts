@@ -81,6 +81,7 @@ export interface AnalysisOptions {
   trendBins: number;
   correlationMethod: CorrelationMethod;
   borderSpace: number;
+  targetGroupCount: number | null;
   enabledReports: ReportId[];
   enabledStrategies: StrategyId[];
 }
@@ -184,6 +185,7 @@ export interface SpaceGroupForecast {
 
 export interface SpaceGroupAnalysis {
   borderSpace: number;
+  targetGroupCount: number | null;
   smallSpaceDefinition: string;
   largeSpaceDefinition: string;
   bestModelId: StrategyId | null;
@@ -645,6 +647,7 @@ export interface DesktopApi {
   getPortfolioBacktestData(request: {
     strategyIds: StrategyId[];
     borderSpace: number;
+    targetGroupCount: number | null;
   }): Promise<PortfolioBacktestData>;
   loadPortfolioBacktest(key: string): Promise<PortfolioBacktestResult | null>;
   savePortfolioBacktest(request: {

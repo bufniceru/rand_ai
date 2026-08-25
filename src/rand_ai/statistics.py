@@ -411,7 +411,9 @@ class DrawsStatistics:
         )
 
     def space_group_analysis(
-        self, border_space: int
+        self,
+        border_space: int,
+        target_group_count: int | None = None,
     ) -> tuple[dict[str, pd.DataFrame], dict[str, object]]:
         """Return historical, null, transition, and forecast group analysis."""
         border = validate_border_space(border_space)
@@ -536,7 +538,9 @@ class DrawsStatistics:
                 }
             )
 
-        model_analysis = walk_forward_models(profiles, border)
+        model_analysis = walk_forward_models(
+            profiles, border, target_group_count
+        )
         metrics = model_analysis["metrics"]
         latest = model_analysis["latest"]
         forecasts = []
@@ -598,6 +602,7 @@ class DrawsStatistics:
         }
         payload: dict[str, object] = {
             "borderSpace": border,
+            "targetGroupCount": target_group_count,
             "smallSpaceDefinition": f"0–{border}",
             "largeSpaceDefinition": f">{border}",
             "bestModelId": model_analysis["best_model_id"],

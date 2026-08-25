@@ -298,6 +298,17 @@ def test_builds_only_one_selected_border_group_strategy() -> None:
         "border_group_statistical"
     ]
 
+    targeted = build_prediction_suites(
+        draws.draws,
+        enabled_strategy_ids=("border_group_statistical",),
+        border_space=5,
+        target_group_count=3,
+    )
+    assert any(
+        detail == "Manual target 3 groups"
+        for detail in targeted[-1].strategies[0].numbers[0].details
+    )
+
 
 def test_sklearn_svm_builds_bounded_features_and_hidden_dependencies() -> None:
     draws = Draws()
