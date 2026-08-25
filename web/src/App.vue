@@ -122,13 +122,6 @@ const activeWorkspaceTab = ref<WorkspaceTabId>("statistics");
 const visitedWorkspaceTabs = ref<Set<WorkspaceTabId>>(new Set(["statistics"]));
 const enabledReportIds = ref<ReportId[]>([]);
 const enabledStrategyIds = ref<StrategyId[]>([]);
-const borderGroupStrategyIds = new Set<StrategyId>([
-  "border_group_statistical",
-  "border_group_markov",
-  "border_group_bayesian",
-  "border_group_ml",
-  "border_group_hybrid",
-]);
 const strategyPlugins = ref<StrategyPlugin[]>([]);
 const recentDatasets = ref<RecentDataset[]>([]);
 const settingsOpen = ref(false);
@@ -139,6 +132,7 @@ const appearanceStartingTemplate = ref<ColorTemplate | null>(null);
 const appearanceError = ref("");
 const updatingStrategySelection = ref(false);
 const lastSeenDrawCountStorageKey = "rand-ai-last-seen-draw-count";
+const borderSpaceStorageKey = "rand-ai-border-space";
 const storedLastSeenDrawCount = Number(
   window.localStorage.getItem(lastSeenDrawCountStorageKey) ?? "50",
 );
@@ -147,6 +141,12 @@ const lastSeenDrawCount = ref(
     ? Math.max(1, Math.trunc(storedLastSeenDrawCount))
     : 50,
 );
+const storedBorderSpace = Number(
+  window.localStorage.getItem(borderSpaceStorageKey) ?? "7",
+);
+const initialBorderSpace = Number.isFinite(storedBorderSpace)
+  ? Math.min(Math.max(Math.trunc(storedBorderSpace), 0), 43)
+  : 7;
 const lastSeenReferenceOffset = ref(0);
 const pendingDataset = ref<DatasetSelection | null>(null);
 const activeDataset = ref<DatasetSelection | null>(null);
@@ -164,7 +164,7 @@ const options = reactive<AnalysisOptions>({
   selectedNumbers: [1, 2, 3, 4, 5, 6],
   trendBins: 100,
   correlationMethod: "pearson",
-  borderSpace: 7,
+  borderSpace: initialBorderSpace,
   enabledReports: [],
   enabledStrategies: [],
 });
@@ -179,11 +179,6 @@ const figures = computed(() => {
   themeRevision.value;
   return analysis.value ? buildFigures(analysis.value) : {};
 });
-const borderGroupsActive = computed(
-  () =>
-    enabledReportIds.value.includes("space-groups") ||
-    enabledStrategyIds.value.some((strategyId) => borderGroupStrategyIds.has(strategyId)),
-);
 const enabledViews = computed(() =>
   views.filter(
     (view) =>
@@ -377,6 +372,7 @@ async function applyAppearance(template: ColorTemplate): Promise<void> {
 async function saveSettings(
   strategyIds: StrategyId[],
   requestedLastSeenDrawCount: number,
+  requestedBorderSpace: number,
 ): Promise<void> {
   if (!window.randAiDesktop) return;
   savingSettings.value = true;
@@ -395,12 +391,23 @@ async function saveSettings(
       lastSeenDrawCountStorageKey,
       String(nextLastSeenDrawCount),
     );
+    const nextBorderSpace = Math.min(
+      Math.max(Math.trunc(requestedBorderSpace || 0), 0),
+      43,
+    );
+    const borderSpaceChanged = nextBorderSpace !== options.borderSpace;
+    options.borderSpace = nextBorderSpace;
+    window.localStorage.setItem(borderSpaceStorageKey, String(nextBorderSpace));
     if (strategySelectionChanged(strategyIds)) {
       await updateStrategySelection(strategyIds, () => {
         settingsOpen.value = false;
       });
     } else {
       settingsOpen.value = false;
+      if (borderSpaceChanged && activeDataset.value) {
+        if (loading.value) reportRefreshPending = true;
+        else await analyzeDataset(activeDataset.value, normalizeOptions());
+      }
     }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
@@ -807,11 +814,6 @@ onBeforeUnmount(() => {
             <option value="spearman">Spearman</option>
           </select>
         </label>
-        <label v-if="borderGroupsActive" class="field-group">
-          <span>Border space</span>
-          <input v-model.number="options.borderSpace" min="0" max="43" type="number">
-          <small>Spaces up to this value stay inside a group.</small>
-        </label>
         <fieldset v-if="isReportEnabled('numbers')" class="number-filter">
           <legend>Trend numbers</legend>
           <div>
@@ -1093,6 +1095,7 @@ onBeforeUnmount(() => {
       :enabled-strategy-ids="enabledStrategyIds"
       :last-seen-draw-count="lastSeenDrawCount"
       :max-last-seen-draw-count="maxLastSeenDrawCount"
+      :border-space="options.borderSpace"
       :saving="savingSettings"
       @cancel="settingsOpen = false"
       @appearance="openAppearance"

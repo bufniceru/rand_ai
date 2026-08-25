@@ -8,13 +8,14 @@ const props = defineProps<{
   enabledStrategyIds: StrategyId[];
   lastSeenDrawCount: number;
   maxLastSeenDrawCount: number;
+  borderSpace: number;
   saving: boolean;
 }>();
 
 const emit = defineEmits<{
   cancel: [];
   appearance: [];
-  save: [strategyIds: StrategyId[], lastSeenDrawCount: number];
+  save: [strategyIds: StrategyId[], lastSeenDrawCount: number, borderSpace: number];
 }>();
 
 const dialog = ref<HTMLElement | null>(null);
@@ -22,6 +23,7 @@ const selectedStrategyIds = ref<Set<StrategyId>>(
   new Set(props.enabledStrategyIds),
 );
 const selectedLastSeenDrawCount = ref(props.lastSeenDrawCount);
+const selectedBorderSpace = ref(props.borderSpace);
 
 const strategyDescriptions: Record<StrategyId, string> = {
   proximity: "Nearest-neighbor spacing profile.",
@@ -105,6 +107,13 @@ function normalizedLastSeenDrawCount(): number {
   );
 }
 
+function normalizedBorderSpace(): number {
+  return Math.min(
+    Math.max(Math.trunc(selectedBorderSpace.value || 0), 0),
+    43,
+  );
+}
+
 onMounted(() => dialog.value?.focus());
 </script>
 
@@ -128,8 +137,8 @@ onMounted(() => dialog.value?.focus());
           <p class="eyebrow">Application settings</p>
           <h2 id="settings-title">Settings</h2>
           <p>
-            Configure the Last Seen displays and choose which prediction
-            strategies are calculated.
+            Configure shared analysis behavior, Last Seen displays, and the
+            prediction strategies that are calculated.
           </p>
         </div>
         <strong>{{ selectedCount }} of {{ plugins.length }} enabled</strong>
@@ -149,6 +158,27 @@ onMounted(() => dialog.value?.focus());
             type="number"
             :disabled="saving"
             @change="selectedLastSeenDrawCount = normalizedLastSeenDrawCount()"
+          >
+        </label>
+      </section>
+
+      <section class="settings-display-section">
+        <div>
+          <strong>Border groups</strong>
+          <small>
+            Spaces up to this inclusive value connect numbers; larger spaces
+            separate groups. This affects analysis, predictions, exports, and portfolios.
+          </small>
+        </div>
+        <label class="settings-number-field">
+          <span>Border space</span>
+          <input
+            v-model.number="selectedBorderSpace"
+            min="0"
+            max="43"
+            type="number"
+            :disabled="saving"
+            @change="selectedBorderSpace = normalizedBorderSpace()"
           >
         </label>
       </section>
@@ -227,8 +257,8 @@ onMounted(() => dialog.value?.focus());
       </div>
 
       <p class="settings-dialog-note">
-        Draw-count changes apply immediately. Strategy changes reanalyze the
-        active dataset so prediction windows use the new selection.
+        Draw-count changes apply immediately. Border-space and strategy changes
+        reanalyze the active dataset using the new settings.
       </p>
 
       <footer class="dialog-actions">
@@ -244,7 +274,12 @@ onMounted(() => dialog.value?.focus());
           class="button primary"
           type="button"
           :disabled="saving"
-          @click="emit('save', selectedIdsInPluginOrder, normalizedLastSeenDrawCount())"
+          @click="emit(
+            'save',
+            selectedIdsInPluginOrder,
+            normalizedLastSeenDrawCount(),
+            normalizedBorderSpace(),
+          )"
         >
           {{ saving ? "Saving…" : "Save settings" }}
         </button>
