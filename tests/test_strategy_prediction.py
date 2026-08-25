@@ -49,7 +49,7 @@ from rand_ai.strategy_prediction import (
 )
 
 
-def test_builds_twenty_seven_named_rankings_and_reports_progress() -> None:
+def test_builds_thirty_two_named_rankings_and_reports_progress() -> None:
     draws = Draws()
     draws.add(Draw(1, 2, 8, 17, 31, 49))
     draws.add(Draw(3, 6, 12, 22, 36, 47))
@@ -92,6 +92,11 @@ def test_builds_twenty_seven_named_rankings_and_reports_progress() -> None:
         "Lagged Logistic",
         "CIS",
         "Decision Tree Selector",
+        "Border Group Statistical",
+        "Border Group Markov",
+        "Border Group Bayesian",
+        "Border Group ML",
+        "Border Group Hybrid",
         "RCOV",
         "Chained Strategy",
     ]
@@ -275,6 +280,22 @@ def test_builds_only_selected_strategy_plugins(
     assert [strategy.strategy_id for strategy in suites[-1].strategies] == [
         "freshness",
         "entropy",
+    ]
+
+
+def test_builds_only_one_selected_border_group_strategy() -> None:
+    draws = Draws()
+    draws.add(Draw(1, 2, 8, 17, 31, 49))
+    draws.add(Draw(3, 6, 12, 22, 36, 47))
+    draws.prepare_predictions()
+
+    suites = build_prediction_suites(
+        draws.draws,
+        enabled_strategy_ids=("border_group_statistical",),
+    )
+
+    assert [strategy.strategy_id for strategy in suites[-1].strategies] == [
+        "border_group_statistical"
     ]
 
 

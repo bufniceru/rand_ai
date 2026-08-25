@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from docx import Document
-from docx.enum.section import WD_SECTION
+from docx import Document as create_document
+from docx.document import Document
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_LINE_SPACING
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
@@ -426,7 +426,7 @@ def add_cover(document: Document) -> None:
 
 
 def build_document() -> Document:
-    document = Document()
+    document = create_document()
     configure_styles(document)
     configure_page(document)
     bullet_id, decimal_id, decimal_restart_id = add_numbering(document)
@@ -731,7 +731,7 @@ def main() -> None:
     document.core_properties.subject = "Exact freshness and proximity prediction calculations"
     document.core_properties.author = "Rand AI"
     document.core_properties.keywords = "Rand AI, prediction, freshness, proximity, gap, lottery"
-    document.save(OUTPUT)
+    document.save(str(OUTPUT))
     print(OUTPUT)
 
 

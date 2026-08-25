@@ -449,6 +449,11 @@ function strategyFullName(strategy: StrategyPrediction): string {
     randomness: "Randomness Ensemble",
     residual_coverage: "Residual Coverage",
     chained: "Chained Strategy",
+    border_group_statistical: "Border Group Statistical",
+    border_group_markov: "Border Group Markov",
+    border_group_bayesian: "Border Group Bayesian",
+    border_group_ml: "Border Group ML",
+    border_group_hybrid: "Border Group Hybrid",
   }[strategy.id] ?? strategy.name;
 }
 

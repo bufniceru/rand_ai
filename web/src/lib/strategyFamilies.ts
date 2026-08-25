@@ -28,6 +28,11 @@ export const STRATEGY_FAMILIES = [
     color: "#FF6188",
   },
   {
+    id: "border-space-groups",
+    label: "Border Space Groups",
+    color: "#C792EA",
+  },
+  {
     id: "random-baselines",
     label: "Random Baselines",
     color: "#FFD866",
@@ -83,6 +88,11 @@ export const STRATEGY_FAMILY_BY_ID = {
   sparse_neural_ticket: "relationships-machine-learning",
   cis: "ensembles-coverage",
   decision_tree_selector: "ensembles-coverage",
+  border_group_statistical: "border-space-groups",
+  border_group_markov: "border-space-groups",
+  border_group_bayesian: "border-space-groups",
+  border_group_ml: "border-space-groups",
+  border_group_hybrid: "border-space-groups",
   residual_coverage: "ensembles-coverage",
   chained: "ensembles-coverage",
 } as const satisfies Record<StrategyId, StrategyFamilyId>;

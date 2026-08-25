@@ -137,7 +137,7 @@ class TestDrawProperties:
 
         assert legacy_draw.date is None
         with pytest.raises(AttributeError):
-            draw.date = "2026-07-24"
+            setattr(draw, "date", "2026-07-24")
 
     def test_prediction_starts_empty_and_is_read_only(self) -> None:
         """Prediction data is attached only by the trusted import calculation."""
@@ -145,7 +145,7 @@ class TestDrawProperties:
 
         assert draw.prediction is None
         with pytest.raises(AttributeError):
-            draw.prediction = None
+            setattr(draw, "prediction", None)
 
     def test_rejects_wrong_number_of_internal_gaps(self) -> None:
         """Verify gap population requires one gap for every Ball."""

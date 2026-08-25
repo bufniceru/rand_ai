@@ -30,6 +30,7 @@ import PredictionAuditView from "./views/PredictionAuditView.vue";
 import RandomnessView from "./views/RandomnessView.vue";
 import RelationshipsView from "./views/RelationshipsView.vue";
 import SpacesView from "./views/SpacesView.vue";
+import SpaceGroupsView from "./views/SpaceGroupsView.vue";
 import StrategyEffectivenessView from "./views/StrategyEffectivenessView.vue";
 import type {
   AnalysisOptions,
@@ -53,6 +54,7 @@ const views: { id: ViewId; label: string; shortLabel: string }[] = [
   { id: "overview", label: "Overview", shortLabel: "Overview" },
   { id: "numbers", label: "Numbers", shortLabel: "Numbers" },
   { id: "spaces", label: "Spaces", shortLabel: "Spaces" },
+  { id: "space-groups", label: "Border Groups", shortLabel: "Border Groups" },
   { id: "relationships", label: "Relationships", shortLabel: "Relationships" },
   { id: "randomness", label: "Randomness", shortLabel: "Randomness" },
   {
@@ -120,6 +122,13 @@ const activeWorkspaceTab = ref<WorkspaceTabId>("statistics");
 const visitedWorkspaceTabs = ref<Set<WorkspaceTabId>>(new Set(["statistics"]));
 const enabledReportIds = ref<ReportId[]>([]);
 const enabledStrategyIds = ref<StrategyId[]>([]);
+const borderGroupStrategyIds = new Set<StrategyId>([
+  "border_group_statistical",
+  "border_group_markov",
+  "border_group_bayesian",
+  "border_group_ml",
+  "border_group_hybrid",
+]);
 const strategyPlugins = ref<StrategyPlugin[]>([]);
 const recentDatasets = ref<RecentDataset[]>([]);
 const settingsOpen = ref(false);
@@ -155,6 +164,7 @@ const options = reactive<AnalysisOptions>({
   selectedNumbers: [1, 2, 3, 4, 5, 6],
   trendBins: 100,
   correlationMethod: "pearson",
+  borderSpace: 7,
   enabledReports: [],
   enabledStrategies: [],
 });
@@ -169,6 +179,11 @@ const figures = computed(() => {
   themeRevision.value;
   return analysis.value ? buildFigures(analysis.value) : {};
 });
+const borderGroupsActive = computed(
+  () =>
+    enabledReportIds.value.includes("space-groups") ||
+    enabledStrategyIds.value.some((strategyId) => borderGroupStrategyIds.has(strategyId)),
+);
 const enabledViews = computed(() =>
   views.filter(
     (view) =>
@@ -407,6 +422,7 @@ function normalizeOptions(): AnalysisOptions {
     selectedNumbers,
     trendBins: Math.min(Math.max(Math.trunc(options.trendBins), 1), maximumBins),
     correlationMethod: options.correlationMethod,
+    borderSpace: Math.min(Math.max(Math.trunc(options.borderSpace), 0), 43),
     enabledReports: [...enabledReportIds.value],
     enabledStrategies: [...enabledStrategyIds.value],
   };
@@ -506,6 +522,7 @@ async function analyzeDataset(
     options.selectedNumbers = [...payload.options.selectedNumbers];
     options.trendBins = payload.options.trendBins;
     options.correlationMethod = payload.options.correlationMethod;
+    options.borderSpace = payload.options.borderSpace;
     ensureActiveView();
     pendingDataset.value = null;
     loadingProgressTarget = 100;
@@ -790,6 +807,11 @@ onBeforeUnmount(() => {
             <option value="spearman">Spearman</option>
           </select>
         </label>
+        <label v-if="borderGroupsActive" class="field-group">
+          <span>Border space</span>
+          <input v-model.number="options.borderSpace" min="0" max="43" type="number">
+          <small>Spaces up to this value stay inside a group.</small>
+        </label>
         <fieldset v-if="isReportEnabled('numbers')" class="number-filter">
           <legend>Trend numbers</legend>
           <div>
@@ -823,6 +845,11 @@ onBeforeUnmount(() => {
         />
         <SpacesView
           v-else-if="activeView === 'spaces' && analysis.options.enabledReports.includes('spaces')"
+          :analysis="analysis"
+          :figures="figures"
+        />
+        <SpaceGroupsView
+          v-else-if="activeView === 'space-groups' && analysis.options.enabledReports.includes('space-groups')"
           :analysis="analysis"
           :figures="figures"
         />
@@ -942,6 +969,8 @@ onBeforeUnmount(() => {
         :dataset-id="analysis.dataset.path"
         :prediction-suites="analysis.predictionSuites"
         :relationship-edges="analysis.possibleDraw.relationshipEdges"
+        :border-space="analysis.options.borderSpace"
+        :space-group-analysis="analysis.spaceGroups"
       />
     </section>
 

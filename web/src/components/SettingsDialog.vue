@@ -57,6 +57,16 @@ const strategyDescriptions: Record<StrategyId, string> = {
   cis: "Online learner combining ten strategy experts.",
   decision_tree_selector:
     "Leakage-safe decision tree selecting one stable expert for the next draw.",
+  border_group_statistical:
+    "Smoothed historical frequencies of circular border-group signatures.",
+  border_group_markov:
+    "Next-signature transitions with statistical backoff.",
+  border_group_bayesian:
+    "Bayesian posterior over signatures from recent circular-group context.",
+  border_group_ml:
+    "Online multinomial model of recent spaces, signatures, and trends.",
+  border_group_hybrid:
+    "Walk-forward log-loss-weighted blend of all border-group models.",
   residual_coverage:
     "Diversity-first complement covering numbers outside every base Top-6.",
   chained:

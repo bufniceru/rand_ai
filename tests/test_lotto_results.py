@@ -29,6 +29,8 @@ def test_lotto_results_yaml_creates_draws_pickle(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Load, persist, restore, and log every real YAML draw."""
+    if not _LOTTO_RESULTS_PATH.is_file():
+        pytest.skip("the private historical lottery dataset is not installed")
     with _LOTTO_RESULTS_PATH.open(encoding="utf-8") as yaml_file:
         yaml_results = yaml.safe_load(yaml_file)["lotto_results"]
     expected_numbers = [

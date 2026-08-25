@@ -33,6 +33,11 @@ const strategyIds: StrategyId[] = [
   "sparse_neural_ticket",
   "cis",
   "decision_tree_selector",
+  "border_group_statistical",
+  "border_group_markov",
+  "border_group_bayesian",
+  "border_group_ml",
+  "border_group_hybrid",
   "residual_coverage",
   "chained",
 ];

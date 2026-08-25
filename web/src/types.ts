@@ -3,6 +3,7 @@ export type ReportId =
   | "overview"
   | "numbers"
   | "spaces"
+  | "space-groups"
   | "relationships"
   | "randomness"
   | "autocorrelation"
@@ -44,12 +45,18 @@ export type StrategyId =
   | "sparse_neural_ticket"
   | "cis"
   | "decision_tree_selector"
+  | "border_group_statistical"
+  | "border_group_markov"
+  | "border_group_bayesian"
+  | "border_group_ml"
+  | "border_group_hybrid"
   | "residual_coverage"
   | "chained";
 export type ViewId =
   | "overview"
   | "numbers"
   | "spaces"
+  | "space-groups"
   | "relationships"
   | "randomness"
   | "autocorrelation"
@@ -73,6 +80,7 @@ export interface AnalysisOptions {
   selectedNumbers: number[];
   trendBins: number;
   correlationMethod: CorrelationMethod;
+  borderSpace: number;
   enabledReports: ReportId[];
   enabledStrategies: StrategyId[];
 }
@@ -156,6 +164,36 @@ export interface AnalysisPayload {
   drawComparisonHistory: LatestDrawComparison[];
   latestDrawComparison: LatestDrawComparison | null;
   possibleDraw: PossibleDrawAnalysis;
+  spaceGroups: SpaceGroupAnalysis | null;
+}
+
+export interface SpaceGroupProbability {
+  signature: string;
+  groupCount: number;
+  probability: number;
+}
+
+export interface SpaceGroupForecast {
+  modelId: StrategyId;
+  name: string;
+  topSignature: string;
+  topGroupCount: number;
+  topProbability: number;
+  probabilities: SpaceGroupProbability[];
+}
+
+export interface SpaceGroupAnalysis {
+  borderSpace: number;
+  smallSpaceDefinition: string;
+  largeSpaceDefinition: string;
+  bestModelId: StrategyId | null;
+  provisional: boolean;
+  forecasts: SpaceGroupForecast[];
+  hybridWeights: Partial<Record<StrategyId, number>>;
+  signatureChiSquare: number;
+  signatureChiSquarePValue: number;
+  transitionMutualInformation: number;
+  transitionPermutationPValue: number;
 }
 
 export interface CoOccurrenceBand {
@@ -579,6 +617,9 @@ export interface DrawPortfolioResultMetadata {
   omittedCandidates: number[];
   constraintLimited: boolean;
   constraintMessage?: string;
+  borderSpace?: number;
+  groupModelId?: StrategyId;
+  provisionalGroupModel?: boolean;
 }
 
 export interface PossibleDrawNumberRequest {
@@ -603,6 +644,7 @@ export interface DesktopApi {
   ): () => void;
   getPortfolioBacktestData(request: {
     strategyIds: StrategyId[];
+    borderSpace: number;
   }): Promise<PortfolioBacktestData>;
   loadPortfolioBacktest(key: string): Promise<PortfolioBacktestResult | null>;
   savePortfolioBacktest(request: {

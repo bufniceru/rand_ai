@@ -217,7 +217,7 @@ class TestDrawsStatisticsTables:
         assert indexed.loc[(1, 2), "count"] == 1
         assert indexed.loc[(2, 1), "count"] == 1
         assert indexed.loc[(1, 1), "count"] == 0
-        assert np.isnan(indexed.loc[(1, 1), "lift"])
+        assert np.isnan(cast(float, indexed.loc[(1, 1), "lift"]))
         assert indexed.loc[(1, 2), "expected_count"] == pytest.approx(
             3 * 30 / (49 * 48)
         )
@@ -332,8 +332,16 @@ class TestDrawsRandomnessAndExports:
             "observed_matching_combination_pairs",
             "expected_matching_combination_pairs",
         }
-        assert 0 <= diagnostics.loc["normalized_frequency_entropy", "value"] <= 1
-        assert np.isfinite(diagnostics.loc["draw_sum_lag_one_autocorrelation", "value"])
+        entropy = cast(
+            float,
+            diagnostics.loc["normalized_frequency_entropy", "value"]
+        )
+        lag_one = cast(
+            float,
+            diagnostics.loc["draw_sum_lag_one_autocorrelation", "value"]
+        )
+        assert 0 <= entropy <= 1
+        assert np.isfinite(lag_one)
         assert not bool(diagnostics.loc["number_frequency_p_value", "reliable"])
 
     def test_single_draw_has_undefined_lag_one_diagnostic(self) -> None:
@@ -344,7 +352,12 @@ class TestDrawsRandomnessAndExports:
             DrawsStatistics(draws).randomness_diagnostics().set_index("diagnostic")
         )
 
-        assert np.isnan(diagnostics.loc["draw_sum_lag_one_autocorrelation", "value"])
+        assert np.isnan(
+            cast(
+                float,
+                diagnostics.loc["draw_sum_lag_one_autocorrelation", "value"],
+            )
+        )
 
     def test_constant_draw_sums_have_undefined_lag_one_diagnostic(self) -> None:
         """Verify lag-one correlation is undefined for a constant sum series."""
@@ -355,7 +368,12 @@ class TestDrawsRandomnessAndExports:
             DrawsStatistics(draws).randomness_diagnostics().set_index("diagnostic")
         )
 
-        assert np.isnan(diagnostics.loc["draw_sum_lag_one_autocorrelation", "value"])
+        assert np.isnan(
+            cast(
+                float,
+                diagnostics.loc["draw_sum_lag_one_autocorrelation", "value"],
+            )
+        )
         assert bool(diagnostics.loc["number_frequency_p_value", "reliable"])
         assert diagnostics.loc[
             "observed_matching_combination_pairs", "value"

@@ -2,7 +2,8 @@
 
 from collections.abc import Collection
 from functools import cached_property
-from math import comb, log
+from dataclasses import asdict
+from math import comb, log, sqrt
 from typing import Literal
 
 import numpy as np
@@ -12,6 +13,19 @@ from scipy.stats import chisquare
 
 from rand_ai.draw import Draw
 from rand_ai.draws import Draws
+from rand_ai.space_groups import (
+    MAX_BORDER_SPACE,
+    MODEL_IDS,
+    MODEL_NAMES,
+    SIGNATURES,
+    exact_null_group_probabilities,
+    exact_null_probabilities,
+    profile_from_spaces,
+    signature_chi_square,
+    transition_diagnostics,
+    validate_border_space,
+    walk_forward_models,
+)
 
 type CorrelationMethod = Literal["pearson", "spearman"]
 type UInt8Array = npt.NDArray[np.uint8]
@@ -51,6 +65,7 @@ class DrawsStatistics:
         self._heavy_sample_size = min(heavy_sample_size, draw_count)
         self._trend_bins = min(trend_bins, draw_count)
         self._numbers = self._snapshot_numbers(draws)
+        self._dates = tuple(draw.date for draw in draws)
         self._spaces = self._calculate_spaces(self._numbers)
         self._sample_indices = self._select_sample_indices()
 
@@ -395,6 +410,207 @@ class DrawsStatistics:
             }
         )
 
+    def space_group_analysis(
+        self, border_space: int
+    ) -> tuple[dict[str, pd.DataFrame], dict[str, object]]:
+        """Return historical, null, transition, and forecast group analysis."""
+        border = validate_border_space(border_space)
+        profiles = [
+            profile_from_spaces(
+                tuple(int(value) for value in spaces),
+                border,
+                numbers=tuple(int(value) for value in numbers),
+            )
+            for numbers, spaces in zip(self._numbers, self._spaces, strict=True)
+        ]
+        null_signatures = exact_null_probabilities(border)
+        null_groups = exact_null_group_probabilities(border)
+        signature_counts = {
+            signature: sum(profile.signature == signature for profile in profiles)
+            for signature in SIGNATURES
+        }
+        group_counts = np.asarray(
+            [profile.group_count for profile in profiles], dtype=np.int64
+        )
+        group_size_counts = np.bincount(
+            np.asarray(
+                [size for profile in profiles for size in profile.signature],
+                dtype=np.int64,
+            ),
+            minlength=7,
+        )
+        signature_rows = []
+        for signature, probability in zip(
+            SIGNATURES, null_signatures, strict=True
+        ):
+            count = signature_counts[signature]
+            expected = self._draw_count * probability
+            signature_rows.append(
+                {
+                    "signature": "+".join(str(value) for value in signature),
+                    "group_count": len(signature),
+                    "count": count,
+                    "percentage": count / self._draw_count * 100,
+                    "null_probability": probability * 100,
+                    "expected_count": expected,
+                    "standardized_residual": (
+                        (count - expected) / sqrt(expected) if expected else 0.0
+                    ),
+                }
+            )
+
+        matrix, mutual_information, permutation_p = transition_diagnostics(profiles)
+        signature_totals = [sum(row) for row in matrix]
+        target_totals = [sum(matrix[row][column] for row in range(len(SIGNATURES))) for column in range(len(SIGNATURES))]
+        transition_total = max(sum(signature_totals), 1)
+        transition_rows = []
+        for left_index, left in enumerate(SIGNATURES):
+            for right_index, right in enumerate(SIGNATURES):
+                count = matrix[left_index][right_index]
+                expected = signature_totals[left_index] * target_totals[right_index] / transition_total
+                transition_rows.append(
+                    {
+                        "from_signature": "+".join(map(str, left)),
+                        "to_signature": "+".join(map(str, right)),
+                        "count": count,
+                        "row_percentage": (
+                            count / signature_totals[left_index] * 100
+                            if signature_totals[left_index]
+                            else 0.0
+                        ),
+                        "expected_count": expected,
+                        "lift": count / expected if expected else 0.0,
+                    }
+                )
+
+        rolling_rows = []
+        for index, profile in enumerate(profiles):
+            row: dict[str, int | float | str | None] = {
+                "draw_number": index + 1,
+                "date": self._dates[index],
+                "numbers": ",".join(str(int(value)) for value in self._numbers[index]),
+                "spaces": ",".join(str(value) for value in profile.spaces),
+                "large_spaces": ",".join(str(value) for value in profile.large_spaces),
+                "separator_indices": ",".join(
+                    str(value) for value in profile.separator_indices
+                ),
+                "separator_count": profile.separator_count,
+                "group_count": profile.group_count,
+                "ordered_groups": " | ".join(
+                    ",".join(str(number) for number in group)
+                    for group in profile.ordered_groups
+                ),
+                "ordered_group_sizes": "+".join(map(str, profile.ordered_group_sizes)),
+                "signature": profile.signature_text,
+                "maximum_space": profile.maximum_space,
+            }
+            for window in (25, 100):
+                start = max(0, index + 1 - window)
+                row[f"rolling_{window}_group_count"] = float(
+                    group_counts[start : index + 1].mean()
+                )
+            rolling_rows.append(row)
+
+        sensitivity_rows = []
+        for candidate_border in range(MAX_BORDER_SPACE + 1):
+            separators = (self._spaces > candidate_border).sum(
+                axis=1, dtype=np.int64
+            )
+            observed_groups = np.maximum(separators, 1)
+            null_distribution = exact_null_group_probabilities(candidate_border)
+            sensitivity_rows.append(
+                {
+                    "border_space": candidate_border,
+                    "average_group_count": float(observed_groups.mean()),
+                    "one_to_three_percentage": float(
+                        np.mean(observed_groups <= 3) * 100
+                    ),
+                    "null_average_group_count": sum(
+                        (index + 1) * probability
+                        for index, probability in enumerate(null_distribution)
+                    ),
+                    "null_one_to_three_percentage": sum(
+                        null_distribution[:3]
+                    )
+                    * 100,
+                }
+            )
+
+        model_analysis = walk_forward_models(profiles, border)
+        metrics = model_analysis["metrics"]
+        latest = model_analysis["latest"]
+        forecasts = []
+        for model_id in MODEL_IDS:
+            probabilities = latest[model_id]
+            top_index = max(
+                range(len(SIGNATURES)), key=probabilities.__getitem__
+            )
+            forecasts.append(
+                {
+                    "modelId": model_id,
+                    "name": MODEL_NAMES[model_id],
+                    "topSignature": "+".join(map(str, SIGNATURES[top_index])),
+                    "topGroupCount": len(SIGNATURES[top_index]),
+                    "topProbability": probabilities[top_index],
+                    "probabilities": [
+                        {
+                            "signature": "+".join(map(str, signature)),
+                            "groupCount": len(signature),
+                            "probability": probability,
+                        }
+                        for signature, probability in zip(
+                            SIGNATURES, probabilities, strict=True
+                        )
+                    ],
+                }
+            )
+        chi_square_statistic, chi_square_p = signature_chi_square(
+            profiles, border
+        )
+        tables = {
+            "space_group_history": pd.DataFrame(rolling_rows),
+            "space_group_count_distribution": pd.DataFrame(
+                {
+                    "group_count": np.arange(1, 7, dtype=np.int64),
+                    "count": np.bincount(group_counts, minlength=7)[1:],
+                    "percentage": np.bincount(group_counts, minlength=7)[1:]
+                    / self._draw_count
+                    * 100,
+                    "null_probability": np.asarray(null_groups) * 100,
+                    "expected_count": np.asarray(null_groups) * self._draw_count,
+                }
+            ),
+            "space_group_size_distribution": pd.DataFrame(
+                {
+                    "group_size": np.arange(1, 7, dtype=np.int64),
+                    "count": group_size_counts[1:],
+                    "percentage": group_size_counts[1:]
+                    / max(group_size_counts[1:].sum(), 1)
+                    * 100,
+                }
+            ),
+            "space_group_signature_distribution": pd.DataFrame(signature_rows),
+            "space_group_transitions": pd.DataFrame(transition_rows),
+            "space_group_threshold_sensitivity": pd.DataFrame(sensitivity_rows),
+            "space_group_model_metrics": pd.DataFrame(
+                [asdict(metric) for metric in metrics]
+            ),
+        }
+        payload: dict[str, object] = {
+            "borderSpace": border,
+            "smallSpaceDefinition": f"0–{border}",
+            "largeSpaceDefinition": f">{border}",
+            "bestModelId": model_analysis["best_model_id"],
+            "provisional": model_analysis["provisional"],
+            "forecasts": forecasts,
+            "hybridWeights": model_analysis["hybrid_weights"],
+            "signatureChiSquare": chi_square_statistic,
+            "signatureChiSquarePValue": chi_square_p,
+            "transitionMutualInformation": mutual_information,
+            "transitionPermutationPValue": permutation_p,
+        }
+        return tables, payload
+
     def correlations(
         self, method: CorrelationMethod = "pearson"
     ) -> dict[str, pd.DataFrame]:
@@ -410,10 +626,12 @@ class DrawsStatistics:
         spaces = pd.DataFrame(self._spaces[indices], columns=SPACE_NAMES)
         combined = pd.concat((numbers, spaces), axis=1)
         combined_correlations = combined.corr(method=method)
+        number_names = list(NUMBER_NAMES)
+        space_names = list(SPACE_NAMES)
         return {
-            "numbers": combined_correlations.loc[NUMBER_NAMES, NUMBER_NAMES].copy(),
-            "spaces": combined_correlations.loc[SPACE_NAMES, SPACE_NAMES].copy(),
-            "number_space": combined_correlations.loc[NUMBER_NAMES, SPACE_NAMES].copy(),
+            "numbers": combined_correlations.loc[number_names, number_names].copy(),
+            "spaces": combined_correlations.loc[space_names, space_names].copy(),
+            "number_space": combined_correlations.loc[number_names, space_names].copy(),
         }
 
     def trend(
