@@ -1080,10 +1080,10 @@ function possibleDrawStateLabel(number: number): string {
           v-if="selectedStrategy?.evidence"
           class="strategy-evidence-card"
           :data-status="selectedStrategy.evidence.status"
-          aria-label="Recurrence evidence"
+          aria-label="Forecast evidence"
         >
           <div>
-            <span>Recurrence evidence · {{ selectedStrategy.evidence.status }}</span>
+            <span>Forecast evidence · {{ selectedStrategy.evidence.status }}</span>
             <strong>{{ selectedStrategy.evidence.summary }}</strong>
           </div>
           <dl>

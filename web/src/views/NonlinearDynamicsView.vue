@@ -3,6 +3,7 @@ import { computed } from "vue";
 import DataTable from "../components/DataTable.vue";
 import {
   NONLINEAR_STATUS_LABELS,
+  RECURRENCE_FORECAST_VERSION_LABEL,
   recurrencePointPercent,
 } from "../lib/nonlinearDynamics";
 import type { AnalysisPayload } from "../types";
@@ -90,7 +91,7 @@ function percent(value: number): string {
 
     <div class="nonlinear-layout">
       <article class="nonlinear-card">
-        <div class="nonlinear-card-heading"><div><p class="eyebrow">Causal validation</p><h3>Walk-forward forecast</h3></div></div>
+        <div class="nonlinear-card-heading"><div><p class="eyebrow">{{ RECURRENCE_FORECAST_VERSION_LABEL }}</p><h3>Walk-forward forecast</h3></div></div>
         <dl class="nonlinear-metrics">
           <div><dt>Evaluated draws</dt><dd>{{ model.forecast.evaluatedDraws }}</dd></div>
           <div><dt>Mean hits/draw</dt><dd>{{ model.forecast.averageHitsPerDraw.toFixed(3) }}</dd></div>

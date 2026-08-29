@@ -391,7 +391,7 @@ def test_recurrence_strategy_serializes_causal_evidence(tmp_path: Path) -> None:
     assert strategy["evidence"] == {
         "status": "insufficient",
         "score": 0.0,
-        "summary": "Too little causal recurrence history for an evidence claim.",
+        "summary": "Too little causal forecast history for a skill claim.",
         "evaluatedForecasts": 2,
         "analogueCount": 0,
         "effectiveNeighbors": 0.0,

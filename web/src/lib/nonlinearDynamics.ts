@@ -7,6 +7,8 @@ export const NONLINEAR_STATUS_LABELS = {
   supported: "Supported evidence",
 } as const satisfies Record<NonlinearEvidenceStatus, string>;
 
+export const RECURRENCE_FORECAST_VERSION_LABEL = "Causal validation · V2";
+
 export function recurrencePointPercent(position: number, size: number): number {
   return ((position + 0.5) / Math.max(size, 1)) * 100;
 }

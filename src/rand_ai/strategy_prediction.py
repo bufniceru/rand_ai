@@ -4491,8 +4491,8 @@ class _StrategyState:
                     "recurrence_dynamics",
                     "Recurrence Dynamics (Experimental)",
                     (
-                        "Delay-embedded nonlinear recurrence analogues with "
-                        "causal evidence tracking; recurrence does not prove chaos."
+                        "V2 three-draw recurrence over normalized sorted values with "
+                        "causal forecast evidence; recurrence does not prove chaos."
                     ),
                     recurrence_scores,
                     gaps,

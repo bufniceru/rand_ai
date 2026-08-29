@@ -3,18 +3,25 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+import rand_ai.nonlinear_dynamics as nonlinear_dynamics
 from rand_ai.nonlinear_dynamics import (
     BASE_PROBABILITY,
     EXPECTED_RANDOM_HITS,
+    MAX_ANALOGUES,
     RecurrenceDynamicsModel,
+    _inverse_distance_weights,
     _lower_confidence_bound,
     _recurrence_matrix,
     _rqa_metrics,
     _run_lengths,
     classify_evidence,
+    classify_forecast_evidence,
     delay_embeddings,
     draw_features,
     feature_history,
+    forecast_delay_embeddings,
+    forecast_feature_history,
+    forecast_features,
     nonlinear_dynamics_analysis,
 )
 
@@ -57,13 +64,33 @@ def test_delay_embeddings_use_three_weighted_draws() -> None:
     assert embedded[0, [0, 20, 40]].tolist() == pytest.approx([0.5, 1.5, 3.0])
 
 
+def test_forecast_features_use_six_values_and_eighteen_value_embeddings() -> None:
+    forward = forecast_features((1, 7, 13, 21, 34, 48))
+    reverse = forecast_features((48, 34, 21, 13, 7, 1))
+    assert forward.shape == (6,)
+    assert forward.tolist() == pytest.approx(reverse.tolist())
+    assert forecast_feature_history(_PATTERN[:2]).shape == (2, 6)
+
+    indexes, empty = forecast_delay_embeddings(np.zeros((2, 6)))
+    assert indexes.tolist() == []
+    assert empty.shape == (0, 18)
+
+    features = np.vstack(
+        (np.ones(6), np.full(6, 2.0), np.full(6, 3.0), np.full(6, 4.0))
+    )
+    indexes, embedded = forecast_delay_embeddings(features)
+    assert indexes.tolist() == [2, 3]
+    assert embedded.shape == (2, 18)
+    assert embedded[0, [0, 6, 12]].tolist() == pytest.approx([0.5, 1.5, 3.0])
+
+
 @pytest.mark.parametrize(
     ("arguments", "expected"),
     [
         ({"evaluated_forecasts": 99, "analogue_count": 24, "average_hits": 2.0, "lower_bound": 2.0, "surrogate_p_value": 0.01}, "insufficient"),
         ({"evaluated_forecasts": 100, "analogue_count": 7, "average_hits": 2.0, "lower_bound": 2.0, "surrogate_p_value": 0.01}, "insufficient"),
         ({"evaluated_forecasts": 100, "analogue_count": 8, "average_hits": EXPECTED_RANDOM_HITS, "lower_bound": 0.0, "surrogate_p_value": None}, "weak"),
-        ({"evaluated_forecasts": 100, "analogue_count": 8, "average_hits": 1.0, "lower_bound": 0.8, "surrogate_p_value": None}, "suggestive"),
+        ({"evaluated_forecasts": 100, "analogue_count": 8, "average_hits": 1.0, "lower_bound": 0.8, "surrogate_p_value": None}, "weak"),
         ({"evaluated_forecasts": 100, "analogue_count": 8, "average_hits": 1.0, "lower_bound": 0.0, "surrogate_p_value": 0.06}, "weak"),
         ({"evaluated_forecasts": 100, "analogue_count": 8, "average_hits": 1.0, "lower_bound": 0.7, "surrogate_p_value": 0.05}, "suggestive"),
         ({"evaluated_forecasts": 100, "analogue_count": 8, "average_hits": 1.0, "lower_bound": 0.8, "surrogate_p_value": 0.01}, "supported"),
@@ -71,6 +98,30 @@ def test_delay_embeddings_use_three_weighted_draws() -> None:
 )
 def test_evidence_classification_is_fixed(arguments: dict[str, float | int | None], expected: str) -> None:
     assert classify_evidence(**arguments) == expected  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("arguments", "expected"),
+    [
+        ({"evaluated_forecasts": 99, "analogue_count": 8, "average_hits": 1.0, "lower_bound": 1.0}, "insufficient"),
+        ({"evaluated_forecasts": 100, "analogue_count": 7, "average_hits": 1.0, "lower_bound": 1.0}, "insufficient"),
+        ({"evaluated_forecasts": 100, "analogue_count": 8, "average_hits": EXPECTED_RANDOM_HITS, "lower_bound": 0.0}, "weak"),
+        ({"evaluated_forecasts": 100, "analogue_count": 8, "average_hits": 1.0, "lower_bound": 0.7}, "suggestive"),
+        ({"evaluated_forecasts": 100, "analogue_count": 8, "average_hits": 1.0, "lower_bound": 0.8}, "supported"),
+    ],
+)
+def test_forecast_evidence_is_separate_from_dynamical_evidence(
+    arguments: dict[str, float | int], expected: str
+) -> None:
+    assert classify_forecast_evidence(**arguments) == expected  # type: ignore[arg-type]
+
+
+def test_inverse_distance_weights_are_finite_normalized_and_zero_safe() -> None:
+    assert _inverse_distance_weights(np.asarray([])).tolist() == []
+    weights = _inverse_distance_weights(np.asarray([0.0, 0.5, 1.0]))
+    assert np.all(np.isfinite(weights))
+    assert weights.sum() == pytest.approx(3.0)
+    assert weights[0] > weights[1] > weights[2]
 
 
 def test_recurrence_model_is_causal_and_returns_complete_scores() -> None:
@@ -92,13 +143,36 @@ def test_recurrence_model_is_causal_and_returns_complete_scores() -> None:
         model.observe(set(draw))
         prediction = model.predict()
 
-    assert prediction.evidence.analogue_count > 0
-    assert prediction.evidence.effective_neighbors > 0
+    assert prediction.evidence.analogue_count == MAX_ANALOGUES
+    assert 0 < prediction.evidence.effective_neighbors <= MAX_ANALOGUES
     assert 0 <= prediction.evidence.distance_percentile <= 1
     assert 0 <= prediction.evidence.score <= 1
     assert len(prediction.details) == 49
     assert len(model.pending_top_numbers or ()) == 6
     assert all(0 < score < 1 for score in prediction.scores.values())
+
+
+def test_recurrence_model_excludes_the_three_draw_temporal_neighborhood(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = RecurrenceDynamicsModel()
+    model.draws = [
+        tuple(range(start, start + 6))
+        for start in (1, 7, 13, 19, 25, 31, 37)
+    ]
+    indexes = np.asarray([2, 3, 4, 5, 6])
+    embeddings = np.asarray([[2.0], [1.0], [0.1], [0.05], [0.0]])
+    monkeypatch.setattr(
+        nonlinear_dynamics,
+        "forecast_delay_embeddings",
+        lambda _features: (indexes, embeddings),
+    )
+
+    prediction = model.predict()
+
+    assert prediction.evidence.analogue_count == 2
+    assert prediction.scores[19] > prediction.scores[31]
+    assert prediction.scores[25] > prediction.scores[31]
 
 
 def test_recurrence_helpers_cover_empty_and_structured_matrices() -> None:
@@ -161,6 +235,22 @@ def test_nonlinear_analysis_handles_empty_and_periodic_histories() -> None:
     assert result["latest"]["analogueCount"] > 0  # type: ignore[index,operator]
     assert len(tables["nonlinear_dynamics_metrics"]) == 8
     assert len(tables["nonlinear_dynamics_forecast"]) == 1
+
+
+def test_nonlinear_analysis_keeps_the_twenty_feature_diagnostic_embedding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    feature_widths: list[int] = []
+    original = nonlinear_dynamics.delay_embeddings
+
+    def tracked(features: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        feature_widths.append(features.shape[1])
+        return original(features)
+
+    monkeypatch.setattr(nonlinear_dynamics, "delay_embeddings", tracked)
+    nonlinear_dynamics_analysis(_PATTERN * 6, surrogate_count=2)
+
+    assert feature_widths == [20, 20, 20]
 
 
 def test_recurrence_prediction_is_prefix_invariant() -> None:

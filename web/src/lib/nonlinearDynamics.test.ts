@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { NonlinearEvidenceStatus } from "../types";
 import {
   NONLINEAR_STATUS_LABELS,
+  RECURRENCE_FORECAST_VERSION_LABEL,
   recurrencePointPercent,
 } from "./nonlinearDynamics";
 
@@ -27,5 +28,9 @@ describe("nonlinear dynamics report helpers", () => {
     expect(recurrencePointPercent(0, 4)).toBe(12.5);
     expect(recurrencePointPercent(3, 4)).toBe(87.5);
     expect(recurrencePointPercent(0, 0)).toBe(50);
+  });
+
+  it("identifies the replacement forecast as V2", () => {
+    expect(RECURRENCE_FORECAST_VERSION_LABEL).toBe("Causal validation · V2");
   });
 });

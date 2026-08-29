@@ -17,9 +17,10 @@ BASE_PROBABILITY = NUMBERS_PER_DRAW / NUMBER_COUNT
 EXPECTED_RANDOM_HITS = NUMBERS_PER_DRAW * BASE_PROBABILITY
 EMBEDDING_DIMENSION = 3
 LAG_WEIGHTS = (0.5, 0.75, 1.0)
-MAX_ANALOGUES = 24
+MAX_ANALOGUES = 8
 THEILER_WINDOW = 3
 PRIOR_STRENGTH = 8.0
+INVERSE_DISTANCE_EPSILON = 1e-9
 MINIMUM_EVIDENCE_FORECASTS = 100
 MINIMUM_CURRENT_ANALOGUES = 8
 DIAGNOSTIC_WINDOW = 750
@@ -63,19 +64,30 @@ def _circular_spaces(numbers: tuple[int, ...]) -> tuple[int, ...]:
     )
 
 
-def draw_features(
-    numbers: tuple[int, ...],
-    previous: tuple[int, ...] | None = None,
-    previous_previous: tuple[int, ...] | None = None,
-) -> np.ndarray:
-    """Return the fixed, order-independent 20-value draw representation."""
+def _validated_draw(numbers: tuple[int, ...]) -> tuple[int, ...]:
     ordered = tuple(sorted(numbers))
     if len(ordered) != NUMBERS_PER_DRAW or len(set(ordered)) != NUMBERS_PER_DRAW:
         raise ValueError("Nonlinear dynamics requires six unique numbers")
     if ordered[0] < 1 or ordered[-1] > NUMBER_COUNT:
         raise ValueError("Draw numbers must be between 1 and 49")
+    return ordered
 
-    number_block = np.asarray([(number - 1) / 48 for number in ordered]) / math.sqrt(6)
+
+def forecast_features(numbers: tuple[int, ...]) -> np.ndarray:
+    """Return the fixed six-value representation used by the v2 forecast."""
+    ordered = _validated_draw(numbers)
+    return np.asarray([(number - 1) / 48 for number in ordered]) / math.sqrt(6)
+
+
+def draw_features(
+    numbers: tuple[int, ...],
+    previous: tuple[int, ...] | None = None,
+    previous_previous: tuple[int, ...] | None = None,
+) -> np.ndarray:
+    """Return the fixed, order-independent 20-value diagnostic representation."""
+    ordered = _validated_draw(numbers)
+
+    number_block = forecast_features(ordered)
     space_block = np.asarray(_circular_spaces(ordered), dtype=float) / (43 * math.sqrt(6))
     consecutive_pairs = sum(
         right - left == 1 for left, right in zip(ordered, ordered[1:])
@@ -117,10 +129,21 @@ def feature_history(draws: list[tuple[int, ...]]) -> np.ndarray:
     )
 
 
-def delay_embeddings(features: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Return embedding end indexes and three-draw lag vectors."""
+def forecast_feature_history(draws: list[tuple[int, ...]]) -> np.ndarray:
+    """Build the six-value v2 forecast features for a chronological history."""
+    return np.asarray([forecast_features(draw) for draw in draws], dtype=float)
+
+
+def _delay_embeddings(
+    features: np.ndarray,
+    *,
+    feature_count: int,
+) -> tuple[np.ndarray, np.ndarray]:
     if len(features) < EMBEDDING_DIMENSION:
-        return np.asarray([], dtype=int), np.empty((0, 60), dtype=float)
+        return (
+            np.asarray([], dtype=int),
+            np.empty((0, EMBEDDING_DIMENSION * feature_count), dtype=float),
+        )
     embedded = [
         np.concatenate(
             tuple(
@@ -136,10 +159,28 @@ def delay_embeddings(features: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     )
 
 
+def delay_embeddings(features: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Return 60-value diagnostic delay embeddings and their end indexes."""
+    return _delay_embeddings(features, feature_count=20)
+
+
+def forecast_delay_embeddings(features: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Return 18-value v2 forecast delay embeddings and their end indexes."""
+    return _delay_embeddings(features, feature_count=6)
+
+
 def _lower_confidence_bound(hits: list[int]) -> float:
     if len(hits) < 2:
         return 0.0
     return fmean(hits) - 1.96 * stdev(hits) / math.sqrt(len(hits))
+
+
+def _inverse_distance_weights(distances: np.ndarray) -> np.ndarray:
+    """Return finite inverse-distance weights normalized to the neighbor count."""
+    if len(distances) == 0:
+        return np.asarray([], dtype=float)
+    raw_weights = 1 / (distances + INVERSE_DISTANCE_EPSILON)
+    return raw_weights * (len(raw_weights) / float(raw_weights.sum()))
 
 
 def classify_evidence(
@@ -150,19 +191,35 @@ def classify_evidence(
     lower_bound: float,
     surrogate_p_value: float | None,
 ) -> EvidenceStatus:
-    """Apply the fixed v1 evidence policy."""
+    """Combine forecast skill and surrogate recurrence into one report verdict."""
+    forecast_status = classify_forecast_evidence(
+        evaluated_forecasts=evaluated_forecasts,
+        analogue_count=analogue_count,
+        average_hits=average_hits,
+        lower_bound=lower_bound,
+    )
+    if forecast_status == "insufficient":
+        return "insufficient"
+    if surrogate_p_value is None or surrogate_p_value > 0.05:
+        return "weak"
+    return "supported" if forecast_status == "supported" else "suggestive"
+
+
+def classify_forecast_evidence(
+    *,
+    evaluated_forecasts: int,
+    analogue_count: int,
+    average_hits: float,
+    lower_bound: float,
+) -> EvidenceStatus:
+    """Classify causal forecast skill without making a dynamical claim."""
     if (
         evaluated_forecasts < MINIMUM_EVIDENCE_FORECASTS
         or analogue_count < MINIMUM_CURRENT_ANALOGUES
     ):
         return "insufficient"
-    if (
-        average_hits <= EXPECTED_RANDOM_HITS
-        or (surrogate_p_value is not None and surrogate_p_value > 0.05)
-    ):
+    if average_hits <= EXPECTED_RANDOM_HITS:
         return "weak"
-    if surrogate_p_value is None:
-        return "suggestive"
     if lower_bound > EXPECTED_RANDOM_HITS:
         return "supported"
     return "suggestive"
@@ -174,6 +231,16 @@ def _evidence_summary(status: EvidenceStatus) -> str:
         "weak": "The observed recurrence forecast does not clear the fixed evidence gates.",
         "suggestive": "Recurrence and mean walk-forward performance are suggestive, not conclusive.",
         "supported": "Recurrence and walk-forward performance clear the fixed evidence gates.",
+    }
+    return summaries[status]
+
+
+def _forecast_evidence_summary(status: EvidenceStatus) -> str:
+    summaries = {
+        "insufficient": "Too little causal forecast history for a skill claim.",
+        "weak": "The causal forecast mean does not exceed the fixed random expectation.",
+        "suggestive": "The causal forecast mean exceeds random, but its lower bound does not.",
+        "supported": "The causal forecast 95% lower bound exceeds random.",
     }
     return summaries[status]
 
@@ -206,7 +273,7 @@ class RecurrenceDynamicsModel:
         evidence = RecurrenceEvidence(
             status="insufficient",
             score=0.0,
-            summary=_evidence_summary("insufficient"),
+            summary=_forecast_evidence_summary("insufficient"),
             evaluated_forecasts=len(self.forecast_hits),
             analogue_count=0,
             effective_neighbors=0.0,
@@ -226,7 +293,9 @@ class RecurrenceDynamicsModel:
 
     def predict(self) -> RecurrencePrediction:
         """Rank the next draw from historical successors of nearby states."""
-        indexes, embeddings = delay_embeddings(feature_history(self.draws))
+        indexes, embeddings = forecast_delay_embeddings(
+            forecast_feature_history(self.draws)
+        )
         if len(embeddings) == 0:
             return self._neutral_prediction()
         current_end = int(indexes[-1])
@@ -240,9 +309,7 @@ class RecurrenceDynamicsModel:
         order = np.argsort(distances, kind="stable")[:MAX_ANALOGUES]
         selected_distances = distances[order]
         selected_indexes = candidate_indexes[order]
-        scale = max(float(selected_distances[0]), 1e-12)
-        raw_weights = np.exp(-selected_distances / scale)
-        weights = raw_weights * (len(raw_weights) / float(raw_weights.sum()))
+        weights = _inverse_distance_weights(selected_distances)
         effective_neighbors = float(weights.sum() ** 2 / np.square(weights).sum())
 
         nearest_distance = float(selected_distances[0])
@@ -251,7 +318,9 @@ class RecurrenceDynamicsModel:
             value <= nearest_distance for value in comparison
         ) / len(comparison)
         self.nearest_distance_history.append(nearest_distance)
-        evidence_score = min(1.0, effective_neighbors / 12) * (1 - distance_percentile)
+        evidence_score = min(1.0, effective_neighbors / MAX_ANALOGUES) * (
+            1 - distance_percentile
+        )
 
         weighted_hits = {number: 0.0 for number in range(1, NUMBER_COUNT + 1)}
         for end_index, weight in zip(selected_indexes, weights, strict=True):
@@ -267,17 +336,17 @@ class RecurrenceDynamicsModel:
         self.pending_top_numbers = tuple(ranking[:NUMBERS_PER_DRAW])
 
         average = fmean(self.forecast_hits) if self.forecast_hits else 0.0
-        status = classify_evidence(
+        lower_bound = _lower_confidence_bound(self.forecast_hits)
+        status = classify_forecast_evidence(
             evaluated_forecasts=len(self.forecast_hits),
             analogue_count=len(selected_indexes),
             average_hits=average,
-            lower_bound=_lower_confidence_bound(self.forecast_hits),
-            surrogate_p_value=None,
+            lower_bound=lower_bound,
         )
         evidence = RecurrenceEvidence(
             status=status,
             score=evidence_score,
-            summary=_evidence_summary(status),
+            summary=_forecast_evidence_summary(status),
             evaluated_forecasts=len(self.forecast_hits),
             analogue_count=len(selected_indexes),
             effective_neighbors=effective_neighbors,
@@ -287,7 +356,7 @@ class RecurrenceDynamicsModel:
         details: dict[int, tuple[str, ...]] = {
             number: (
                 f"Posterior occurrence {scores[number]:.2%}",
-                f"{len(selected_indexes)} causal analogues",
+                f"{len(selected_indexes)} causal V2 analogues",
                 f"Effective neighbors {effective_neighbors:.1f}",
                 f"Nearest-distance percentile {distance_percentile:.1%}",
                 f"Evidence {status}",
