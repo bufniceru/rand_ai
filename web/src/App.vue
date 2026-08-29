@@ -25,6 +25,7 @@ import LastSeenHighlightView from "./views/LastSeenHighlightView.vue";
 import LastSeenSpaceHighlightView from "./views/LastSeenSpaceHighlightView.vue";
 import LatestDrawComparisonView from "./views/LatestDrawComparisonView.vue";
 import NumbersView from "./views/NumbersView.vue";
+import NonlinearDynamicsView from "./views/NonlinearDynamicsView.vue";
 import OverviewView from "./views/OverviewView.vue";
 import PredictionAuditView from "./views/PredictionAuditView.vue";
 import RandomnessView from "./views/RandomnessView.vue";
@@ -57,6 +58,11 @@ const views: { id: ViewId; label: string; shortLabel: string }[] = [
   { id: "space-groups", label: "Border Groups", shortLabel: "Border Groups" },
   { id: "relationships", label: "Relationships", shortLabel: "Relationships" },
   { id: "randomness", label: "Randomness", shortLabel: "Randomness" },
+  {
+    id: "nonlinear-dynamics",
+    label: "Nonlinear Dynamics",
+    shortLabel: "Nonlinear Dynamics",
+  },
   {
     id: "autocorrelation",
     label: "Autocorrelation",
@@ -894,6 +900,10 @@ onBeforeUnmount(() => {
           v-else-if="activeView === 'randomness' && analysis.options.enabledReports.includes('randomness')"
           :analysis="analysis"
           :figures="figures"
+        />
+        <NonlinearDynamicsView
+          v-else-if="activeView === 'nonlinear-dynamics' && analysis.options.enabledReports.includes('nonlinear-dynamics')"
+          :analysis="analysis"
         />
         <AutocorrelationView
           v-else-if="activeView === 'autocorrelation' && analysis.options.enabledReports.includes('autocorrelation')"

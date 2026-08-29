@@ -2326,6 +2326,188 @@ tbody tr:nth-child(even) {
     0 7px 18px rgba(164, 13, 18, 0.34);
 }
 
+.nonlinear-dynamics-view {
+  gap: 1rem;
+}
+
+.nonlinear-evidence-panel,
+.nonlinear-card,
+.strategy-evidence-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(16, 40, 63, 0.08);
+}
+
+.nonlinear-evidence-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr);
+  gap: 1.25rem;
+  padding: 1.25rem;
+  border-left: 5px solid var(--blue);
+}
+
+.nonlinear-evidence-panel[data-status="insufficient"],
+.strategy-evidence-card[data-status="insufficient"] {
+  border-left-color: #727072;
+}
+
+.nonlinear-evidence-panel[data-status="weak"],
+.strategy-evidence-card[data-status="weak"] {
+  border-left-color: #ff6188;
+}
+
+.nonlinear-evidence-panel[data-status="suggestive"],
+.strategy-evidence-card[data-status="suggestive"] {
+  border-left-color: #ffd866;
+}
+
+.nonlinear-evidence-panel[data-status="supported"],
+.strategy-evidence-card[data-status="supported"] {
+  border-left-color: #a9dc76;
+}
+
+.nonlinear-status {
+  display: inline-flex;
+  margin-bottom: 0.55rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--blue) 14%, transparent);
+  color: inherit;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.nonlinear-evidence-panel h3,
+.nonlinear-card h3 {
+  margin: 0;
+}
+
+.nonlinear-evidence-panel p,
+.nonlinear-note {
+  color: var(--text-muted);
+}
+
+.nonlinear-evidence-panel dl,
+.nonlinear-metrics,
+.strategy-evidence-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.nonlinear-evidence-panel dl div,
+.nonlinear-metrics div,
+.strategy-evidence-card dl div {
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: var(--surface-muted);
+}
+
+.nonlinear-evidence-panel dt,
+.nonlinear-metrics dt,
+.strategy-evidence-card dt {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.nonlinear-evidence-panel dd,
+.nonlinear-metrics dd,
+.strategy-evidence-card dd {
+  margin: 0.2rem 0 0;
+  color: inherit;
+  font-weight: 800;
+}
+
+.nonlinear-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.nonlinear-card {
+  padding: 1rem;
+}
+
+.nonlinear-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.nonlinear-card-heading > span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.recurrence-plot {
+  display: block;
+  width: min(100%, 520px);
+  margin: 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.recurrence-background {
+  fill: var(--surface-muted);
+}
+
+.recurrence-point {
+  fill: var(--blue);
+  opacity: 0.82;
+}
+
+.nonlinear-top-numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.nonlinear-top-numbers span {
+  display: grid;
+  width: 2.2rem;
+  height: 2.2rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blue);
+  color: var(--surface);
+  font-weight: 800;
+}
+
+.strategy-evidence-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr);
+  gap: 1rem;
+  margin: 0 0 1rem;
+  padding: 1rem;
+  border-left-width: 5px;
+}
+
+.strategy-evidence-card > div span {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+@media (max-width: 900px) {
+  .nonlinear-evidence-panel,
+  .nonlinear-layout,
+  .strategy-evidence-card {
+    grid-template-columns: 1fr;
+  }
+}
+
 .all-predictions-cell > strong {
   width: 40px;
   height: 40px;

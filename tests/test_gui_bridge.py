@@ -55,6 +55,7 @@ def test_rejects_invalid_selected_numbers(value: str) -> None:
 
 def test_parses_report_plugin_selection_in_stable_order() -> None:
     assert parse_report_ids("randomness,overview") == ("overview", "randomness")
+    assert "nonlinear-dynamics" in DEFAULT_REPORT_IDS
     assert parse_report_ids("draw-portfolio,predictions") == (
         "predictions",
         "draw-portfolio",
@@ -73,6 +74,7 @@ def test_parses_strategy_plugin_selection_in_stable_order() -> None:
     assert "lag_logistic" not in DEFAULT_STRATEGY_IDS
     assert "sparse_neural_ticket" not in DEFAULT_STRATEGY_IDS
     assert "decision_tree_selector" not in DEFAULT_STRATEGY_IDS
+    assert "recurrence_dynamics" not in DEFAULT_STRATEGY_IDS
     assert parse_strategy_ids("") == ()
     with pytest.raises(argparse.ArgumentTypeError, match="unknown prediction strategy"):
         parse_strategy_ids("freshness,unknown")
@@ -169,6 +171,7 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
     )
     assert categorical["numbers"][0]["details"][0].startswith("Exact state gap")
     assert "Estimated probability" in categorical["numbers"][0]["details"][1]
+    assert categorical["evidence"] is None
     assert all(
         len(strategy["numbers"]) == 49
         and len(strategy["topNumbers"]) == 6
@@ -223,9 +226,13 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
         for strategy in comparison["strategies"]
     )
     assert payload["possibleDraw"]["lastDrawNumbers"] == [5, 12, 19, 27, 36, 45]
+    assert payload["nonlinearDynamics"]["status"] == "insufficient"
+    assert payload["nonlinearDynamics"]["surrogate"]["count"] == 99
     assert len(payload["possibleDraw"]["lastSeenRows"]) == 49
     assert len(payload["possibleDraw"]["relationshipEdges"]) == 1176
     assert "sampled_spaces" in payload["tables"]
+    assert "nonlinear_dynamics_metrics" in payload["tables"]
+    assert "nonlinear_dynamics_forecast" in payload["tables"]
     assert payload["tables"]["freshness_gap_distribution"]["columns"] == [
         "gap",
         "hits",
@@ -276,6 +283,7 @@ def test_disabled_report_plugins_are_not_calculated_or_returned(
     assert payload["drawComparisonHistory"] == []
     assert payload["latestDrawComparison"] is None
     assert payload["possibleDraw"]["relationshipEdges"] == []
+    assert payload["nonlinearDynamics"] is None
 
 
 def test_numbers_report_builds_shared_frequency_table_without_overview(
@@ -368,6 +376,28 @@ def test_analysis_emits_only_enabled_strategy_plugins(tmp_path: Path) -> None:
     assert [
         strategy["id"] for strategy in payload["predictionSuites"][-1]["strategies"]
     ] == ["freshness", "entropy"]
+
+
+def test_recurrence_strategy_serializes_causal_evidence(tmp_path: Path) -> None:
+    payload = build_analysis_payload(
+        _draws(),
+        _pickle_path(tmp_path),
+        enabled_reports=("predictions",),
+        enabled_strategies=("recurrence_dynamics",),
+    )
+
+    strategy = payload["predictionSuites"][-1]["strategies"][0]
+    assert strategy["id"] == "recurrence_dynamics"
+    assert strategy["evidence"] == {
+        "status": "insufficient",
+        "score": 0.0,
+        "summary": "Too little causal recurrence history for an evidence claim.",
+        "evaluatedForecasts": 2,
+        "analogueCount": 0,
+        "effectiveNeighbors": 0.0,
+        "distancePercentile": 1.0,
+        "averageHitsPerDraw": 1.0,
+    }
 
 
 def test_full_history_prediction_reports_use_compact_audit_records(
@@ -770,6 +800,8 @@ def test_analyzes_and_exports_trusted_file(tmp_path: Path) -> None:
         metadata = json.loads(archive.read("metadata.json"))
     assert "tables/summary.csv" in names
     assert "tables/sampled_spaces.csv" in names
+    assert "tables/nonlinear_dynamics_metrics.csv" in names
+    assert "tables/nonlinear_dynamics_forecast.csv" in names
     assert metadata["selectedNumbers"] == [1, 5]
     assert metadata["correlationMethod"] == "spearman"
     assert metadata["enabledReports"] == list(DEFAULT_REPORT_IDS)

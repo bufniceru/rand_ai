@@ -467,6 +467,7 @@ function strategyFullName(strategy: StrategyPrediction): string {
     proximity: "Proximity",
     freshness: "Freshness",
     emd: "Earth Mover Distance",
+    recurrence_dynamics: "Recurrence Dynamics (Experimental)",
     randomness: "Random baseline",
     fresh_random: "Fresh Random",
     chi_square: "Chi-square Frequency",
@@ -1074,6 +1075,24 @@ function possibleDrawStateLabel(number: number): string {
             Top 6: {{ selectedStrategy.topNumbers.join(", ") }}
           </strong>
         </div>
+
+        <section
+          v-if="selectedStrategy?.evidence"
+          class="strategy-evidence-card"
+          :data-status="selectedStrategy.evidence.status"
+          aria-label="Recurrence evidence"
+        >
+          <div>
+            <span>Recurrence evidence · {{ selectedStrategy.evidence.status }}</span>
+            <strong>{{ selectedStrategy.evidence.summary }}</strong>
+          </div>
+          <dl>
+            <div><dt>Evidence index</dt><dd>{{ Math.round(selectedStrategy.evidence.score * 100) }}%</dd></div>
+            <div><dt>Analogues</dt><dd>{{ selectedStrategy.evidence.analogueCount }}</dd></div>
+            <div><dt>Effective</dt><dd>{{ selectedStrategy.evidence.effectiveNeighbors.toFixed(1) }}</dd></div>
+            <div><dt>Distance</dt><dd>{{ Math.round(selectedStrategy.evidence.distancePercentile * 100) }}%</dd></div>
+          </dl>
+        </section>
 
         <section
           v-if="selectedStrategy && selectedStrategyEfficacy"

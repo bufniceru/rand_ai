@@ -16,6 +16,10 @@ from sklearn.tree import DecisionTreeRegressor
 from rand_ai.categorical_chi_square import CategoricalChiSquareModel
 from rand_ai.draw import Draw
 from rand_ai.mkgsv import MkgsvModel
+from rand_ai.nonlinear_dynamics import (
+    RecurrenceDynamicsModel,
+    RecurrenceEvidence,
+)
 from rand_ai.prediction import CombinedPrediction
 from rand_ai.sparse_neural_ticket import (
     SparseNeuralTicketArtifact,
@@ -183,6 +187,7 @@ _BASE_STRATEGY_IDS = (
     "proximity",
     "freshness",
     "emd",
+    "recurrence_dynamics",
     "randomness",
     "fresh_random",
     "chi_square",
@@ -341,6 +346,20 @@ class StrategyEfficacy:
 
 
 @dataclass(frozen=True, slots=True)
+class StrategyEvidence:
+    """Expose optional evidence metadata for an experimental strategy."""
+
+    status: str
+    score: float
+    summary: str
+    evaluated_forecasts: int
+    analogue_count: int
+    effective_neighbors: float
+    distance_percentile: float
+    average_hits_per_draw: float
+
+
+@dataclass(frozen=True, slots=True)
 class StrategyPrediction:
     """Store one named 49-number strategy ranking."""
 
@@ -350,6 +369,7 @@ class StrategyPrediction:
     numbers: tuple[StrategyNumberPrediction, ...]
     top_numbers: tuple[int, ...]
     efficacy: StrategyEfficacy | None = None
+    evidence: StrategyEvidence | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -401,6 +421,7 @@ def _strategy(
     scores: dict[int, float],
     gaps: dict[int, int],
     details: dict[int, tuple[str, ...]] | None = None,
+    evidence: StrategyEvidence | None = None,
 ) -> StrategyPrediction:
     ranked = _ranking_from_scores(scores, gaps)
     predictions = tuple(
@@ -419,6 +440,20 @@ def _strategy(
         description=description,
         numbers=predictions,
         top_numbers=tuple(ranked[:_NUMBERS_PER_DRAW]),
+        evidence=evidence,
+    )
+
+
+def _recurrence_evidence(evidence: RecurrenceEvidence) -> StrategyEvidence:
+    return StrategyEvidence(
+        status=evidence.status,
+        score=evidence.score,
+        summary=evidence.summary,
+        evaluated_forecasts=evidence.evaluated_forecasts,
+        analogue_count=evidence.analogue_count,
+        effective_neighbors=evidence.effective_neighbors,
+        distance_percentile=evidence.distance_percentile,
+        average_hits_per_draw=evidence.average_hits_per_draw,
     )
 
 
@@ -710,6 +745,11 @@ class _StrategyState:
         self.border_groups = (
             SpaceGroupForecaster(self.border_space, target_group_count)
             if self.enabled_strategy_ids.intersection(BORDER_GROUP_MODEL_IDS)
+            else None
+        )
+        self.recurrence_dynamics = (
+            RecurrenceDynamicsModel()
+            if "recurrence_dynamics" in self.enabled_strategy_ids
             else None
         )
         self.categorical_chi_square = (
@@ -2015,6 +2055,8 @@ class _StrategyState:
 
     def train(self, drawn: set[int]) -> None:
         """Learn the current draw using only the state available before it."""
+        if self.recurrence_dynamics is not None:
+            self.recurrence_dynamics.train(drawn)
         if self.border_groups is not None:
             self.border_groups.observe(
                 profile_for_numbers(drawn, self.border_space)
@@ -2186,6 +2228,8 @@ class _StrategyState:
         )
         entropy_percent = _gap_entropy_percent(tuple(drawn)) if entropy_enabled else 0.0
         ordered = sorted(drawn)
+        if self.recurrence_dynamics is not None:
+            self.recurrence_dynamics.observe(drawn)
         for index, number in enumerate(ordered):
             if proximity_enabled:
                 distances = []
@@ -4430,6 +4474,30 @@ class _StrategyState:
                     earth_mover_scores,
                     gaps,
                     earth_mover_details,
+                )
+
+        if self.recurrence_dynamics is not None:
+            recurrence_prediction = self.recurrence_dynamics.predict()
+            recurrence_scores = recurrence_prediction.scores
+            rankings["recurrence_dynamics"] = _ranking_from_scores(
+                recurrence_scores,
+                gaps,
+            )
+            self.recurrence_dynamics.set_pending_top_numbers(
+                tuple(rankings["recurrence_dynamics"][:_NUMBERS_PER_DRAW])
+            )
+            if "recurrence_dynamics" in requested:
+                built["recurrence_dynamics"] = _strategy(
+                    "recurrence_dynamics",
+                    "Recurrence Dynamics (Experimental)",
+                    (
+                        "Delay-embedded nonlinear recurrence analogues with "
+                        "causal evidence tracking; recurrence does not prove chaos."
+                    ),
+                    recurrence_scores,
+                    gaps,
+                    recurrence_prediction.details,
+                    _recurrence_evidence(recurrence_prediction.evidence),
                 )
 
         random_ranking: list[int] = []

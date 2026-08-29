@@ -30,6 +30,7 @@ const strategyNames: Record<StrategyId, string> = {
   freshness: "Freshness",
   emd: "Earth Mover Distance",
   randomness: "Random baseline",
+  recurrence_dynamics: "Recurrence Dynamics (Experimental)",
   fresh_random: "Fresh Random",
   chi_square: "Chi-square Frequency",
   categorical_chi_square: "Categorical Chi-square",

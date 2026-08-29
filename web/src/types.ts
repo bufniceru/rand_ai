@@ -6,6 +6,7 @@ export type ReportId =
   | "space-groups"
   | "relationships"
   | "randomness"
+  | "nonlinear-dynamics"
   | "autocorrelation"
   | "co-occurrence"
   | "prediction-audit"
@@ -22,6 +23,7 @@ export type StrategyId =
   | "proximity"
   | "freshness"
   | "emd"
+  | "recurrence_dynamics"
   | "randomness"
   | "fresh_random"
   | "chi_square"
@@ -59,6 +61,7 @@ export type ViewId =
   | "space-groups"
   | "relationships"
   | "randomness"
+  | "nonlinear-dynamics"
   | "autocorrelation"
   | "co-occurrence"
   | "prediction-audit"
@@ -166,6 +169,56 @@ export interface AnalysisPayload {
   latestDrawComparison: LatestDrawComparison | null;
   possibleDraw: PossibleDrawAnalysis;
   spaceGroups: SpaceGroupAnalysis | null;
+  nonlinearDynamics: NonlinearDynamicsAnalysis | null;
+}
+
+export type NonlinearEvidenceStatus =
+  | "insufficient"
+  | "weak"
+  | "suggestive"
+  | "supported";
+
+export interface NonlinearDynamicsMetrics {
+  recurrenceRate: number;
+  determinism: number;
+  meanDiagonalLength: number;
+  maximumDiagonalLength: number;
+  laminarity: number;
+  trappingTime: number;
+}
+
+export interface NonlinearDynamicsAnalysis {
+  status: NonlinearEvidenceStatus;
+  summary: string;
+  caveat: string;
+  drawCount: number;
+  embeddingCount: number;
+  embeddingDimension: number;
+  recurrenceThreshold: number;
+  metrics: NonlinearDynamicsMetrics;
+  surrogate: {
+    count: number;
+    meanDeterminism: number;
+    standardDeviation: number;
+    pValue: number;
+  };
+  forecast: {
+    evaluatedDraws: number;
+    averageHitsPerDraw: number;
+    lowerConfidenceBound: number;
+    expectedRandomHitsPerDraw: number;
+  };
+  latest: {
+    analogueCount: number;
+    effectiveNeighbors: number;
+    distancePercentile: number;
+    evidenceScore: number;
+    topNumbers: number[];
+  };
+  plot: {
+    size: number;
+    points: { x: number; y: number }[];
+  };
 }
 
 export interface SpaceGroupProbability {
@@ -386,6 +439,17 @@ export interface StrategyEfficacy {
   hitDifference: number;
 }
 
+export interface StrategyEvidence {
+  status: NonlinearEvidenceStatus;
+  score: number;
+  summary: string;
+  evaluatedForecasts: number;
+  analogueCount: number;
+  effectiveNeighbors: number;
+  distancePercentile: number;
+  averageHitsPerDraw: number;
+}
+
 export interface StrategyEfficacyRecord {
   referenceDrawNumber: number;
   targetDrawNumber: number;
@@ -438,6 +502,7 @@ export interface StrategyPrediction {
   topNumbers: number[];
   numbers: StrategyNumberPrediction[];
   efficacy: StrategyEfficacy | null;
+  evidence?: StrategyEvidence | null;
 }
 
 export interface PredictionSuite {

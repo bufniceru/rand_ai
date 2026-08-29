@@ -424,6 +424,7 @@ function strategyFullName(strategy: StrategyPrediction): string {
     freshness: "Freshness",
     proximity: "Proximity",
     emd: "Earth Mover's Distance",
+    recurrence_dynamics: "Recurrence Dynamics (Experimental)",
     chi_square: "Chi-Square",
     categorical_chi_square: "Categorical Chi-square",
     entropy: "Entropy",
