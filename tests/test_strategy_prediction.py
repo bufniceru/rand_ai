@@ -36,6 +36,9 @@ from rand_ai.strategy_prediction import (
     _NUMBERS_PER_DRAW,
     _SKLEARN_SVM_EXPERT_IDS,
     _SKLEARN_SVM_FEATURE_COUNT,
+    _SRPH_RESIDUAL_BASE_ID,
+    _SRPH_RESIDUAL_CANDIDATE_IDS,
+    _SRPH_RESIDUAL_WEIGHT,
     _StrategyState,
     _median,
     _proximity_bucket,
@@ -49,7 +52,7 @@ from rand_ai.strategy_prediction import (
 )
 
 
-def test_builds_thirty_five_named_rankings_and_reports_progress() -> None:
+def test_builds_thirty_six_named_rankings_and_reports_progress() -> None:
     draws = Draws()
     draws.add(Draw(1, 2, 8, 17, 31, 49))
     draws.add(Draw(3, 6, 12, 22, 36, 47))
@@ -90,6 +93,7 @@ def test_builds_thirty_five_named_rankings_and_reports_progress() -> None:
         "SVC",
         "SRH",
         "SRPH",
+        "SRD",
         "TBL",
         "Scikit Online SVM",
         "Lagged Logistic",
@@ -646,6 +650,91 @@ def test_svc_recurrence_proximity_hybrid_uses_fixed_quarter_weight() -> None:
     assert adapted_details[1][3] == "Effectiveness history 1 completed draws"
 
 
+def test_srph_residual_diversity_falls_back_and_tracks_counterfactuals() -> None:
+    state = _StrategyState(("srph_residual_diversity_hybrid",))
+    ascending = list(range(1, 50))
+    descending = list(range(49, 0, -1))
+    rankings = {
+        _SRPH_RESIDUAL_BASE_ID: ascending,
+        "freshness": descending,
+        "emd": ascending,
+        "bayesian": ascending,
+        "doublet_triplet_markov": ascending,
+    }
+    srph_scores = {
+        number: (49 - number) / 48 for number in range(1, 50)
+    }
+    gaps = {number: 0 for number in range(1, 50)}
+
+    scores, details = state._srph_residual_scores(
+        rankings,
+        srph_scores,
+        gaps,
+    )
+
+    assert scores == srph_scores
+    assert state.srph_residual_pending_rankings.keys() == {
+        _SRPH_RESIDUAL_BASE_ID,
+        *_SRPH_RESIDUAL_CANDIDATE_IDS,
+    }
+    assert details[1][0] == "Selector fallback to SRPH"
+    assert details[1][1] == "SRPH effective weight 100.0%; rank #1; Top 6 yes"
+    assert details[1][2].startswith("Freshness effective weight 0.0%;")
+    assert details[1][-1] == "Selector history 0 completed draws"
+
+    state.srph_residual_pending_rankings = {
+        _SRPH_RESIDUAL_BASE_ID: ascending,
+        "freshness": [1, 2, 3, 4, 5, 7, 6, *range(8, 50)],
+        "emd": ascending,
+        "bayesian": ascending,
+        "doublet_triplet_markov": ascending,
+    }
+    state._train_srph_residual_effectiveness({6, 7, 20, 30, 40, 49})
+
+    assert state.srph_residual_evaluated_draws == 1
+    assert state.srph_residual_total_hits[_SRPH_RESIDUAL_BASE_ID] == 1
+    assert state.srph_residual_total_hits["freshness"] == 1
+    assert state.srph_residual_unique_added_hits["freshness"] == 1
+    assert state.srph_residual_displaced_hits["freshness"] == 1
+
+
+def test_srph_residual_diversity_selects_positive_blended_quality() -> None:
+    state = _StrategyState(("srph_residual_diversity_hybrid",))
+    ascending = list(range(1, 50))
+    descending = list(range(49, 0, -1))
+    rankings = {
+        _SRPH_RESIDUAL_BASE_ID: ascending,
+        "freshness": descending,
+        "emd": descending,
+        "bayesian": ascending,
+        "doublet_triplet_markov": ascending,
+    }
+    srph_scores = {
+        number: (49 - number) / 48 for number in range(1, 50)
+    }
+    gaps = {number: 0 for number in range(1, 50)}
+    state.srph_residual_evaluated_draws = 1
+    state.srph_residual_total_hits[_SRPH_RESIDUAL_BASE_ID] = 1
+    state.srph_residual_total_hits["freshness"] = 2
+    state.srph_residual_total_hits["emd"] = 2
+
+    scores, details = state._srph_residual_scores(
+        rankings,
+        srph_scores,
+        gaps,
+    )
+
+    expected = (
+        (1 - _SRPH_RESIDUAL_WEIGHT) * srph_scores[1]
+        + _SRPH_RESIDUAL_WEIGHT * 0
+    )
+    assert scores[1] == pytest.approx(expected)
+    assert details[1][0] == "Selector selected Freshness"
+    assert details[1][1].startswith("SRPH effective weight 90.0%")
+    assert details[1][2].startswith("Freshness effective weight 10.0%")
+    assert details[1][-1] == "Selector history 1 completed draws"
+
+
 def test_svc_recurrence_hybrid_builds_with_hidden_sources() -> None:
     draws = Draws()
     draws.add(Draw(1, 2, 8, 17, 31, 49))
@@ -702,6 +791,43 @@ def test_svc_recurrence_proximity_hybrid_builds_with_hidden_sources() -> None:
     assert hybrid.efficacy.evaluated_draws == 1
     assert hybrid.numbers[0].details[3] == (
         "Effectiveness history 1 completed draws"
+    )
+
+
+def test_srph_residual_diversity_builds_with_hidden_sources() -> None:
+    draws = Draws()
+    draws.add(Draw(1, 2, 8, 17, 31, 49))
+    draws.add(Draw(3, 6, 12, 22, 36, 47))
+    draws.prepare_predictions()
+    state = _StrategyState(("srph_residual_diversity_hybrid",))
+
+    assert state.requested_strategy_ids == frozenset(
+        {"srph_residual_diversity_hybrid"}
+    )
+    assert {
+        "svc_recurrence_proximity_hybrid",
+        "svc_recurrence_hybrid",
+        "recurrence_dynamics",
+        "svc",
+        "proximity",
+        *_SRPH_RESIDUAL_CANDIDATE_IDS,
+    }.issubset(state.enabled_strategy_ids)
+
+    suites = build_prediction_suites(
+        draws.draws,
+        enabled_strategy_ids=("srph_residual_diversity_hybrid",),
+    )
+
+    assert [strategy.strategy_id for strategy in suites[-1].strategies] == [
+        "srph_residual_diversity_hybrid"
+    ]
+    hybrid = suites[-1].strategies[0]
+    assert hybrid.name == "SRD"
+    assert hybrid.evidence is None
+    assert hybrid.efficacy is not None
+    assert hybrid.efficacy.evaluated_draws == 1
+    assert hybrid.numbers[0].details[-1] == (
+        "Selector history 1 completed draws"
     )
 
 
@@ -780,6 +906,57 @@ def test_svc_recurrence_proximity_hybrid_is_causal_and_preserves_srh() -> None:
     assert (
         prefix_by_id["svc_recurrence_proximity_hybrid"].numbers
         == extended_srph.numbers
+    )
+
+
+def test_srph_residual_diversity_is_causal_and_preserves_sources() -> None:
+    number_sets = (
+        (1, 8, 15, 22, 29, 36),
+        (2, 9, 16, 23, 30, 37),
+        (3, 10, 17, 24, 31, 38),
+        (4, 11, 18, 25, 32, 39),
+    )
+    prefix_draws = Draws()
+    extended_draws = Draws()
+    for index in range(40):
+        numbers = number_sets[index % len(number_sets)]
+        prefix_draws.add(Draw(*numbers))
+        extended_draws.add(Draw(*numbers))
+    extended_draws.add(Draw(5, 12, 19, 26, 33, 40))
+    prefix_draws.prepare_predictions()
+    extended_draws.prepare_predictions()
+    source_ids = (
+        _SRPH_RESIDUAL_BASE_ID,
+        *_SRPH_RESIDUAL_CANDIDATE_IDS,
+    )
+
+    source_only = build_prediction_suites(
+        prefix_draws.draws,
+        history_start=39,
+        enabled_strategy_ids=source_ids,
+    )[0].strategies
+    with_residual = build_prediction_suites(
+        prefix_draws.draws,
+        history_start=39,
+        enabled_strategy_ids=(*source_ids, "srph_residual_diversity_hybrid"),
+    )[0].strategies
+    extended_residual = build_prediction_suites(
+        extended_draws.draws,
+        history_start=39,
+        enabled_strategy_ids=("srph_residual_diversity_hybrid",),
+    )[0].strategies[0]
+
+    source_only_by_id = {
+        strategy.strategy_id: strategy for strategy in source_only
+    }
+    with_residual_by_id = {
+        strategy.strategy_id: strategy for strategy in with_residual
+    }
+    for strategy_id in source_ids:
+        assert with_residual_by_id[strategy_id] == source_only_by_id[strategy_id]
+    assert (
+        with_residual_by_id["srph_residual_diversity_hybrid"].numbers
+        == extended_residual.numbers
     )
 
 

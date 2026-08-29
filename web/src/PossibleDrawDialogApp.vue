@@ -86,7 +86,7 @@ const orderedStrategies = computed(() => {
   const fallbackOrder: StrategyId[] = [
     "freshness", "proximity", "emd", "chi_square", "categorical_chi_square", "entropy", "markov100", "mkgsv",
     "mkfr", "mksp", "mknp", "mkrd", "bayesian", "predictive_grid", "co_occurrence",
-    "doublet_triplet_markov", "mixed", "svc", "svc_recurrence_hybrid", "svc_recurrence_proximity_hybrid", "tbl",
+    "doublet_triplet_markov", "mixed", "svc", "svc_recurrence_hybrid", "svc_recurrence_proximity_hybrid", "srph_residual_diversity_hybrid", "tbl",
     "cis", "fresh_random", "randomness",
     "decision_tree_selector",
     "residual_coverage",
@@ -443,6 +443,8 @@ function strategyFullName(strategy: StrategyPrediction): string {
     svc_recurrence_hybrid: "SVC–Recurrence Hybrid (Experimental)",
     svc_recurrence_proximity_hybrid:
       "SVC–Recurrence–Proximity Hybrid (Experimental)",
+    srph_residual_diversity_hybrid:
+      "SRPH Residual Diversity Hybrid (Experimental)",
     tbl: "Trend Baseline",
     sklearn_svm: "Scikit Online SVM",
     lag_logistic: "Lagged Logistic",

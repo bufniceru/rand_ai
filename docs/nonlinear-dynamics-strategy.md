@@ -141,3 +141,31 @@ Proximity and the 25% weight were selected after testing multiple alternatives,
 so the apparent improvement is selection-biased. The weight is frozen for future
 untouched-draw evaluation. See the
 [fixed SRPH benchmark](../reports/svc_recurrence_proximity_hybrid_benchmark.md).
+
+## SRPH Residual Diversity Hybrid
+
+**SRPH Residual Diversity Hybrid (Experimental)** is a separate default-disabled
+shadow strategy. It evaluates four frozen residual candidates—Freshness, EMD,
+Bayesian, and Doublet/Triplet Markov—through the ranking that would actually be
+deployed:
+
+```text
+candidate score = 0.90 × SRPH score + 0.10 × candidate rank strength
+```
+
+For each completed forecast, SRD records the Top-6 hits of SRPH and every
+counterfactual candidate blend. Each quality uses the same neutral 24-draw prior
+as the SVC–Recurrence weighting. The best candidate is selected only when its
+prior-smoothed cumulative quality is strictly greater than SRPH's; equal or lower
+quality reproduces SRPH exactly. Candidate ties resolve in the frozen order
+Freshness, EMD, Bayesian, then Doublet/Triplet Markov.
+
+Training occurs only after the predicted target is known. Unique added hits and
+displaced SRPH hits are retained for diagnostics, but they do not alter selection.
+There is no recent window, adaptive residual weight, agreement bonus, quota, or
+regime switch.
+
+The fixed historical replay improves the earlier validation slice but trails SRPH
+on the nominal holdout. Candidate and weight selection also make the evidence
+selection-biased, so SRD is not promoted. See the
+[fixed SRD benchmark](../reports/srph_residual_diversity_hybrid_benchmark.md).
