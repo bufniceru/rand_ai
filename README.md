@@ -36,6 +36,19 @@ The Electron shell invokes `rand-ai-gui-bridge` with the project virtual
 environment. Set `RAND_AI_PYTHON` to a different Python executable when
 needed.
 
+### Application documentation
+
+The [Sphinx application guide](docs/app/index.md) covers installation, desktop
+workflows, data handling, security, architecture, and contributor operations.
+Build it locally with:
+
+```powershell
+uv run --group docs sphinx-build -W --keep-going -b html docs/app docs/_build/html
+```
+
+Open `docs/_build/html/index.html` after the build completes. The application
+guide is intentionally separate from the algorithm-specific papers below.
+
 ### Strategy documentation
 
 - [Chi-Square Frequency strategy](docs/chi-square-frequency-strategy.md) —

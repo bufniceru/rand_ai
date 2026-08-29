@@ -147,7 +147,14 @@ pipeline {
         stage('Sync Python environment') {
             steps {
                 withEnv(["PATH+UV=${env.UV_INSTALL_DIR}"]) {
-                    bat 'uv sync --locked'
+                    bat 'uv sync --locked --group docs'
+                }
+            }
+        }
+        stage('Build application documentation') {
+            steps {
+                withEnv(["PATH+UV=${env.UV_INSTALL_DIR}"]) {
+                    bat 'uv run --group docs sphinx-build -W --keep-going -b html docs/app docs/_build/html'
                 }
             }
         }
