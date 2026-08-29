@@ -85,6 +85,8 @@ _FRESH_RANDOM_SEED_OFFSET = 7919
 _FRESH_RANDOM_INFLUENCE = 0.35
 _SVC_RECURRENCE_PRIOR_DRAWS = 24.0
 _SVC_RECURRENCE_PROXIMITY_WEIGHT = 0.25
+_SRPH_RESIDUAL_PRIOR_DRAWS = 24.0
+_SRPH_RESIDUAL_WEIGHT = 0.10
 _CHAIN_EFFECTIVENESS_PRIOR_DRAWS = 24.0
 _CHAIN_EFFECTIVENESS_MINIMUM = 0.50
 _CHAIN_EFFECTIVENESS_MAXIMUM = 1.50
@@ -209,6 +211,7 @@ _BASE_STRATEGY_IDS = (
     "svc",
     "svc_recurrence_hybrid",
     "svc_recurrence_proximity_hybrid",
+    "srph_residual_diversity_hybrid",
     "tbl",
     "sklearn_svm",
     "lag_logistic",
@@ -237,6 +240,19 @@ _CHAIN_EXPERT_IDS = (
 )
 STRATEGY_IDS = (*_BASE_STRATEGY_IDS, "residual_coverage", "chained")
 _SVC_RECURRENCE_EXPERT_IDS = ("recurrence_dynamics", "svc")
+_SRPH_RESIDUAL_BASE_ID = "svc_recurrence_proximity_hybrid"
+_SRPH_RESIDUAL_CANDIDATE_IDS = (
+    "freshness",
+    "emd",
+    "bayesian",
+    "doublet_triplet_markov",
+)
+_SRPH_RESIDUAL_LABELS = {
+    "freshness": "Freshness",
+    "emd": "EMD",
+    "bayesian": "Bayesian",
+    "doublet_triplet_markov": "Doublet/Triplet Markov",
+}
 _CIS_EXPERTS = (
     ("freshness", "Freshness", 0.06),
     ("proximity", "Proximity", 0.05),
@@ -296,6 +312,10 @@ _STRATEGY_DEPENDENCIES = {
         "svc_recurrence_hybrid",
         "proximity",
     },
+    "srph_residual_diversity_hybrid": {
+        _SRPH_RESIDUAL_BASE_ID,
+        *_SRPH_RESIDUAL_CANDIDATE_IDS,
+    },
     "predictive_grid": {"emd", "markov100"},
     "cis": {
         "freshness",
@@ -327,6 +347,7 @@ _STRATEGY_DEPENDENCIES = {
             "categorical_chi_square",
             "svc_recurrence_hybrid",
             "svc_recurrence_proximity_hybrid",
+            "srph_residual_diversity_hybrid",
         }
     ),
     "chained": set(_CHAIN_EXPERT_IDS),
@@ -988,6 +1009,21 @@ class _StrategyState:
         }
         self.svc_recurrence_evaluated_draws = 0
         self.svc_recurrence_pending_rankings: dict[str, list[int]] = {}
+        self.srph_residual_total_hits = {
+            strategy_id: 0
+            for strategy_id in (
+                _SRPH_RESIDUAL_BASE_ID,
+                *_SRPH_RESIDUAL_CANDIDATE_IDS,
+            )
+        }
+        self.srph_residual_unique_added_hits = {
+            strategy_id: 0 for strategy_id in _SRPH_RESIDUAL_CANDIDATE_IDS
+        }
+        self.srph_residual_displaced_hits = {
+            strategy_id: 0 for strategy_id in _SRPH_RESIDUAL_CANDIDATE_IDS
+        }
+        self.srph_residual_evaluated_draws = 0
+        self.srph_residual_pending_rankings: dict[str, list[int]] = {}
         self.mkgsv = (
             MkgsvModel() if "mkgsv" in self.enabled_strategy_ids else None
         )
@@ -1813,6 +1849,27 @@ class _StrategyState:
             )
         self.svc_recurrence_evaluated_draws += 1
 
+    def _train_srph_residual_effectiveness(self, drawn: set[int]) -> None:
+        pending = self.srph_residual_pending_rankings
+        if not pending:
+            return
+        base_top = set(pending[_SRPH_RESIDUAL_BASE_ID][:_NUMBERS_PER_DRAW])
+        self.srph_residual_total_hits[_SRPH_RESIDUAL_BASE_ID] += len(
+            drawn.intersection(base_top)
+        )
+        for strategy_id in _SRPH_RESIDUAL_CANDIDATE_IDS:
+            candidate_top = set(pending[strategy_id][:_NUMBERS_PER_DRAW])
+            self.srph_residual_total_hits[strategy_id] += len(
+                drawn.intersection(candidate_top)
+            )
+            self.srph_residual_unique_added_hits[strategy_id] += len(
+                drawn.intersection(candidate_top.difference(base_top))
+            )
+            self.srph_residual_displaced_hits[strategy_id] += len(
+                drawn.intersection(base_top.difference(candidate_top))
+            )
+        self.srph_residual_evaluated_draws += 1
+
     def _train_decision_tree_selector(self, drawn: set[int]) -> None:
         pending_features = self.decision_tree_selector_pending_features
         pending_rankings = self.decision_tree_selector_pending_rankings
@@ -2173,6 +2230,124 @@ class _StrategyState:
             )
         return scores, details
 
+    def _srph_residual_quality(self, strategy_id: str) -> float:
+        return (
+            self.srph_residual_total_hits[strategy_id]
+            + _SRPH_RESIDUAL_PRIOR_DRAWS * _EXPECTED_RANDOM_HITS_PER_DRAW
+        ) / (
+            self.srph_residual_evaluated_draws + _SRPH_RESIDUAL_PRIOR_DRAWS
+        )
+
+    def _srph_residual_scores(
+        self,
+        rankings: dict[str, list[int]],
+        srph_scores: dict[int, float],
+        gaps: dict[int, int],
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        base_ranking = rankings[_SRPH_RESIDUAL_BASE_ID]
+        rank_maps = {
+            strategy_id: {
+                number: rank for rank, number in enumerate(ranking, start=1)
+            }
+            for strategy_id, ranking in (
+                (_SRPH_RESIDUAL_BASE_ID, base_ranking),
+                *(
+                    (strategy_id, rankings[strategy_id])
+                    for strategy_id in _SRPH_RESIDUAL_CANDIDATE_IDS
+                ),
+            )
+        }
+        counterfactual_scores: dict[str, dict[int, float]] = {}
+        counterfactual_rankings: dict[str, list[int]] = {}
+        for strategy_id in _SRPH_RESIDUAL_CANDIDATE_IDS:
+            scores = {
+                number: (
+                    (1 - _SRPH_RESIDUAL_WEIGHT) * srph_scores[number]
+                    + _SRPH_RESIDUAL_WEIGHT
+                    * (_NUMBER_COUNT - rank_maps[strategy_id][number])
+                    / (_NUMBER_COUNT - 1)
+                )
+                for number in range(1, _NUMBER_COUNT + 1)
+            }
+            counterfactual_scores[strategy_id] = scores
+            counterfactual_rankings[strategy_id] = _ranking_from_scores(
+                scores,
+                gaps,
+            )
+
+        self.srph_residual_pending_rankings = {
+            _SRPH_RESIDUAL_BASE_ID: list(base_ranking),
+            **counterfactual_rankings,
+        }
+        qualities = {
+            strategy_id: self._srph_residual_quality(strategy_id)
+            for strategy_id in (
+                _SRPH_RESIDUAL_BASE_ID,
+                *_SRPH_RESIDUAL_CANDIDATE_IDS,
+            )
+        }
+        selected_candidate = max(
+            _SRPH_RESIDUAL_CANDIDATE_IDS,
+            key=lambda strategy_id: (
+                qualities[strategy_id],
+                -_SRPH_RESIDUAL_CANDIDATE_IDS.index(strategy_id),
+            ),
+        )
+        use_residual = (
+            qualities[selected_candidate] > qualities[_SRPH_RESIDUAL_BASE_ID]
+        )
+        scores = (
+            counterfactual_scores[selected_candidate]
+            if use_residual
+            else dict(srph_scores)
+        )
+        base_weight = 1 - _SRPH_RESIDUAL_WEIGHT if use_residual else 1.0
+        residual_weight = _SRPH_RESIDUAL_WEIGHT if use_residual else 0.0
+        selected_label = _SRPH_RESIDUAL_LABELS[selected_candidate]
+        quality_summary = "; ".join(
+            f"{_SRPH_RESIDUAL_LABELS[strategy_id]} "
+            f"{qualities[strategy_id]:.3f}"
+            for strategy_id in _SRPH_RESIDUAL_CANDIDATE_IDS
+        )
+        net_lift = (
+            self.srph_residual_unique_added_hits[selected_candidate]
+            - self.srph_residual_displaced_hits[selected_candidate]
+        )
+        details: dict[int, tuple[str, ...]] = {}
+        for number in range(1, _NUMBER_COUNT + 1):
+            base_rank = rank_maps[_SRPH_RESIDUAL_BASE_ID][number]
+            candidate_rank = rank_maps[selected_candidate][number]
+            details[number] = (
+                (
+                    f"Selector {'selected ' + selected_label if use_residual else 'fallback to SRPH'}"
+                ),
+                (
+                    f"SRPH effective weight {base_weight:.1%}; rank #{base_rank}; "
+                    f"Top 6 {'yes' if base_rank <= _NUMBERS_PER_DRAW else 'no'}"
+                ),
+                (
+                    f"{selected_label} effective weight {residual_weight:.1%}; "
+                    f"rank #{candidate_rank}; "
+                    f"Top 6 {'yes' if candidate_rank <= _NUMBERS_PER_DRAW else 'no'}"
+                ),
+                (
+                    f"Quality SRPH {qualities[_SRPH_RESIDUAL_BASE_ID]:.3f}; "
+                    f"{selected_label} {qualities[selected_candidate]:.3f}"
+                ),
+                f"Candidate qualities {quality_summary}",
+                (
+                    f"Cumulative residual lift {net_lift:+d} hits "
+                    f"({self.srph_residual_unique_added_hits[selected_candidate]} "
+                    "added; "
+                    f"{self.srph_residual_displaced_hits[selected_candidate]} displaced)"
+                ),
+                (
+                    "Selector history "
+                    f"{self.srph_residual_evaluated_draws} completed draws"
+                ),
+            )
+        return scores, details
+
     @staticmethod
     def _consecutive_group_starts(
         numbers: Collection[int],
@@ -2236,6 +2411,9 @@ class _StrategyState:
 
         if "svc_recurrence_hybrid" in self.enabled_strategy_ids:
             self._train_svc_recurrence_effectiveness(drawn)
+
+        if "srph_residual_diversity_hybrid" in self.enabled_strategy_ids:
+            self._train_srph_residual_effectiveness(drawn)
 
         if self.mkgsv is not None:
             self.mkgsv.train(drawn)
@@ -4946,6 +5124,7 @@ class _StrategyState:
                     svc_details,
                 )
 
+        proximity_hybrid_scores: dict[int, float] = {}
         if "svc_recurrence_hybrid" in enabled:
             hybrid_scores, hybrid_details = self._svc_recurrence_scores(rankings)
             rankings["svc_recurrence_hybrid"] = _ranking_from_scores(
@@ -5169,6 +5348,30 @@ class _StrategyState:
                     doublet_triplet_markov_scores,
                     gaps,
                     doublet_triplet_markov_details,
+                )
+
+        if "srph_residual_diversity_hybrid" in enabled:
+            residual_scores, residual_details = self._srph_residual_scores(
+                rankings,
+                proximity_hybrid_scores,
+                gaps,
+            )
+            rankings["srph_residual_diversity_hybrid"] = _ranking_from_scores(
+                residual_scores,
+                gaps,
+            )
+            if "srph_residual_diversity_hybrid" in requested:
+                built["srph_residual_diversity_hybrid"] = _strategy(
+                    "srph_residual_diversity_hybrid",
+                    "SRD",
+                    (
+                        "Experimental guarded residual blend retaining SRPH "
+                        "unless a fixed 10% candidate blend has higher "
+                        "cumulative walk-forward Top-6 quality."
+                    ),
+                    residual_scores,
+                    gaps,
+                    residual_details,
                 )
 
         if "sklearn_svm" in enabled:

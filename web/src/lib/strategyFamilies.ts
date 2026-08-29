@@ -84,6 +84,7 @@ export const STRATEGY_FAMILY_BY_ID = {
   mixed: "ensembles-coverage",
   svc_recurrence_hybrid: "ensembles-coverage",
   svc_recurrence_proximity_hybrid: "ensembles-coverage",
+  srph_residual_diversity_hybrid: "ensembles-coverage",
   svc: "relationships-machine-learning",
   tbl: "relationships-machine-learning",
   sklearn_svm: "relationships-machine-learning",

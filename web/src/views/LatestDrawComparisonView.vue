@@ -122,6 +122,8 @@ function strategyFullName(strategy: DrawComparisonStrategy): string {
     svc_recurrence_hybrid: "SVC–Recurrence Hybrid (Experimental)",
     svc_recurrence_proximity_hybrid:
       "SVC–Recurrence–Proximity Hybrid (Experimental)",
+    srph_residual_diversity_hybrid:
+      "SRPH Residual Diversity Hybrid (Experimental)",
     tbl: "Temporal Behavior Learning",
     sklearn_svm: "Scikit Online SVM",
     lag_logistic: "Lagged Logistic",

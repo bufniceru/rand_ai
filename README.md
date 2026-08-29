@@ -44,7 +44,7 @@ needed.
 - [Exact-State Categorical Chi-Square strategy](docs/categorical-chi-square-strategy.md)
   — per-number gap and retained left/right-space dependency probabilities with
   hierarchical sparse-state backoff.
-- [Nonlinear Dynamics, Recurrence Dynamics, and the SVC hybrids](docs/nonlinear-dynamics-strategy.md)
+- [Nonlinear Dynamics, Recurrence Dynamics, and the SVC residual hybrids](docs/nonlinear-dynamics-strategy.md)
   — delay-embedded recurrence diagnostics, causal analogue ranking, the
   effectiveness-weighted experimental hybrids, limitations, and benchmarks.
 
