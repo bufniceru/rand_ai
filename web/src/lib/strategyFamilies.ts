@@ -82,6 +82,7 @@ export const STRATEGY_FAMILY_BY_ID = {
   co_occurrence: "relationships-machine-learning",
   doublet_triplet_markov: "markov-sequence",
   mixed: "ensembles-coverage",
+  svc_recurrence_hybrid: "ensembles-coverage",
   svc: "relationships-machine-learning",
   tbl: "relationships-machine-learning",
   sklearn_svm: "relationships-machine-learning",

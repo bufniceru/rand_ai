@@ -83,6 +83,7 @@ _MKRD_CENTER_WEIGHT = 0.10
 _RANDOM_SEED = 20260626
 _FRESH_RANDOM_SEED_OFFSET = 7919
 _FRESH_RANDOM_INFLUENCE = 0.35
+_SVC_RECURRENCE_PRIOR_DRAWS = 24.0
 _CHAIN_EFFECTIVENESS_PRIOR_DRAWS = 24.0
 _CHAIN_EFFECTIVENESS_MINIMUM = 0.50
 _CHAIN_EFFECTIVENESS_MAXIMUM = 1.50
@@ -205,6 +206,7 @@ _BASE_STRATEGY_IDS = (
     "doublet_triplet_markov",
     "mixed",
     "svc",
+    "svc_recurrence_hybrid",
     "tbl",
     "sklearn_svm",
     "lag_logistic",
@@ -232,6 +234,7 @@ _CHAIN_EXPERT_IDS = (
     "cis",
 )
 STRATEGY_IDS = (*_BASE_STRATEGY_IDS, "residual_coverage", "chained")
+_SVC_RECURRENCE_EXPERT_IDS = ("recurrence_dynamics", "svc")
 _CIS_EXPERTS = (
     ("freshness", "Freshness", 0.06),
     ("proximity", "Proximity", 0.05),
@@ -286,6 +289,7 @@ _STRATEGY_DEPENDENCIES = {
     "tbl": {"freshness", "proximity", "randomness"},
     "fresh_random": {"freshness", "randomness"},
     "mixed": {"freshness", "proximity", "emd", "bayesian"},
+    "svc_recurrence_hybrid": {"recurrence_dynamics", "svc"},
     "predictive_grid": {"emd", "markov100"},
     "cis": {
         "freshness",
@@ -315,6 +319,7 @@ _STRATEGY_DEPENDENCIES = {
             "sparse_neural_ticket",
             "decision_tree_selector",
             "categorical_chi_square",
+            "svc_recurrence_hybrid",
         }
     ),
     "chained": set(_CHAIN_EXPERT_IDS),
@@ -971,6 +976,11 @@ class _StrategyState:
         self.sparse_neural_ticket_history: list[list[str | int | None]] = []
         self.sparse_neural_ticket_ready = False
         self.sparse_neural_ticket_invalid = False
+        self.svc_recurrence_total_hits = {
+            strategy_id: 0 for strategy_id in _SVC_RECURRENCE_EXPERT_IDS
+        }
+        self.svc_recurrence_evaluated_draws = 0
+        self.svc_recurrence_pending_rankings: dict[str, list[int]] = {}
         self.mkgsv = (
             MkgsvModel() if "mkgsv" in self.enabled_strategy_ids else None
         )
@@ -1787,6 +1797,15 @@ class _StrategyState:
             self.chain_recent_hits[strategy_id].append(hits)
         self.chain_evaluated_draws += 1
 
+    def _train_svc_recurrence_effectiveness(self, drawn: set[int]) -> None:
+        if not self.svc_recurrence_pending_rankings:
+            return
+        for strategy_id, ranking in self.svc_recurrence_pending_rankings.items():
+            self.svc_recurrence_total_hits[strategy_id] += len(
+                drawn.intersection(ranking[:_NUMBERS_PER_DRAW])
+            )
+        self.svc_recurrence_evaluated_draws += 1
+
     def _train_decision_tree_selector(self, drawn: set[int]) -> None:
         pending_features = self.decision_tree_selector_pending_features
         pending_rankings = self.decision_tree_selector_pending_rankings
@@ -2026,6 +2045,72 @@ class _StrategyState:
             _CHAIN_EFFECTIVENESS_MAXIMUM,
         )
 
+    def _svc_recurrence_weights(self) -> dict[str, float]:
+        evaluated = self.svc_recurrence_evaluated_draws
+        qualities = {
+            strategy_id: (
+                self.svc_recurrence_total_hits[strategy_id]
+                + _SVC_RECURRENCE_PRIOR_DRAWS
+                * _EXPECTED_RANDOM_HITS_PER_DRAW
+            )
+            / (evaluated + _SVC_RECURRENCE_PRIOR_DRAWS)
+            for strategy_id in _SVC_RECURRENCE_EXPERT_IDS
+        }
+        quality_total = sum(qualities.values()) or 1.0
+        return {
+            strategy_id: quality / quality_total
+            for strategy_id, quality in qualities.items()
+        }
+
+    def _svc_recurrence_scores(
+        self,
+        rankings: dict[str, list[int]],
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        source_rankings = {
+            strategy_id: rankings[strategy_id]
+            for strategy_id in _SVC_RECURRENCE_EXPERT_IDS
+        }
+        self.svc_recurrence_pending_rankings = {
+            strategy_id: list(ranking)
+            for strategy_id, ranking in source_rankings.items()
+        }
+        rank_maps = {
+            strategy_id: {
+                number: rank for rank, number in enumerate(ranking, start=1)
+            }
+            for strategy_id, ranking in source_rankings.items()
+        }
+        weights = self._svc_recurrence_weights()
+        scores: dict[int, float] = {}
+        details: dict[int, tuple[str, ...]] = {}
+        for number in range(1, _NUMBER_COUNT + 1):
+            recurrence_rank = rank_maps["recurrence_dynamics"][number]
+            svc_rank = rank_maps["svc"][number]
+            recurrence_strength = (_NUMBER_COUNT - recurrence_rank) / (
+                _NUMBER_COUNT - 1
+            )
+            svc_strength = (_NUMBER_COUNT - svc_rank) / (_NUMBER_COUNT - 1)
+            scores[number] = (
+                weights["recurrence_dynamics"] * recurrence_strength
+                + weights["svc"] * svc_strength
+            )
+            details[number] = (
+                (
+                    f"Recurrence weight {weights['recurrence_dynamics']:.1%}; "
+                    f"rank #{recurrence_rank}; "
+                    f"Top 6 {'yes' if recurrence_rank <= _NUMBERS_PER_DRAW else 'no'}"
+                ),
+                (
+                    f"SVC weight {weights['svc']:.1%}; rank #{svc_rank}; "
+                    f"Top 6 {'yes' if svc_rank <= _NUMBERS_PER_DRAW else 'no'}"
+                ),
+                (
+                    "Effectiveness history "
+                    f"{self.svc_recurrence_evaluated_draws} completed draws"
+                ),
+            )
+        return scores, details
+
     @staticmethod
     def _consecutive_group_starts(
         numbers: Collection[int],
@@ -2086,6 +2171,9 @@ class _StrategyState:
 
         if "chained" in self.enabled_strategy_ids:
             self._train_chained_effectiveness(drawn)
+
+        if "svc_recurrence_hybrid" in self.enabled_strategy_ids:
+            self._train_svc_recurrence_effectiveness(drawn)
 
         if self.mkgsv is not None:
             self.mkgsv.train(drawn)
@@ -4794,6 +4882,26 @@ class _StrategyState:
                     svc_scores,
                     gaps,
                     svc_details,
+                )
+
+        if "svc_recurrence_hybrid" in enabled:
+            hybrid_scores, hybrid_details = self._svc_recurrence_scores(rankings)
+            rankings["svc_recurrence_hybrid"] = _ranking_from_scores(
+                hybrid_scores,
+                gaps,
+            )
+            if "svc_recurrence_hybrid" in requested:
+                built["svc_recurrence_hybrid"] = _strategy(
+                    "svc_recurrence_hybrid",
+                    "SRH",
+                    (
+                        "Experimental leakage-free rank blend of Recurrence "
+                        "Dynamics and SVC, weighted by cumulative walk-forward "
+                        "Top-6 effectiveness."
+                    ),
+                    hybrid_scores,
+                    gaps,
+                    hybrid_details,
                 )
 
         if "tbl" in enabled:

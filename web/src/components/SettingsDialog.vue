@@ -59,6 +59,8 @@ const strategyDescriptions: Record<StrategyId, string> = {
     "Consecutive doublet/triplet recurrence with first-order next-draw Markov transitions.",
   mixed: "Weighted consensus of four complementary strategies.",
   svc: "Online support-vector classification model.",
+  svc_recurrence_hybrid:
+    "Experimental leakage-free rank blend of SVC and Recurrence Dynamics, weighted by cumulative walk-forward effectiveness.",
   tbl: "Temporal behavior learning ensemble.",
   sklearn_svm:
     "Scikit-learn online linear SVM with temporal, expert-rank, and prior-efficacy inputs.",

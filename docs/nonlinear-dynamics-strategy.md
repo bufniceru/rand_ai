@@ -97,3 +97,27 @@ V2 parameters were selected after exploratory work on the included history, so
 that history is now regression evidence rather than independent confirmation. See
 [the fixed benchmark](../reports/recurrence_dynamics_benchmark.md) for the recorded
 V1 and V2 results.
+
+## SVC–Recurrence Hybrid
+
+**SVC–Recurrence Hybrid (Experimental)** is a separate opt-in strategy that
+combines the full 1–49 rankings from Recurrence Dynamics and the online Support
+Vector Classifier. It does not change either source strategy.
+
+For each source, cumulative Top-6 hits are updated only after the predicted draw
+is known. A neutral 24-draw prior shrinks its mean effectiveness toward the
+theoretical random expectation:
+
+```text
+quality = (past hits + 24 × 36/49) / (evaluated draws + 24)
+```
+
+The two qualities are normalized into weights. Each number's source rank becomes
+`(49 - rank) / 48`, and the hybrid score is the weighted sum of those two rank
+strengths. Before any completed forecast, the weights are exactly 50/50. Raw
+model scores are not mixed because the source score scales are not comparable.
+
+The hybrid uses no short-window response, agreement bonus, or fixed source quota.
+Its result is auditable through the displayed source weights and ranks. See the
+[fixed hybrid benchmark](../reports/svc_recurrence_hybrid_benchmark.md); the mixed
+historical result is why the strategy remains experimental.
