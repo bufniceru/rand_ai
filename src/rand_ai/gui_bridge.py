@@ -76,10 +76,11 @@ DEFAULT_STRATEGY_IDS = tuple(
         "svc_recurrence_hybrid",
         "svc_recurrence_proximity_hybrid",
         "srph_residual_diversity_hybrid",
+        "srph_minimax_regret_hybrid",
     }
 )
 MAX_HISTORY_WINDOW = 250
-STRATEGY_CACHE_SCHEMA_VERSION = 19
+STRATEGY_CACHE_SCHEMA_VERSION = 20
 STRATEGY_CACHE_MAX_ENTRIES = 20
 STRATEGY_CACHE_MAX_BYTES = 1024 * 1024 * 1024
 PROGRESS_PREFIX = "RAND_AI_PROGRESS "

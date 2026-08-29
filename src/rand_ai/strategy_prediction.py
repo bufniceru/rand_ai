@@ -7,7 +7,7 @@ from collections import deque
 from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass, replace
 from heapq import nlargest
-from itertools import combinations
+from itertools import combinations, product
 
 import numpy as np
 from sklearn.linear_model import SGDClassifier
@@ -87,6 +87,11 @@ _SVC_RECURRENCE_PRIOR_DRAWS = 24.0
 _SVC_RECURRENCE_PROXIMITY_WEIGHT = 0.25
 _SRPH_RESIDUAL_PRIOR_DRAWS = 24.0
 _SRPH_RESIDUAL_WEIGHT = 0.10
+_SRPH_MINIMAX_BLOCK_SIZE = 40
+_SRPH_MINIMAX_MINIMUM_BLOCKS = 4
+_SRPH_MINIMAX_WEIGHT_UNIT = 0.05
+_SRPH_MINIMAX_BASE_MINIMUM_UNITS = 10
+_SRPH_MINIMAX_RESIDUAL_MAXIMUM_UNITS = 4
 _CHAIN_EFFECTIVENESS_PRIOR_DRAWS = 24.0
 _CHAIN_EFFECTIVENESS_MINIMUM = 0.50
 _CHAIN_EFFECTIVENESS_MAXIMUM = 1.50
@@ -212,6 +217,7 @@ _BASE_STRATEGY_IDS = (
     "svc_recurrence_hybrid",
     "svc_recurrence_proximity_hybrid",
     "srph_residual_diversity_hybrid",
+    "srph_minimax_regret_hybrid",
     "tbl",
     "sklearn_svm",
     "lag_logistic",
@@ -253,6 +259,37 @@ _SRPH_RESIDUAL_LABELS = {
     "bayesian": "Bayesian",
     "doublet_triplet_markov": "Doublet/Triplet Markov",
 }
+_SRPH_MINIMAX_SOURCE_IDS = (
+    _SRPH_RESIDUAL_BASE_ID,
+    *_SRPH_RESIDUAL_CANDIDATE_IDS,
+)
+_SRPH_MINIMAX_LABELS = {
+    _SRPH_RESIDUAL_BASE_ID: "SRPH",
+    **_SRPH_RESIDUAL_LABELS,
+}
+
+
+def _srph_minimax_weight_candidates() -> tuple[tuple[int, ...], ...]:
+    """Return the frozen guarded 5% mixture grid in stable tie order."""
+    total_units = round(1 / _SRPH_MINIMAX_WEIGHT_UNIT)
+    candidates = []
+    residual_range = range(_SRPH_MINIMAX_RESIDUAL_MAXIMUM_UNITS + 1)
+    for residual_units in product(residual_range, repeat=4):
+        base_units = total_units - sum(residual_units)
+        if base_units >= _SRPH_MINIMAX_BASE_MINIMUM_UNITS:
+            candidates.append((base_units, *residual_units))
+    return tuple(
+        sorted(
+            candidates,
+            key=lambda weights: tuple(-weight for weight in weights),
+        )
+    )
+
+
+_SRPH_MINIMAX_WEIGHT_CANDIDATES = _srph_minimax_weight_candidates()
+_SRPH_MINIMAX_BASE_INDEX = _SRPH_MINIMAX_WEIGHT_CANDIDATES.index(
+    (20, 0, 0, 0, 0)
+)
 _CIS_EXPERTS = (
     ("freshness", "Freshness", 0.06),
     ("proximity", "Proximity", 0.05),
@@ -316,6 +353,7 @@ _STRATEGY_DEPENDENCIES = {
         _SRPH_RESIDUAL_BASE_ID,
         *_SRPH_RESIDUAL_CANDIDATE_IDS,
     },
+    "srph_minimax_regret_hybrid": set(_SRPH_MINIMAX_SOURCE_IDS),
     "predictive_grid": {"emd", "markov100"},
     "cis": {
         "freshness",
@@ -348,6 +386,7 @@ _STRATEGY_DEPENDENCIES = {
             "svc_recurrence_hybrid",
             "svc_recurrence_proximity_hybrid",
             "srph_residual_diversity_hybrid",
+            "srph_minimax_regret_hybrid",
         }
     ),
     "chained": set(_CHAIN_EXPERT_IDS),
@@ -1024,6 +1063,12 @@ class _StrategyState:
         }
         self.srph_residual_evaluated_draws = 0
         self.srph_residual_pending_rankings: dict[str, list[int]] = {}
+        self.srph_minimax_completed_blocks: list[tuple[int, ...]] = []
+        self.srph_minimax_current_block_hits = [
+            0 for _candidate in _SRPH_MINIMAX_WEIGHT_CANDIDATES
+        ]
+        self.srph_minimax_current_block_draws = 0
+        self.srph_minimax_pending_top_sixes: tuple[tuple[int, ...], ...] = ()
         self.mkgsv = (
             MkgsvModel() if "mkgsv" in self.enabled_strategy_ids else None
         )
@@ -1870,6 +1915,24 @@ class _StrategyState:
             )
         self.srph_residual_evaluated_draws += 1
 
+    def _train_srph_minimax_counterfactuals(self, drawn: set[int]) -> None:
+        pending = self.srph_minimax_pending_top_sixes
+        if not pending:
+            return
+        for index, top_numbers in enumerate(pending):
+            self.srph_minimax_current_block_hits[index] += len(
+                drawn.intersection(top_numbers)
+            )
+        self.srph_minimax_current_block_draws += 1
+        if self.srph_minimax_current_block_draws == _SRPH_MINIMAX_BLOCK_SIZE:
+            self.srph_minimax_completed_blocks.append(
+                tuple(self.srph_minimax_current_block_hits)
+            )
+            self.srph_minimax_current_block_hits = [
+                0 for _candidate in _SRPH_MINIMAX_WEIGHT_CANDIDATES
+            ]
+            self.srph_minimax_current_block_draws = 0
+
     def _train_decision_tree_selector(self, drawn: set[int]) -> None:
         pending_features = self.decision_tree_selector_pending_features
         pending_rankings = self.decision_tree_selector_pending_rankings
@@ -2348,6 +2411,137 @@ class _StrategyState:
             )
         return scores, details
 
+    def _srph_minimax_candidate_metrics(self, candidate_index: int) -> tuple[int, int]:
+        """Return worst completed-block regret and completed-history hits."""
+        if not self.srph_minimax_completed_blocks:
+            return 0, 0
+        candidate_hits = [
+            block[candidate_index]
+            for block in self.srph_minimax_completed_blocks
+        ]
+        oracle_hits = [max(block) for block in self.srph_minimax_completed_blocks]
+        return (
+            max(
+                oracle - candidate
+                for oracle, candidate in zip(oracle_hits, candidate_hits)
+            ),
+            sum(candidate_hits),
+        )
+
+    def _srph_minimax_selected_index(self) -> int:
+        """Choose the deterministic pure minimax-regret guarded mixture."""
+        if (
+            len(self.srph_minimax_completed_blocks)
+            < _SRPH_MINIMAX_MINIMUM_BLOCKS
+        ):
+            return _SRPH_MINIMAX_BASE_INDEX
+        return min(
+            range(len(_SRPH_MINIMAX_WEIGHT_CANDIDATES)),
+            key=lambda index: (
+                self._srph_minimax_candidate_metrics(index)[0],
+                -self._srph_minimax_candidate_metrics(index)[1],
+                *(
+                    -weight
+                    for weight in _SRPH_MINIMAX_WEIGHT_CANDIDATES[index]
+                ),
+            ),
+        )
+
+    def _srph_minimax_scores(
+        self,
+        rankings: dict[str, list[int]],
+        srph_scores: dict[int, float],
+        gaps: dict[int, int],
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        """Build and track every frozen guarded minimax counterfactual."""
+        rank_maps = {
+            strategy_id: {
+                number: rank for rank, number in enumerate(rankings[strategy_id], 1)
+            }
+            for strategy_id in _SRPH_MINIMAX_SOURCE_IDS
+        }
+        selected_index = self._srph_minimax_selected_index()
+        selected_units = _SRPH_MINIMAX_WEIGHT_CANDIDATES[selected_index]
+        selected_scores = dict(srph_scores)
+        pending_top_sixes: list[tuple[int, ...]] = []
+        total_units = round(1 / _SRPH_MINIMAX_WEIGHT_UNIT)
+
+        for index, weight_units in enumerate(_SRPH_MINIMAX_WEIGHT_CANDIDATES):
+            if index == _SRPH_MINIMAX_BASE_INDEX:
+                candidate_scores = dict(srph_scores)
+                candidate_ranking = list(rankings[_SRPH_RESIDUAL_BASE_ID])
+            else:
+                candidate_scores = {
+                    number: (
+                        weight_units[0] * srph_scores[number]
+                        + sum(
+                            weight_units[source_index]
+                            * (
+                                _NUMBER_COUNT
+                                - rank_maps[strategy_id][number]
+                            )
+                            / (_NUMBER_COUNT - 1)
+                            for source_index, strategy_id in enumerate(
+                                _SRPH_RESIDUAL_CANDIDATE_IDS,
+                                start=1,
+                            )
+                        )
+                    )
+                    / total_units
+                    for number in range(1, _NUMBER_COUNT + 1)
+                }
+                candidate_ranking = _ranking_from_scores(candidate_scores, gaps)
+            pending_top_sixes.append(
+                tuple(candidate_ranking[:_NUMBERS_PER_DRAW])
+            )
+            if index == selected_index:
+                selected_scores = candidate_scores
+
+        self.srph_minimax_pending_top_sixes = tuple(pending_top_sixes)
+        completed_blocks = len(self.srph_minimax_completed_blocks)
+        worst_regret, completed_hits = self._srph_minimax_candidate_metrics(
+            selected_index
+        )
+        warm_up = completed_blocks < _SRPH_MINIMAX_MINIMUM_BLOCKS
+        status = (
+            "Minimax warm-up fallback to SRPH "
+            f"({completed_blocks}/{_SRPH_MINIMAX_MINIMUM_BLOCKS} blocks)"
+            if warm_up
+            else "Minimax selected guarded blend"
+        )
+        details: dict[int, tuple[str, ...]] = {}
+        for number in range(1, _NUMBER_COUNT + 1):
+            source_details = tuple(
+                (
+                    f"{_SRPH_MINIMAX_LABELS[strategy_id]} weight "
+                    f"{units * _SRPH_MINIMAX_WEIGHT_UNIT:.1%}; "
+                    f"rank #{rank_maps[strategy_id][number]}; Top 6 "
+                    f"{'yes' if rank_maps[strategy_id][number] <= _NUMBERS_PER_DRAW else 'no'}"
+                )
+                for strategy_id, units in zip(
+                    _SRPH_MINIMAX_SOURCE_IDS,
+                    selected_units,
+                )
+            )
+            details[number] = (
+                status,
+                *source_details,
+                (
+                    f"Worst completed-block regret {worst_regret} hits; "
+                    f"counterfactual total {completed_hits} hits"
+                ),
+                (
+                    f"Completed game history {completed_blocks} blocks / "
+                    f"{completed_blocks * _SRPH_MINIMAX_BLOCK_SIZE} draws"
+                ),
+                (
+                    "Open block progress "
+                    f"{self.srph_minimax_current_block_draws}/"
+                    f"{_SRPH_MINIMAX_BLOCK_SIZE} draws"
+                ),
+            )
+        return selected_scores, details
+
     @staticmethod
     def _consecutive_group_starts(
         numbers: Collection[int],
@@ -2414,6 +2608,9 @@ class _StrategyState:
 
         if "srph_residual_diversity_hybrid" in self.enabled_strategy_ids:
             self._train_srph_residual_effectiveness(drawn)
+
+        if "srph_minimax_regret_hybrid" in self.enabled_strategy_ids:
+            self._train_srph_minimax_counterfactuals(drawn)
 
         if self.mkgsv is not None:
             self.mkgsv.train(drawn)
@@ -5372,6 +5569,30 @@ class _StrategyState:
                     residual_scores,
                     gaps,
                     residual_details,
+                )
+
+        if "srph_minimax_regret_hybrid" in enabled:
+            minimax_scores, minimax_details = self._srph_minimax_scores(
+                rankings,
+                proximity_hybrid_scores,
+                gaps,
+            )
+            rankings["srph_minimax_regret_hybrid"] = _ranking_from_scores(
+                minimax_scores,
+                gaps,
+            )
+            if "srph_minimax_regret_hybrid" in requested:
+                built["srph_minimax_regret_hybrid"] = _strategy(
+                    "srph_minimax_regret_hybrid",
+                    "SMR",
+                    (
+                        "Experimental pure minimax-regret selection over 503 "
+                        "guarded SRPH and residual rank blends, using only "
+                        "completed 40-draw blocks."
+                    ),
+                    minimax_scores,
+                    gaps,
+                    minimax_details,
                 )
 
         if "sklearn_svm" in enabled:

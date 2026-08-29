@@ -30,6 +30,7 @@ const strategyIds: StrategyId[] = [
   "svc_recurrence_hybrid",
   "svc_recurrence_proximity_hybrid",
   "srph_residual_diversity_hybrid",
+  "srph_minimax_regret_hybrid",
   "svc",
   "tbl",
   "sklearn_svm",

@@ -104,6 +104,10 @@ const strategyPlugins = [
     id: "srph_residual_diversity_hybrid",
     label: "SRPH Residual Diversity Hybrid (Experimental)",
   },
+  {
+    id: "srph_minimax_regret_hybrid",
+    label: "SRPH Minimax Regret Hybrid",
+  },
   { id: "tbl", label: "Temporal Behavior Learning" },
   { id: "sklearn_svm", label: "Scikit Online SVM" },
   { id: "lag_logistic", label: "Lagged Logistic" },
@@ -134,7 +138,8 @@ const defaultStrategyPluginIds = strategyPlugins
       strategyId !== "recurrence_dynamics" &&
       strategyId !== "svc_recurrence_hybrid" &&
       strategyId !== "svc_recurrence_proximity_hybrid" &&
-      strategyId !== "srph_residual_diversity_hybrid",
+      strategyId !== "srph_residual_diversity_hybrid" &&
+      strategyId !== "srph_minimax_regret_hybrid",
   );
 let enabledStrategyIds = new Set(defaultStrategyPluginIds);
 

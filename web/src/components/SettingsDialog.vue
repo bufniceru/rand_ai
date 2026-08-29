@@ -65,6 +65,8 @@ const strategyDescriptions: Record<StrategyId, string> = {
     "Experimental rank blend reserving 25% for Proximity and adaptively splitting 75% between SVC and Recurrence Dynamics.",
   srph_residual_diversity_hybrid:
     "Experimental guarded residual blend retaining SRPH unless a fixed 10% candidate blend has higher cumulative walk-forward quality.",
+  srph_minimax_regret_hybrid:
+    "Experimental minimax-regret selector over 503 guarded SRPH and residual blends using completed 40-draw blocks.",
   tbl: "Temporal behavior learning ensemble.",
   sklearn_svm:
     "Scikit-learn online linear SVM with temporal, expert-rank, and prior-efficacy inputs.",

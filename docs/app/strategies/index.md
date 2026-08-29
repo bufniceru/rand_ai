@@ -67,6 +67,7 @@ lagged-logistic
 svc-recurrence-hybrid
 svc-recurrence-proximity-hybrid
 srph-residual-diversity-hybrid
+srph-minimax-regret-hybrid
 decision-tree-selector
 residual-coverage
 ```

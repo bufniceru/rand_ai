@@ -39,6 +39,13 @@ from rand_ai.strategy_prediction import (
     _SRPH_RESIDUAL_BASE_ID,
     _SRPH_RESIDUAL_CANDIDATE_IDS,
     _SRPH_RESIDUAL_WEIGHT,
+    _SRPH_MINIMAX_BASE_INDEX,
+    _SRPH_MINIMAX_BLOCK_SIZE,
+    _SRPH_MINIMAX_MINIMUM_BLOCKS,
+    _SRPH_MINIMAX_RESIDUAL_MAXIMUM_UNITS,
+    _SRPH_MINIMAX_SOURCE_IDS,
+    _SRPH_MINIMAX_WEIGHT_CANDIDATES,
+    _SRPH_MINIMAX_WEIGHT_UNIT,
     _StrategyState,
     _median,
     _proximity_bucket,
@@ -52,7 +59,7 @@ from rand_ai.strategy_prediction import (
 )
 
 
-def test_builds_thirty_six_named_rankings_and_reports_progress() -> None:
+def test_builds_thirty_seven_named_rankings_and_reports_progress() -> None:
     draws = Draws()
     draws.add(Draw(1, 2, 8, 17, 31, 49))
     draws.add(Draw(3, 6, 12, 22, 36, 47))
@@ -94,6 +101,7 @@ def test_builds_thirty_six_named_rankings_and_reports_progress() -> None:
         "SRH",
         "SRPH",
         "SRD",
+        "SMR",
         "TBL",
         "Scikit Online SVM",
         "Lagged Logistic",
@@ -735,6 +743,146 @@ def test_srph_residual_diversity_selects_positive_blended_quality() -> None:
     assert details[1][-1] == "Selector history 1 completed draws"
 
 
+def test_srph_minimax_grid_and_warm_up_track_all_counterfactuals() -> None:
+    assert len(_SRPH_MINIMAX_WEIGHT_CANDIDATES) == 503
+    assert _SRPH_MINIMAX_BASE_INDEX == 0
+    assert _SRPH_MINIMAX_WEIGHT_CANDIDATES[0] == (20, 0, 0, 0, 0)
+    assert all(
+        sum(weights) == round(1 / _SRPH_MINIMAX_WEIGHT_UNIT)
+        and weights[0] >= 10
+        and all(
+            weight <= _SRPH_MINIMAX_RESIDUAL_MAXIMUM_UNITS
+            for weight in weights[1:]
+        )
+        for weights in _SRPH_MINIMAX_WEIGHT_CANDIDATES
+    )
+
+    state = _StrategyState(("srph_minimax_regret_hybrid",))
+    ascending = list(range(1, 50))
+    descending = list(range(49, 0, -1))
+    rankings = {
+        _SRPH_RESIDUAL_BASE_ID: ascending,
+        "freshness": descending,
+        "emd": ascending,
+        "bayesian": ascending,
+        "doublet_triplet_markov": ascending,
+    }
+    srph_scores = {
+        number: (49 - number) / 48 for number in range(1, 50)
+    }
+    gaps = {number: 0 for number in range(1, 50)}
+
+    assert state._srph_minimax_candidate_metrics(0) == (0, 0)
+    assert state._srph_minimax_selected_index() == _SRPH_MINIMAX_BASE_INDEX
+    scores, details = state._srph_minimax_scores(rankings, srph_scores, gaps)
+
+    assert scores == srph_scores
+    assert len(state.srph_minimax_pending_top_sixes) == 503
+    assert details[1][0] == "Minimax warm-up fallback to SRPH (0/4 blocks)"
+    assert details[1][1] == "SRPH weight 100.0%; rank #1; Top 6 yes"
+    assert details[1][2].startswith("Freshness weight 0.0%; rank #49")
+    assert details[1][-1] == "Open block progress 0/40 draws"
+
+    empty = _StrategyState(("srph_minimax_regret_hybrid",))
+    empty._train_srph_minimax_counterfactuals({1, 2, 3, 4, 5, 6})
+    for _index in range(_SRPH_MINIMAX_BLOCK_SIZE - 1):
+        state._train_srph_minimax_counterfactuals({1, 2, 3, 4, 5, 6})
+    assert state.srph_minimax_current_block_draws == 39
+    assert state.srph_minimax_completed_blocks == []
+    state._train_srph_minimax_counterfactuals({1, 2, 3, 4, 5, 6})
+    assert state.srph_minimax_current_block_draws == 0
+    assert len(state.srph_minimax_completed_blocks) == 1
+    assert len(state.srph_minimax_completed_blocks[0]) == 503
+
+
+def test_srph_minimax_selector_uses_regret_then_frozen_ties() -> None:
+    state = _StrategyState(("srph_minimax_regret_hybrid",))
+    freshness_index = _SRPH_MINIMAX_WEIGHT_CANDIDATES.index((19, 1, 0, 0, 0))
+    emd_index = _SRPH_MINIMAX_WEIGHT_CANDIDATES.index((19, 0, 1, 0, 0))
+    lower_base_index = _SRPH_MINIMAX_WEIGHT_CANDIDATES.index((18, 2, 0, 0, 0))
+    lower_total_index = _SRPH_MINIMAX_WEIGHT_CANDIDATES.index((17, 3, 0, 0, 0))
+    spike_indices = [
+        _SRPH_MINIMAX_WEIGHT_CANDIDATES.index(weights)
+        for weights in (
+            (16, 4, 0, 0, 0),
+            (16, 0, 4, 0, 0),
+            (16, 0, 0, 4, 0),
+            (16, 0, 0, 0, 4),
+        )
+    ]
+
+    def block(**values: int) -> tuple[int, ...]:
+        hits = [0] * len(_SRPH_MINIMAX_WEIGHT_CANDIDATES)
+        for key, value in values.items():
+            hits[int(key)] = value
+        return tuple(hits)
+
+    state.srph_minimax_completed_blocks = [
+        block(
+            **{
+                str(freshness_index): 10 if block_index == 3 else 11,
+                str(emd_index): 10 if block_index == 3 else 11,
+                str(lower_base_index): 10 if block_index == 3 else 11,
+                str(lower_total_index): 9 if block_index == 3 else 11,
+                str(spike_indices[block_index]): (
+                    10 if block_index == 3 else 12
+                ),
+            }
+        )
+        for block_index in range(_SRPH_MINIMAX_MINIMUM_BLOCKS)
+    ]
+    assert state._srph_minimax_candidate_metrics(freshness_index) == (1, 43)
+    assert state._srph_minimax_candidate_metrics(lower_total_index) == (1, 42)
+    assert state._srph_minimax_selected_index() == freshness_index
+    state.srph_minimax_current_block_hits[emd_index] = 240
+    state.srph_minimax_current_block_draws = 39
+    assert state._srph_minimax_selected_index() == freshness_index
+
+
+def test_srph_minimax_active_formula_and_details() -> None:
+    state = _StrategyState(("srph_minimax_regret_hybrid",))
+    selected_units = (10, 4, 4, 0, 2)
+    selected_index = _SRPH_MINIMAX_WEIGHT_CANDIDATES.index(selected_units)
+    block = [0] * len(_SRPH_MINIMAX_WEIGHT_CANDIDATES)
+    block[selected_index] = 20
+    state.srph_minimax_completed_blocks = [
+        tuple(block) for _index in range(_SRPH_MINIMAX_MINIMUM_BLOCKS)
+    ]
+    ascending = list(range(1, 50))
+    descending = list(range(49, 0, -1))
+    rankings = {
+        _SRPH_RESIDUAL_BASE_ID: ascending,
+        "freshness": descending,
+        "emd": descending,
+        "bayesian": ascending,
+        "doublet_triplet_markov": ascending,
+    }
+    srph_scores = {
+        number: (49 - number) / 48 for number in range(1, 50)
+    }
+    gaps = {number: 0 for number in range(1, 50)}
+
+    scores, details = state._srph_minimax_scores(rankings, srph_scores, gaps)
+
+    expected = (
+        10 * srph_scores[1]
+        + 4 * 0
+        + 4 * 0
+        + 0 * 1
+        + 2 * 1
+    ) / 20
+    assert state._srph_minimax_selected_index() == selected_index
+    assert scores[1] == pytest.approx(expected)
+    assert details[1][0] == "Minimax selected guarded blend"
+    assert details[1][1].startswith("SRPH weight 50.0%; rank #1")
+    assert details[1][2].startswith("Freshness weight 20.0%; rank #49")
+    assert details[1][5].startswith("Doublet/Triplet Markov weight 10.0%")
+    assert details[1][6] == (
+        "Worst completed-block regret 0 hits; counterfactual total 80 hits"
+    )
+    assert details[1][7] == "Completed game history 4 blocks / 160 draws"
+
+
 def test_svc_recurrence_hybrid_builds_with_hidden_sources() -> None:
     draws = Draws()
     draws.add(Draw(1, 2, 8, 17, 31, 49))
@@ -828,6 +976,42 @@ def test_srph_residual_diversity_builds_with_hidden_sources() -> None:
     assert hybrid.efficacy.evaluated_draws == 1
     assert hybrid.numbers[0].details[-1] == (
         "Selector history 1 completed draws"
+    )
+
+
+def test_srph_minimax_builds_with_hidden_sources() -> None:
+    draws = Draws()
+    draws.add(Draw(1, 2, 8, 17, 31, 49))
+    draws.add(Draw(3, 6, 12, 22, 36, 47))
+    draws.prepare_predictions()
+    state = _StrategyState(("srph_minimax_regret_hybrid",))
+
+    assert state.requested_strategy_ids == frozenset(
+        {"srph_minimax_regret_hybrid"}
+    )
+    assert {
+        *_SRPH_MINIMAX_SOURCE_IDS,
+        "svc_recurrence_hybrid",
+        "recurrence_dynamics",
+        "svc",
+        "proximity",
+    }.issubset(state.enabled_strategy_ids)
+
+    suites = build_prediction_suites(
+        draws.draws,
+        enabled_strategy_ids=("srph_minimax_regret_hybrid",),
+    )
+
+    assert [strategy.strategy_id for strategy in suites[-1].strategies] == [
+        "srph_minimax_regret_hybrid"
+    ]
+    hybrid = suites[-1].strategies[0]
+    assert hybrid.name == "SMR"
+    assert hybrid.evidence is None
+    assert hybrid.efficacy is not None
+    assert hybrid.efficacy.evaluated_draws == 1
+    assert hybrid.numbers[0].details[0] == (
+        "Minimax warm-up fallback to SRPH (0/4 blocks)"
     )
 
 
@@ -957,6 +1141,56 @@ def test_srph_residual_diversity_is_causal_and_preserves_sources() -> None:
     assert (
         with_residual_by_id["srph_residual_diversity_hybrid"].numbers
         == extended_residual.numbers
+    )
+
+
+def test_srph_minimax_is_causal_and_preserves_sources() -> None:
+    number_sets = (
+        (1, 8, 15, 22, 29, 36),
+        (2, 9, 16, 23, 30, 37),
+        (3, 10, 17, 24, 31, 38),
+        (4, 11, 18, 25, 32, 39),
+    )
+    prefix_draws = Draws()
+    extended_draws = Draws()
+    for index in range(8):
+        numbers = number_sets[index % len(number_sets)]
+        prefix_draws.add(Draw(*numbers))
+        extended_draws.add(Draw(*numbers))
+    extended_draws.add(Draw(5, 12, 19, 26, 33, 40))
+    prefix_draws.prepare_predictions()
+    extended_draws.prepare_predictions()
+
+    source_only = build_prediction_suites(
+        prefix_draws.draws,
+        history_start=7,
+        enabled_strategy_ids=_SRPH_MINIMAX_SOURCE_IDS,
+    )[0].strategies
+    with_minimax = build_prediction_suites(
+        prefix_draws.draws,
+        history_start=7,
+        enabled_strategy_ids=(
+            *_SRPH_MINIMAX_SOURCE_IDS,
+            "srph_minimax_regret_hybrid",
+        ),
+    )[0].strategies
+    extended_minimax = build_prediction_suites(
+        extended_draws.draws,
+        history_start=7,
+        enabled_strategy_ids=("srph_minimax_regret_hybrid",),
+    )[0].strategies[0]
+
+    source_only_by_id = {
+        strategy.strategy_id: strategy for strategy in source_only
+    }
+    with_minimax_by_id = {
+        strategy.strategy_id: strategy for strategy in with_minimax
+    }
+    for strategy_id in _SRPH_MINIMAX_SOURCE_IDS:
+        assert with_minimax_by_id[strategy_id] == source_only_by_id[strategy_id]
+    assert (
+        with_minimax_by_id["srph_minimax_regret_hybrid"].numbers
+        == extended_minimax.numbers
     )
 
 
