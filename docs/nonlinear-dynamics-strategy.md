@@ -121,3 +121,23 @@ The hybrid uses no short-window response, agreement bonus, or fixed source quota
 Its result is auditable through the displayed source weights and ranks. See the
 [fixed hybrid benchmark](../reports/svc_recurrence_hybrid_benchmark.md); the mixed
 historical result is why the strategy remains experimental.
+
+## SVC–Recurrence–Proximity Hybrid
+
+**SVC–Recurrence–Proximity Hybrid (Experimental)** is a separate default-disabled
+shadow strategy. It preserves the adaptive two-source score and injects the
+historical nearest-neighbor spacing profile from Proximity at a frozen 25%:
+
+```text
+score = 0.75 × SVC–Recurrence score + 0.25 × Proximity rank strength
+```
+
+The adaptive Recurrence and SVC weights therefore divide 75% of the score while
+Proximity always retains exactly 25%. At cold start the effective weights are
+37.5%, 37.5%, and 25%. The strategy adds no separate learner, recent window,
+agreement bonus, or source quota.
+
+Proximity and the 25% weight were selected after testing multiple alternatives,
+so the apparent improvement is selection-biased. The weight is frozen for future
+untouched-draw evaluation. See the
+[fixed SRPH benchmark](../reports/svc_recurrence_proximity_hybrid_benchmark.md).

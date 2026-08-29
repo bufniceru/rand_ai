@@ -49,7 +49,7 @@ from rand_ai.strategy_prediction import (
 )
 
 
-def test_builds_thirty_four_named_rankings_and_reports_progress() -> None:
+def test_builds_thirty_five_named_rankings_and_reports_progress() -> None:
     draws = Draws()
     draws.add(Draw(1, 2, 8, 17, 31, 49))
     draws.add(Draw(3, 6, 12, 22, 36, 47))
@@ -89,6 +89,7 @@ def test_builds_thirty_four_named_rankings_and_reports_progress() -> None:
         "Mix",
         "SVC",
         "SRH",
+        "SRPH",
         "TBL",
         "Scikit Online SVM",
         "Lagged Logistic",
@@ -607,6 +608,44 @@ def test_svc_recurrence_hybrid_uses_smoothed_prior_effectiveness() -> None:
     assert adapted_details[1][2] == "Effectiveness history 1 completed draws"
 
 
+def test_svc_recurrence_proximity_hybrid_uses_fixed_quarter_weight() -> None:
+    state = _StrategyState(("svc_recurrence_proximity_hybrid",))
+    ascending = list(range(1, 50))
+    descending = list(range(49, 0, -1))
+    rankings = {
+        "recurrence_dynamics": ascending,
+        "svc": descending,
+        "proximity": ascending,
+    }
+
+    pair_scores, _pair_details = state._svc_recurrence_scores(rankings)
+    scores, details = state._svc_recurrence_proximity_scores(
+        rankings,
+        pair_scores,
+    )
+
+    assert scores[1] == pytest.approx(0.625)
+    assert scores[49] == pytest.approx(0.375)
+    assert details[1] == (
+        "Recurrence effective weight 37.5%; rank #1; Top 6 yes",
+        "SVC effective weight 37.5%; rank #49; Top 6 no",
+        "Proximity fixed weight 25.0%; rank #1; Top 6 yes",
+        "Effectiveness history 0 completed draws",
+    )
+
+    state._train_svc_recurrence_effectiveness(set(range(1, 7)))
+    adapted_pair_scores, _pair_details = state._svc_recurrence_scores(rankings)
+    adapted_scores, adapted_details = state._svc_recurrence_proximity_scores(
+        rankings,
+        adapted_pair_scores,
+    )
+
+    assert adapted_scores[1] > scores[1]
+    assert adapted_scores[49] < scores[49]
+    assert adapted_details[1][2].startswith("Proximity fixed weight 25.0%")
+    assert adapted_details[1][3] == "Effectiveness history 1 completed draws"
+
+
 def test_svc_recurrence_hybrid_builds_with_hidden_sources() -> None:
     draws = Draws()
     draws.add(Draw(1, 2, 8, 17, 31, 49))
@@ -627,6 +666,41 @@ def test_svc_recurrence_hybrid_builds_with_hidden_sources() -> None:
     assert hybrid.efficacy is not None
     assert hybrid.efficacy.evaluated_draws == 1
     assert hybrid.numbers[0].details[2] == (
+        "Effectiveness history 1 completed draws"
+    )
+
+
+def test_svc_recurrence_proximity_hybrid_builds_with_hidden_sources() -> None:
+    draws = Draws()
+    draws.add(Draw(1, 2, 8, 17, 31, 49))
+    draws.add(Draw(3, 6, 12, 22, 36, 47))
+    draws.prepare_predictions()
+    state = _StrategyState(("svc_recurrence_proximity_hybrid",))
+
+    assert state.requested_strategy_ids == frozenset(
+        {"svc_recurrence_proximity_hybrid"}
+    )
+    assert {
+        "svc_recurrence_hybrid",
+        "recurrence_dynamics",
+        "svc",
+        "proximity",
+    }.issubset(state.enabled_strategy_ids)
+
+    suites = build_prediction_suites(
+        draws.draws,
+        enabled_strategy_ids=("svc_recurrence_proximity_hybrid",),
+    )
+
+    assert [strategy.strategy_id for strategy in suites[-1].strategies] == [
+        "svc_recurrence_proximity_hybrid"
+    ]
+    hybrid = suites[-1].strategies[0]
+    assert hybrid.name == "SRPH"
+    assert hybrid.evidence is None
+    assert hybrid.efficacy is not None
+    assert hybrid.efficacy.evaluated_draws == 1
+    assert hybrid.numbers[0].details[3] == (
         "Effectiveness history 1 completed draws"
     )
 
@@ -661,6 +735,52 @@ def test_svc_recurrence_hybrid_is_independent_of_future_dataset_length() -> None
 
     assert prefix_hybrid.top_numbers == extended_hybrid.top_numbers
     assert prefix_hybrid.numbers == extended_hybrid.numbers
+
+
+def test_svc_recurrence_proximity_hybrid_is_causal_and_preserves_srh() -> None:
+    number_sets = (
+        (1, 8, 15, 22, 29, 36),
+        (2, 9, 16, 23, 30, 37),
+        (3, 10, 17, 24, 31, 38),
+        (4, 11, 18, 25, 32, 39),
+    )
+    prefix_draws = Draws()
+    extended_draws = Draws()
+    for index in range(40):
+        numbers = number_sets[index % len(number_sets)]
+        prefix_draws.add(Draw(*numbers))
+        extended_draws.add(Draw(*numbers))
+    extended_draws.add(Draw(5, 12, 19, 26, 33, 40))
+    prefix_draws.prepare_predictions()
+    extended_draws.prepare_predictions()
+
+    srh_only = build_prediction_suites(
+        prefix_draws.draws,
+        history_start=39,
+        enabled_strategy_ids=("svc_recurrence_hybrid",),
+    )[0].strategies[0]
+    prefix_strategies = build_prediction_suites(
+        prefix_draws.draws,
+        history_start=39,
+        enabled_strategy_ids=(
+            "svc_recurrence_hybrid",
+            "svc_recurrence_proximity_hybrid",
+        ),
+    )[0].strategies
+    extended_srph = build_prediction_suites(
+        extended_draws.draws,
+        history_start=39,
+        enabled_strategy_ids=("svc_recurrence_proximity_hybrid",),
+    )[0].strategies[0]
+
+    prefix_by_id = {
+        strategy.strategy_id: strategy for strategy in prefix_strategies
+    }
+    assert prefix_by_id["svc_recurrence_hybrid"] == srh_only
+    assert (
+        prefix_by_id["svc_recurrence_proximity_hybrid"].numbers
+        == extended_srph.numbers
+    )
 
 
 def test_residual_coverage_prioritizes_uncovered_overdue_numbers() -> None:

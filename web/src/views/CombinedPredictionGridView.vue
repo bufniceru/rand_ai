@@ -486,6 +486,8 @@ function strategyFullName(strategy: StrategyPrediction): string {
     mixed: "Mixed Prediction",
     svc: "Support Vector Classifier",
     svc_recurrence_hybrid: "SVC–Recurrence Hybrid (Experimental)",
+    svc_recurrence_proximity_hybrid:
+      "SVC–Recurrence–Proximity Hybrid (Experimental)",
     tbl: "Temporal Behavior Learning",
     sklearn_svm: "Scikit Online SVM",
     lag_logistic: "Lagged Logistic",

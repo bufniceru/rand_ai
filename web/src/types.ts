@@ -42,6 +42,7 @@ export type StrategyId =
   | "mixed"
   | "svc"
   | "svc_recurrence_hybrid"
+  | "svc_recurrence_proximity_hybrid"
   | "tbl"
   | "sklearn_svm"
   | "lag_logistic"

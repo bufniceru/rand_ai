@@ -61,6 +61,8 @@ const strategyDescriptions: Record<StrategyId, string> = {
   svc: "Online support-vector classification model.",
   svc_recurrence_hybrid:
     "Experimental leakage-free rank blend of SVC and Recurrence Dynamics, weighted by cumulative walk-forward effectiveness.",
+  svc_recurrence_proximity_hybrid:
+    "Experimental rank blend reserving 25% for Proximity and adaptively splitting 75% between SVC and Recurrence Dynamics.",
   tbl: "Temporal behavior learning ensemble.",
   sklearn_svm:
     "Scikit-learn online linear SVM with temporal, expert-rank, and prior-efficacy inputs.",
