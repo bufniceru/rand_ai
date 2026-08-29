@@ -44,6 +44,9 @@ needed.
 - [Exact-State Categorical Chi-Square strategy](docs/categorical-chi-square-strategy.md)
   — per-number gap and retained left/right-space dependency probabilities with
   hierarchical sparse-state backoff.
+- [Nonlinear Dynamics and Recurrence Dynamics](docs/nonlinear-dynamics-strategy.md)
+  — delay-embedded recurrence diagnostics, causal analogue ranking, fixed
+  evidence gates, limitations, and benchmark interpretation.
 
 ### Opening a dataset
 

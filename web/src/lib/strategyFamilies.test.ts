@@ -10,6 +10,7 @@ const strategyIds: StrategyId[] = [
   "proximity",
   "freshness",
   "emd",
+  "recurrence_dynamics",
   "randomness",
   "fresh_random",
   "chi_square",

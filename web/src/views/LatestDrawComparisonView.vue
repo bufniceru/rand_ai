@@ -101,6 +101,7 @@ function strategyFullName(strategy: DrawComparisonStrategy): string {
     proximity: "Proximity",
     freshness: "Freshness",
     emd: "Earth Mover Distance",
+    recurrence_dynamics: "Recurrence Dynamics (Experimental)",
     randomness: "Random Baseline",
     fresh_random: "Fresh Random",
     chi_square: "Chi-square Frequency",

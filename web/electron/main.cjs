@@ -24,6 +24,7 @@ const reportPlugins = [
   { id: "space-groups", label: "Border Groups" },
   { id: "relationships", label: "Relationships" },
   { id: "randomness", label: "Randomness" },
+  { id: "nonlinear-dynamics", label: "Nonlinear Dynamics" },
   { id: "autocorrelation", label: "Autocorrelation" },
   { id: "co-occurrence", label: "Co-occurrence" },
   { id: "prediction-audit", label: "Prediction Audit" },
@@ -41,6 +42,7 @@ const legacyReportPluginIds = reportPlugins
   .map((plugin) => plugin.id)
   .filter(
     (reportId) =>
+      reportId !== "nonlinear-dynamics" &&
       reportId !== "autocorrelation" &&
       reportId !== "co-occurrence" &&
       reportId !== "prediction-audit" &&
@@ -66,6 +68,10 @@ const strategyPlugins = [
   { id: "proximity", label: "Proximity" },
   { id: "freshness", label: "Freshness" },
   { id: "emd", label: "Earth Mover Distance" },
+  {
+    id: "recurrence_dynamics",
+    label: "Recurrence Dynamics (Experimental)",
+  },
   { id: "randomness", label: "Random baseline" },
   { id: "fresh_random", label: "Fresh Random" },
   { id: "chi_square", label: "Chi-square Frequency" },
@@ -112,7 +118,8 @@ const defaultStrategyPluginIds = strategyPlugins
       strategyId !== "sklearn_svm" &&
       strategyId !== "lag_logistic" &&
       strategyId !== "sparse_neural_ticket" &&
-      strategyId !== "decision_tree_selector",
+      strategyId !== "decision_tree_selector" &&
+      strategyId !== "recurrence_dynamics",
   );
 let enabledStrategyIds = new Set(defaultStrategyPluginIds);
 
@@ -123,6 +130,7 @@ const dashboardViews = [
   ["space-groups", "Border Groups"],
   ["relationships", "Relationships"],
   ["randomness", "Randomness"],
+  ["nonlinear-dynamics", "Nonlinear Dynamics"],
   ["autocorrelation", "Autocorrelation"],
   ["co-occurrence", "Co-occurrence"],
   ["prediction-audit", "Prediction Audit"],

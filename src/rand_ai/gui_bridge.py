@@ -23,6 +23,7 @@ from rand_ai.lotto_results import (
     resolve_lotto_results_yaml,
     upsert_lotto_result,
 )
+from rand_ai.nonlinear_dynamics import nonlinear_dynamics_analysis
 from rand_ai.statistics import CorrelationMethod, DrawsStatistics
 from rand_ai.space_groups import (
     DEFAULT_BORDER_SPACE,
@@ -45,6 +46,7 @@ REPORT_IDS = (
     "space-groups",
     "relationships",
     "randomness",
+    "nonlinear-dynamics",
     "autocorrelation",
     "co-occurrence",
     "prediction-audit",
@@ -70,10 +72,11 @@ DEFAULT_STRATEGY_IDS = tuple(
         "lag_logistic",
         "sparse_neural_ticket",
         "decision_tree_selector",
+        "recurrence_dynamics",
     }
 )
 MAX_HISTORY_WINDOW = 250
-STRATEGY_CACHE_SCHEMA_VERSION = 14
+STRATEGY_CACHE_SCHEMA_VERSION = 16
 STRATEGY_CACHE_MAX_ENTRIES = 20
 STRATEGY_CACHE_MAX_BYTES = 1024 * 1024 * 1024
 PROGRESS_PREFIX = "RAND_AI_PROGRESS "
@@ -370,6 +373,7 @@ def _prediction_progress(
 
 def _strategy_payload(strategy: StrategyPrediction) -> dict[str, Any]:
     efficacy = strategy.efficacy
+    evidence = strategy.evidence
     return {
         "id": strategy.strategy_id,
         "name": strategy.name,
@@ -388,6 +392,20 @@ def _strategy_payload(strategy: StrategyPrediction) -> dict[str, Any]:
                     efficacy.random_average_hits_per_draw
                 ),
                 "hitDifference": efficacy.hit_difference,
+            }
+        ),
+        "evidence": (
+            None
+            if evidence is None
+            else {
+                "status": evidence.status,
+                "score": evidence.score,
+                "summary": evidence.summary,
+                "evaluatedForecasts": evidence.evaluated_forecasts,
+                "analogueCount": evidence.analogue_count,
+                "effectiveNeighbors": evidence.effective_neighbors,
+                "distancePercentile": evidence.distance_percentile,
+                "averageHitsPerDraw": evidence.average_hits_per_draw,
             }
         ),
         "numbers": [
@@ -766,6 +784,12 @@ def build_analysis_payload(
         report_ids,
         progress,
     )
+    nonlinear_dynamics_payload: dict[str, object] | None = None
+    if "nonlinear-dynamics" in report_set:
+        nonlinear_dynamics_payload, nonlinear_tables = nonlinear_dynamics_analysis(
+            [tuple(ball.value for ball in draw.balls) for draw in draws.draws]
+        )
+        tables.update(nonlinear_tables)
     space_group_payload: dict[str, object] | None = None
     if "space-groups" in report_set:
         _report_progress(progress, 83, "Analyzing border-space groups")
@@ -849,6 +873,7 @@ def build_analysis_payload(
             name: _table_payload(table) for name, table in tables.items()
         },
         "spaceGroups": space_group_payload,
+        "nonlinearDynamics": nonlinear_dynamics_payload,
         "history": history,
         "analysisHistory": (
             [
@@ -1043,6 +1068,11 @@ def write_export_archive(
             border_space, target_group_count
         )
         tables.update(group_tables)
+    if "nonlinear-dynamics" in report_ids:
+        _payload, nonlinear_tables = nonlinear_dynamics_analysis(
+            [tuple(ball.value for ball in draw.balls) for draw in draws.draws]
+        )
+        tables.update(nonlinear_tables)
     metadata = {
         "source": str(source_path.resolve()),
         "drawCount": statistics.draw_count,

@@ -49,7 +49,7 @@ from rand_ai.strategy_prediction import (
 )
 
 
-def test_builds_thirty_two_named_rankings_and_reports_progress() -> None:
+def test_builds_thirty_three_named_rankings_and_reports_progress() -> None:
     draws = Draws()
     draws.add(Draw(1, 2, 8, 17, 31, 49))
     draws.add(Draw(3, 6, 12, 22, 36, 47))
@@ -70,6 +70,7 @@ def test_builds_thirty_two_named_rankings_and_reports_progress() -> None:
         "Prox",
         "Fresh",
         "EMD",
+        "Recurrence Dynamics (Experimental)",
         "Rand",
         "FRnd",
         "Chi²",

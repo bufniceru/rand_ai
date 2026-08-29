@@ -84,6 +84,7 @@ docs/
 !docs/
 docs/*
 !docs/chi-square-frequency-strategy.md
+!docs/nonlinear-dynamics-strategy.md
 *.pdf
 *.doc
 *.docx

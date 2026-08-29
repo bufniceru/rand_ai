@@ -37,6 +37,8 @@ const strategyDescriptions: Record<StrategyId, string> = {
   proximity: "Nearest-neighbor spacing profile.",
   freshness: "Gap recency and historical hit-rate model.",
   emd: "Earth-mover similarity to historical draw vectors.",
+  recurrence_dynamics:
+    "Experimental V2 three-draw recurrence using eight causal value analogues.",
   randomness: "Deterministic random comparison baseline.",
   fresh_random: "Seeded random ranking guided 35% by freshness.",
   chi_square: "Signed frequency deviation from uniform random expectation.",
