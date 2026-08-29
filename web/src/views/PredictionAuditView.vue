@@ -18,6 +18,11 @@ interface SelectedOccurrence {
 }
 
 const selectedStrategyId = ref<"all" | StrategyId>("all");
+
+function activeStrategyName(name: string): string {
+  return name.replace(/ \(Experimental\)$/, "");
+}
+
 const historyScope = ref<HistoryScope>("all");
 const selectedOccurrence = ref<SelectedOccurrence | null>(null);
 
@@ -27,7 +32,7 @@ const strategyCatalog = computed(() => {
   for (const record of records.value) {
     for (const item of record.numbers) {
       for (const strategy of item.strategies) {
-        catalog.set(strategy.id, strategy.name);
+        catalog.set(strategy.id, activeStrategyName(strategy.name));
       }
     }
   }
@@ -83,7 +88,7 @@ const numberSummary = computed(() =>
       for (const strategy of strategies) {
         const current = strategyCounts.get(strategy.id);
         strategyCounts.set(strategy.id, {
-          name: strategy.name,
+          name: activeStrategyName(strategy.name),
           count: (current?.count ?? 0) + 1,
         });
       }
