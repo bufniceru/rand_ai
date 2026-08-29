@@ -96,6 +96,10 @@ const strategyPlugins = [
     id: "svc_recurrence_hybrid",
     label: "SVC–Recurrence Hybrid (Experimental)",
   },
+  {
+    id: "svc_recurrence_proximity_hybrid",
+    label: "SVC–Recurrence–Proximity Hybrid (Experimental)",
+  },
   { id: "tbl", label: "Temporal Behavior Learning" },
   { id: "sklearn_svm", label: "Scikit Online SVM" },
   { id: "lag_logistic", label: "Lagged Logistic" },
@@ -124,7 +128,8 @@ const defaultStrategyPluginIds = strategyPlugins
       strategyId !== "sparse_neural_ticket" &&
       strategyId !== "decision_tree_selector" &&
       strategyId !== "recurrence_dynamics" &&
-      strategyId !== "svc_recurrence_hybrid",
+      strategyId !== "svc_recurrence_hybrid" &&
+      strategyId !== "svc_recurrence_proximity_hybrid",
   );
 let enabledStrategyIds = new Set(defaultStrategyPluginIds);
 

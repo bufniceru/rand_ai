@@ -84,6 +84,7 @@ _RANDOM_SEED = 20260626
 _FRESH_RANDOM_SEED_OFFSET = 7919
 _FRESH_RANDOM_INFLUENCE = 0.35
 _SVC_RECURRENCE_PRIOR_DRAWS = 24.0
+_SVC_RECURRENCE_PROXIMITY_WEIGHT = 0.25
 _CHAIN_EFFECTIVENESS_PRIOR_DRAWS = 24.0
 _CHAIN_EFFECTIVENESS_MINIMUM = 0.50
 _CHAIN_EFFECTIVENESS_MAXIMUM = 1.50
@@ -207,6 +208,7 @@ _BASE_STRATEGY_IDS = (
     "mixed",
     "svc",
     "svc_recurrence_hybrid",
+    "svc_recurrence_proximity_hybrid",
     "tbl",
     "sklearn_svm",
     "lag_logistic",
@@ -290,6 +292,10 @@ _STRATEGY_DEPENDENCIES = {
     "fresh_random": {"freshness", "randomness"},
     "mixed": {"freshness", "proximity", "emd", "bayesian"},
     "svc_recurrence_hybrid": {"recurrence_dynamics", "svc"},
+    "svc_recurrence_proximity_hybrid": {
+        "svc_recurrence_hybrid",
+        "proximity",
+    },
     "predictive_grid": {"emd", "markov100"},
     "cis": {
         "freshness",
@@ -320,6 +326,7 @@ _STRATEGY_DEPENDENCIES = {
             "decision_tree_selector",
             "categorical_chi_square",
             "svc_recurrence_hybrid",
+            "svc_recurrence_proximity_hybrid",
         }
     ),
     "chained": set(_CHAIN_EXPERT_IDS),
@@ -2103,6 +2110,61 @@ class _StrategyState:
                 (
                     f"SVC weight {weights['svc']:.1%}; rank #{svc_rank}; "
                     f"Top 6 {'yes' if svc_rank <= _NUMBERS_PER_DRAW else 'no'}"
+                ),
+                (
+                    "Effectiveness history "
+                    f"{self.svc_recurrence_evaluated_draws} completed draws"
+                ),
+            )
+        return scores, details
+
+    def _svc_recurrence_proximity_scores(
+        self,
+        rankings: dict[str, list[int]],
+        svc_recurrence_scores: dict[int, float],
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+        weights = self._svc_recurrence_weights()
+        pair_weight = 1 - _SVC_RECURRENCE_PROXIMITY_WEIGHT
+        recurrence_weight = pair_weight * weights["recurrence_dynamics"]
+        svc_weight = pair_weight * weights["svc"]
+        rank_maps = {
+            strategy_id: {
+                number: rank for rank, number in enumerate(ranking, start=1)
+            }
+            for strategy_id, ranking in (
+                ("recurrence_dynamics", rankings["recurrence_dynamics"]),
+                ("svc", rankings["svc"]),
+                ("proximity", rankings["proximity"]),
+            )
+        }
+        scores: dict[int, float] = {}
+        details: dict[int, tuple[str, ...]] = {}
+        for number in range(1, _NUMBER_COUNT + 1):
+            recurrence_rank = rank_maps["recurrence_dynamics"][number]
+            svc_rank = rank_maps["svc"][number]
+            proximity_rank = rank_maps["proximity"][number]
+            proximity_strength = (_NUMBER_COUNT - proximity_rank) / (
+                _NUMBER_COUNT - 1
+            )
+            scores[number] = (
+                pair_weight * svc_recurrence_scores[number]
+                + _SVC_RECURRENCE_PROXIMITY_WEIGHT * proximity_strength
+            )
+            details[number] = (
+                (
+                    f"Recurrence effective weight {recurrence_weight:.1%}; "
+                    f"rank #{recurrence_rank}; "
+                    f"Top 6 {'yes' if recurrence_rank <= _NUMBERS_PER_DRAW else 'no'}"
+                ),
+                (
+                    f"SVC effective weight {svc_weight:.1%}; rank #{svc_rank}; "
+                    f"Top 6 {'yes' if svc_rank <= _NUMBERS_PER_DRAW else 'no'}"
+                ),
+                (
+                    "Proximity fixed weight "
+                    f"{_SVC_RECURRENCE_PROXIMITY_WEIGHT:.1%}; "
+                    f"rank #{proximity_rank}; "
+                    f"Top 6 {'yes' if proximity_rank <= _NUMBERS_PER_DRAW else 'no'}"
                 ),
                 (
                     "Effectiveness history "
@@ -4903,6 +4965,31 @@ class _StrategyState:
                     gaps,
                     hybrid_details,
                 )
+
+            if "svc_recurrence_proximity_hybrid" in enabled:
+                proximity_hybrid_scores, proximity_hybrid_details = (
+                    self._svc_recurrence_proximity_scores(
+                        rankings,
+                        hybrid_scores,
+                    )
+                )
+                rankings["svc_recurrence_proximity_hybrid"] = (
+                    _ranking_from_scores(proximity_hybrid_scores, gaps)
+                )
+                if "svc_recurrence_proximity_hybrid" in requested:
+                    built["svc_recurrence_proximity_hybrid"] = _strategy(
+                        "svc_recurrence_proximity_hybrid",
+                        "SRPH",
+                        (
+                            "Experimental rank blend reserving 25% for "
+                            "Proximity and splitting 75% between Recurrence "
+                            "Dynamics and SVC by cumulative walk-forward "
+                            "Top-6 effectiveness."
+                        ),
+                        proximity_hybrid_scores,
+                        gaps,
+                        proximity_hybrid_details,
+                    )
 
         if "tbl" in enabled:
             self.prior_rankings = {

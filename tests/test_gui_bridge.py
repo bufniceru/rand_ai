@@ -76,6 +76,7 @@ def test_parses_strategy_plugin_selection_in_stable_order() -> None:
     assert "decision_tree_selector" not in DEFAULT_STRATEGY_IDS
     assert "recurrence_dynamics" not in DEFAULT_STRATEGY_IDS
     assert "svc_recurrence_hybrid" not in DEFAULT_STRATEGY_IDS
+    assert "svc_recurrence_proximity_hybrid" not in DEFAULT_STRATEGY_IDS
     assert parse_strategy_ids("") == ()
     with pytest.raises(argparse.ArgumentTypeError, match="unknown prediction strategy"):
         parse_strategy_ids("freshness,unknown")
@@ -418,6 +419,26 @@ def test_svc_recurrence_hybrid_serializes_without_recurrence_evidence(
     assert strategy["efficacy"]["evaluatedDraws"] == 2
     assert payload["strategyEfficacyHistory"][-1]["strategyHits"].keys() == {
         "svc_recurrence_hybrid"
+    }
+
+
+def test_svc_recurrence_proximity_hybrid_serializes_as_shadow_strategy(
+    tmp_path: Path,
+) -> None:
+    payload = build_analysis_payload(
+        _draws(),
+        _pickle_path(tmp_path),
+        enabled_reports=("predictions", "strategy-effectiveness"),
+        enabled_strategies=("svc_recurrence_proximity_hybrid",),
+    )
+
+    strategy = payload["predictionSuites"][-1]["strategies"][0]
+    assert strategy["id"] == "svc_recurrence_proximity_hybrid"
+    assert strategy["name"] == "SRPH"
+    assert strategy["evidence"] is None
+    assert strategy["efficacy"]["evaluatedDraws"] == 2
+    assert payload["strategyEfficacyHistory"][-1]["strategyHits"].keys() == {
+        "svc_recurrence_proximity_hybrid"
     }
 
 
