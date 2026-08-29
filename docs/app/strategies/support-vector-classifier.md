@@ -1,4 +1,4 @@
-# #1 Support Vector Classifier
+# Support Vector Classifier
 
 ## Introduction
 
