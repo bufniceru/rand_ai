@@ -50,8 +50,9 @@ uv run --group docs sphinx-build -W --keep-going -b html docs/app docs/_build/ht
 ```
 
 Warnings fail the build. Keep internal links valid, ensure examples match the
-current interface, and keep implementation-specific algorithm material outside
-this application guide.
+current interface, and keep the general application chapters independent of
+ranking algorithms. Put reviewed implementation-specific strategy material in
+the dedicated **Strategies** section.
 
 ## Packaging and CI
 

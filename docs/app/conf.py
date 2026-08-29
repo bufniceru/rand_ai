@@ -16,6 +16,7 @@ version = release
 extensions = [
     "myst_parser",
     "sphinx.ext.autosectionlabel",
+    "sphinx.ext.mathjax",
 ]
 
 source_suffix = {".md": "markdown"}

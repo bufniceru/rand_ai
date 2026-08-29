@@ -8,8 +8,9 @@ Python engine.
 
 This guide serves both application users and contributors. It describes what
 the application does, how its processes exchange data, and how to operate and
-build it. It intentionally does not document the internal methods used to
-produce number rankings.
+build it. The numbered application-guide chapters remain independent of
+strategy implementation details. Detailed descriptions of selected ranking
+engines are collected separately under **Strategies**.
 
 ```{admonition} Interpretation limit
 :class: caution
@@ -31,4 +32,11 @@ using-the-application
 architecture
 data-and-security
 contributing
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Strategies
+
+strategies/index
 ```
