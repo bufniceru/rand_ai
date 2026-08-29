@@ -92,6 +92,10 @@ const strategyPlugins = [
   },
   { id: "mixed", label: "Mixed Prediction" },
   { id: "svc", label: "Support Vector Classifier" },
+  {
+    id: "svc_recurrence_hybrid",
+    label: "SVC–Recurrence Hybrid (Experimental)",
+  },
   { id: "tbl", label: "Temporal Behavior Learning" },
   { id: "sklearn_svm", label: "Scikit Online SVM" },
   { id: "lag_logistic", label: "Lagged Logistic" },
@@ -119,7 +123,8 @@ const defaultStrategyPluginIds = strategyPlugins
       strategyId !== "lag_logistic" &&
       strategyId !== "sparse_neural_ticket" &&
       strategyId !== "decision_tree_selector" &&
-      strategyId !== "recurrence_dynamics",
+      strategyId !== "recurrence_dynamics" &&
+      strategyId !== "svc_recurrence_hybrid",
   );
 let enabledStrategyIds = new Set(defaultStrategyPluginIds);
 

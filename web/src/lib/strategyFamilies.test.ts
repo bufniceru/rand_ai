@@ -27,6 +27,7 @@ const strategyIds: StrategyId[] = [
   "co_occurrence",
   "doublet_triplet_markov",
   "mixed",
+  "svc_recurrence_hybrid",
   "svc",
   "tbl",
   "sklearn_svm",

@@ -41,6 +41,7 @@ export type StrategyId =
   | "doublet_triplet_markov"
   | "mixed"
   | "svc"
+  | "svc_recurrence_hybrid"
   | "tbl"
   | "sklearn_svm"
   | "lag_logistic"
