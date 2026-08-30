@@ -85,8 +85,10 @@ const strategyDescriptions: Record<StrategyId, string> = {
     "Bayesian posterior over signatures from recent circular-group context.",
   border_group_ml:
     "Online multinomial model of recent spaces, signatures, and trends.",
+  border_group_svc:
+    "Balanced RBF support-vector classifier with bounded causal retraining.",
   border_group_hybrid:
-    "Walk-forward log-loss-weighted blend of all border-group models.",
+    "Walk-forward log-loss-weighted blend of Statistical, Markov, Bayesian, ML, and SVC border-group forecasts.",
   residual_coverage:
     "Diversity-first complement covering numbers outside every base Top-6.",
   chained:

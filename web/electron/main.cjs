@@ -121,6 +121,7 @@ const strategyPlugins = [
   { id: "border_group_markov", label: "Border Group Markov" },
   { id: "border_group_bayesian", label: "Border Group Bayesian" },
   { id: "border_group_ml", label: "Border Group ML" },
+  { id: "border_group_svc", label: "Border Group SVC" },
   { id: "border_group_hybrid", label: "Border Group Hybrid" },
   { id: "residual_coverage", label: "Residual Coverage" },
   { id: "chained", label: "Chained Strategy" },
