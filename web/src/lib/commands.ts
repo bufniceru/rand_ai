@@ -1,8 +1,8 @@
-import { numberFrequencyFigure } from "./figureBuilders";
+import { groupFrequencyFigure, numberFrequencyFigure } from "./figureBuilders";
 import type {
   FigureSpec,
-  StatisticsCommandId,
   StatisticsCommandPayload,
+  StatisticsCommandRequest,
 } from "../types";
 
 export interface CommandAvailabilityContext {
@@ -10,8 +10,9 @@ export interface CommandAvailabilityContext {
 }
 
 export interface CommandExecutionContext extends CommandAvailabilityContext {
+  borderSpace: number;
   runStatisticsCommand(
-    commandId: StatisticsCommandId,
+    request: StatisticsCommandRequest,
   ): Promise<StatisticsCommandPayload>;
 }
 
@@ -49,14 +50,41 @@ export const applicationCommands: readonly AppCommand[] = [
       hasDataset ? null : "Analyze a dataset first",
     execute: async (context) => {
       const payload = await context.runStatisticsCommand(
-        "statistics.number-frequency",
+        { id: "statistics.number-frequency" },
       );
+      if (payload.id !== "statistics.number-frequency") {
+        throw new Error("Unexpected Number Frequency response.");
+      }
       return {
         kind: "figure",
         commandId: payload.id,
         title: "Statistics: Number Frequency",
         subtitle: `${payload.datasetName} · ${payload.drawCount.toLocaleString()} draws`,
         figure: numberFrequencyFigure(payload.table),
+      };
+    },
+  },
+  {
+    id: "statistics.group-frequency",
+    title: "Group Frequency",
+    category: "Statistics",
+    keywords: ["groups", "border", "frequency", "count"],
+    disabledReason: ({ hasDataset }) =>
+      hasDataset ? null : "Analyze a dataset first",
+    execute: async (context) => {
+      const payload = await context.runStatisticsCommand({
+        id: "statistics.group-frequency",
+        borderSpace: context.borderSpace,
+      });
+      if (payload.id !== "statistics.group-frequency") {
+        throw new Error("Unexpected Group Frequency response.");
+      }
+      return {
+        kind: "figure",
+        commandId: payload.id,
+        title: "Statistics: Group Frequency",
+        subtitle: `${payload.datasetName} · ${payload.drawCount.toLocaleString()} draws · Border space ${payload.borderSpace}`,
+        figure: groupFrequencyFigure(payload.table),
       };
     },
   },

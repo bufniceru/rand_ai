@@ -342,6 +342,52 @@ def test_statistics_command_returns_complete_number_frequency(
     assert isinstance(number_one["standardized_residual"], float)
 
 
+def test_statistics_command_returns_complete_group_frequency(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_path = _pickle_path(tmp_path)
+    original_loader = gui_bridge.load_trusted_draws
+    load_requests: list[tuple[Path, bool]] = []
+
+    def tracked_loader(
+        path: Path,
+        *,
+        prepare_predictions: bool = True,
+    ) -> Draws:
+        load_requests.append((path, prepare_predictions))
+        return original_loader(path, prepare_predictions=prepare_predictions)
+
+    monkeypatch.setattr(gui_bridge, "load_trusted_draws", tracked_loader)
+    payload = statistics_command_data(
+        source_path,
+        "statistics.group-frequency",
+        border_space=7,
+    )
+
+    assert load_requests == [(source_path, False)]
+    assert payload["id"] == "statistics.group-frequency"
+    assert payload["datasetName"] == "draws.pkl"
+    assert payload["drawCount"] == 3
+    assert payload["borderSpace"] == 7
+    assert payload["table"]["columns"] == ["group_count", "count"]
+    assert payload["table"]["rows"] == [
+        {"group_count": 1, "count": 1},
+        {"group_count": 2, "count": 0},
+        {"group_count": 3, "count": 1},
+        {"group_count": 4, "count": 0},
+        {"group_count": 5, "count": 1},
+        {"group_count": 6, "count": 0},
+    ]
+
+    with pytest.raises(ValueError, match="border_space"):
+        statistics_command_data(
+            source_path,
+            "statistics.group-frequency",
+            border_space=44,
+        )
+
+
 def test_statistics_command_rejects_unknown_id(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="Unknown statistics command"):
         statistics_command_data(_pickle_path(tmp_path), "statistics.unknown")
@@ -1024,6 +1070,29 @@ def test_cli_returns_number_frequency_command_data(
     assert payload["id"] == "statistics.number-frequency"
     assert payload["drawCount"] == 3
     assert len(payload["table"]["rows"]) == 49
+
+
+def test_cli_returns_group_frequency_command_data(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source_path = _pickle_path(tmp_path)
+    main(
+        [
+            "statistics-command",
+            "--input",
+            str(source_path),
+            "--command-id",
+            "statistics.group-frequency",
+            "--border-space",
+            "7",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["id"] == "statistics.group-frequency"
+    assert payload["borderSpace"] == 7
+    assert [row["count"] for row in payload["table"]["rows"]] == [1, 0, 1, 0, 1, 0]
 
 
 def test_cli_rejects_unknown_statistics_command(tmp_path: Path) -> None:

@@ -146,6 +146,22 @@ class TestDrawsStatisticsTables:
         assert number_one["expected_count"] == pytest.approx(18 / 49)
         assert frequencies["count"].sum() == 18
 
+    def test_group_count_frequency_values(self) -> None:
+        """Verify every group-count row and the configured border definition."""
+        statistics = DrawsStatistics(_sample_draws())
+
+        border_seven = statistics.group_count_frequencies(7)
+        assert border_seven["group_count"].tolist() == [1, 2, 3, 4, 5, 6]
+        assert border_seven["count"].tolist() == [1, 0, 1, 0, 1, 0]
+        assert border_seven["count"].sum() == statistics.draw_count
+
+        border_zero = statistics.group_count_frequencies(0)
+        assert border_zero["count"].tolist() == [1, 0, 0, 0, 1, 1]
+
+        for value in (-1, 44, True, 7.0):
+            with pytest.raises(ValueError, match="border_space"):
+                statistics.group_count_frequencies(cast(int, value))
+
     def test_position_frequency_values(self) -> None:
         """Verify position tables contain a complete six-by-49 grid."""
         frequencies = DrawsStatistics(_sample_draws()).position_frequencies()

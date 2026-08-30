@@ -410,6 +410,18 @@ class DrawsStatistics:
             }
         )
 
+    def group_count_frequencies(self, border_space: int) -> pd.DataFrame:
+        """Return whole-dataset draw counts for border groups one through six."""
+        border = validate_border_space(border_space)
+        separator_counts = np.count_nonzero(self._spaces > border, axis=1)
+        group_counts = np.maximum(separator_counts, 1)
+        return pd.DataFrame(
+            {
+                "group_count": np.arange(1, 7, dtype=np.int64),
+                "count": np.bincount(group_counts, minlength=7)[1:],
+            }
+        )
+
     def space_group_analysis(
         self,
         border_space: int,

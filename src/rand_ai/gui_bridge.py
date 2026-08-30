@@ -80,7 +80,10 @@ DEFAULT_STRATEGY_IDS = tuple(
     }
 )
 MAX_HISTORY_WINDOW = 250
-STATISTICS_COMMAND_IDS = ("statistics.number-frequency",)
+STATISTICS_COMMAND_IDS = (
+    "statistics.number-frequency",
+    "statistics.group-frequency",
+)
 STRATEGY_CACHE_SCHEMA_VERSION = 20
 STRATEGY_CACHE_MAX_ENTRIES = 20
 STRATEGY_CACHE_MAX_BYTES = 1024 * 1024 * 1024
@@ -941,6 +944,8 @@ def load_trusted_draws(
 def statistics_command_data(
     source_path: Path,
     command_id: str,
+    *,
+    border_space: int = DEFAULT_BORDER_SPACE,
 ) -> dict[str, Any]:
     """Calculate one whitelisted statistic against the complete trusted dataset."""
     if command_id not in STATISTICS_COMMAND_IDS:
@@ -949,14 +954,21 @@ def statistics_command_data(
     statistics = DrawsStatistics(draws)
     if command_id == "statistics.number-frequency":
         table = statistics.number_frequencies()
+        validated_border = None
+    elif command_id == "statistics.group-frequency":
+        validated_border = validate_border_space(border_space)
+        table = statistics.group_count_frequencies(validated_border)
     else:  # pragma: no cover - guarded by the whitelist above
         raise ValueError(f"Unsupported statistics command: {command_id}")
-    return {
+    payload: dict[str, Any] = {
         "id": command_id,
         "datasetName": source_path.name,
         "drawCount": statistics.draw_count,
         "table": _table_payload(table),
     }
+    if validated_border is not None:
+        payload["borderSpace"] = validated_border
+    return payload
 
 
 def analyze_file(
@@ -1205,6 +1217,12 @@ def _argument_parser() -> argparse.ArgumentParser:
         required=True,
         choices=STATISTICS_COMMAND_IDS,
     )
+    statistics_parser.add_argument(
+        "--border-space",
+        default=DEFAULT_BORDER_SPACE,
+        type=int,
+        choices=range(44),
+    )
     return parser
 
 
@@ -1263,7 +1281,11 @@ def main(arguments: Sequence[str] | None = None) -> None:
         return
     if options.command == "statistics-command":
         json.dump(
-            statistics_command_data(options.input, options.command_id),
+            statistics_command_data(
+                options.input,
+                options.command_id,
+                border_space=options.border_space,
+            ),
             sys.stdout,
             separators=(",", ":"),
         )

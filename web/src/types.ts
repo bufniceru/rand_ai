@@ -141,14 +141,32 @@ export interface TablePayload {
   rows: TableRow[];
 }
 
-export type StatisticsCommandId = "statistics.number-frequency";
+export type StatisticsCommandId =
+  | "statistics.number-frequency"
+  | "statistics.group-frequency";
 
-export interface StatisticsCommandPayload {
-  id: StatisticsCommandId;
+export type StatisticsCommandRequest =
+  | { id: "statistics.number-frequency" }
+  | { id: "statistics.group-frequency"; borderSpace: number };
+
+interface StatisticsCommandPayloadBase {
   datasetName: string;
   drawCount: number;
   table: TablePayload;
 }
+
+export interface NumberFrequencyCommandPayload extends StatisticsCommandPayloadBase {
+  id: "statistics.number-frequency";
+}
+
+export interface GroupFrequencyCommandPayload extends StatisticsCommandPayloadBase {
+  id: "statistics.group-frequency";
+  borderSpace: number;
+}
+
+export type StatisticsCommandPayload =
+  | NumberFrequencyCommandPayload
+  | GroupFrequencyCommandPayload;
 
 export interface HistoryNumber {
   value: number;
@@ -721,7 +739,7 @@ export interface DesktopApi {
     forceReanalysis?: boolean;
   }): Promise<AnalysisPayload>;
   runStatisticsCommand(
-    commandId: StatisticsCommandId,
+    request: StatisticsCommandRequest,
   ): Promise<StatisticsCommandPayload>;
   onAnalysisProgress(
     callback: (progress: AnalysisProgress) => void,

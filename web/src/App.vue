@@ -414,7 +414,8 @@ async function executeAppCommand(commandId: string): Promise<void> {
     if (!api) throw new Error("Statistics commands require the Electron desktop application.");
     const context: CommandExecutionContext = {
       ...commandAvailabilityContext(),
-      runStatisticsCommand: (id) => api.runStatisticsCommand(id),
+      borderSpace: options.borderSpace,
+      runStatisticsCommand: (request) => api.runStatisticsCommand(request),
     };
     const result = await command.execute(context);
     if (token === commandExecutionToken) {

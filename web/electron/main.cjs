@@ -1114,22 +1114,33 @@ ipcMain.handle("dataset:analyze", async (event, request) => {
   return payload;
 });
 
-ipcMain.handle("statistics-command:run", async (_event, requestedCommandId) => {
+ipcMain.handle("statistics-command:run", async (_event, request) => {
   if (!activeDatasetPath) {
     throw new Error("Analyze a dataset before running statistics commands.");
   }
-  const commandId = String(requestedCommandId ?? "");
-  if (commandId !== "statistics.number-frequency") {
+  const commandId = String(request?.id ?? "");
+  if (![
+    "statistics.number-frequency",
+    "statistics.group-frequency",
+  ].includes(commandId)) {
     throw new Error(`Unknown statistics command: ${commandId}`);
   }
+  const bridgeArguments = [
+    "statistics-command",
+    "--input",
+    activeDatasetPath,
+    "--command-id",
+    commandId,
+  ];
+  if (commandId === "statistics.group-frequency") {
+    const borderSpace = request?.borderSpace;
+    if (!Number.isInteger(borderSpace) || borderSpace < 0 || borderSpace > 43) {
+      throw new Error("Border space must be an integer between 0 and 43.");
+    }
+    bridgeArguments.push("--border-space", String(borderSpace));
+  }
   return runBridge(
-    [
-      "statistics-command",
-      "--input",
-      activeDatasetPath,
-      "--command-id",
-      commandId,
-    ],
+    bridgeArguments,
     true,
   );
 });

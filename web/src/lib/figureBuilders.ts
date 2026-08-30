@@ -115,6 +115,34 @@ export function numberFrequencyFigure(source: TablePayload): FigureSpec {
   };
 }
 
+export function groupFrequencyFigure(source: TablePayload): FigureSpec {
+  const rows = source.rows;
+  const layout = baseLayout("Border Group Frequency", "Number of groups", "Draws");
+  return {
+    data: [{
+      type: "bar",
+      name: "Observed",
+      x: rows.map((row) => numberValue(row, "group_count")),
+      y: rows.map((row) => numberValue(row, "count")),
+      marker: { color: themeColor("charts.series1") },
+      hovertemplate: "%{x} groups<br>%{y} draws<extra></extra>",
+    }],
+    layout: {
+      ...layout,
+      xaxis: {
+        ...(layout.xaxis as Record<string, unknown>),
+        tickmode: "array",
+        tickvals: [1, 2, 3, 4, 5, 6],
+        range: [0.5, 6.5],
+      },
+      yaxis: {
+        ...(layout.yaxis as Record<string, unknown>),
+        rangemode: "tozero",
+      },
+    },
+  };
+}
+
 function drawSumDistribution(analysis: AnalysisPayload): FigureSpec {
   const rows = table(analysis, "draw_structure_distributions").rows.filter(
     (row) => row.measure === "draw_sum",
@@ -319,7 +347,6 @@ function freshnessGapDistribution(analysis: AnalysisPayload): FigureSpec {
 }
 
 function borderGroupFigures(analysis: AnalysisPayload): Record<string, FigureSpec> {
-  const countRows = table(analysis, "space_group_count_distribution").rows;
   const signatureRows = table(analysis, "space_group_signature_distribution").rows;
   const historyRows = table(analysis, "space_group_history").rows;
   const sensitivityRows = table(analysis, "space_group_threshold_sensitivity").rows;
@@ -327,25 +354,6 @@ function borderGroupFigures(analysis: AnalysisPayload): Record<string, FigureSpe
     (row) => row.log_loss !== null,
   );
   return {
-    border_group_counts: {
-      data: [
-        {
-          type: "bar",
-          name: "Observed",
-          x: countRows.map((row) => numberValue(row, "group_count")),
-          y: countRows.map((row) => numberValue(row, "percentage")),
-          marker: { color: themeColor("charts.series1") },
-        },
-        {
-          type: "bar",
-          name: "Exact random null",
-          x: countRows.map((row) => numberValue(row, "group_count")),
-          y: countRows.map((row) => numberValue(row, "null_probability")),
-          marker: { color: themeColor("charts.series2") },
-        },
-      ],
-      layout: { ...baseLayout("Group-count distribution", "Groups", "Draws (%)"), barmode: "group" },
-    },
     border_group_signatures: {
       data: [
         {

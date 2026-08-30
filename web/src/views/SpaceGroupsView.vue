@@ -79,10 +79,7 @@ const bestName = computed(() =>
       </article>
     </section>
 
-    <div class="chart-grid">
-      <article class="chart-card"><PlotlyChart :figure="figures.border_group_counts" /></article>
-      <article class="chart-card"><PlotlyChart :figure="figures.border_group_signatures" /></article>
-    </div>
+    <article class="chart-card wide"><PlotlyChart :figure="figures.border_group_signatures" /></article>
     <article class="chart-card wide"><PlotlyChart :figure="figures.border_group_history" /></article>
     <div class="chart-grid">
       <article class="chart-card"><PlotlyChart :figure="figures.border_group_transitions" /></article>
