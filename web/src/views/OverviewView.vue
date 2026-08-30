@@ -20,7 +20,7 @@ const summary = computed(() => summaryLookup(props.analysis));
         <p class="eyebrow">Dataset overview</p>
         <h2>Draw history at a glance</h2>
       </div>
-      <p>Frequency, composition, and combination coverage for the active dataset.</p>
+      <p>Structure, composition, and combination coverage for the active dataset.</p>
     </header>
     <div class="metric-grid">
       <article class="metric-card">
@@ -40,7 +40,6 @@ const summary = computed(() => summaryLookup(props.analysis));
         <strong>{{ analysis.dataset.sampleSize.toLocaleString() }}</strong>
       </article>
     </div>
-    <article class="chart-card wide"><PlotlyChart :figure="figures.number_frequencies" /></article>
     <div class="chart-grid">
       <article class="chart-card"><PlotlyChart :figure="figures.draw_sum_distribution" /></article>
       <article class="chart-card"><PlotlyChart :figure="figures.draw_composition" /></article>

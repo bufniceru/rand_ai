@@ -980,6 +980,182 @@ tbody tr:nth-child(even) {
   outline: none;
 }
 
+.command-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 64px;
+  background: rgba(11, 28, 44, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+.command-palette {
+  width: min(760px, calc(100vw - 48px));
+  overflow: hidden;
+  border: 1px solid var(--theme-lines-default, #8aa6bc);
+  background: var(--theme-surfaces-primary, #ffffff);
+  box-shadow: 0 24px 70px rgba(5, 18, 30, 0.34);
+}
+
+.command-palette h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.command-palette-search {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 10px;
+  padding: 0 14px;
+  border: 2px solid var(--theme-controls-focus, #2d78bc);
+  background: var(--theme-controls-inputBackground, #f8fbfe);
+}
+
+.command-palette-search > span {
+  color: var(--theme-text-muted, #60788e);
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.command-palette-search input {
+  width: 100%;
+  padding: 13px 0;
+  border: 0;
+  outline: 0;
+  color: var(--theme-text-primary, #172033);
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+}
+
+.command-palette ul {
+  max-height: min(440px, calc(100vh - 220px));
+  overflow: auto;
+  margin: 0;
+  padding: 4px 10px 10px;
+  list-style: none;
+}
+
+.command-palette li button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 12px;
+  border: 0;
+  color: var(--theme-text-primary, #172033);
+  background: transparent;
+  text-align: left;
+}
+
+.command-palette li button.active {
+  color: var(--theme-controls-primaryText, #ffffff);
+  background: var(--theme-controls-primaryBackground, #2469a4);
+}
+
+.command-palette li button.disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.command-palette li button small {
+  flex: 0 0 auto;
+  color: inherit;
+}
+
+.command-palette-empty {
+  padding: 24px 12px;
+  color: var(--theme-text-muted, #60788e);
+  text-align: center;
+}
+
+.command-palette footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--theme-lines-default, #d0dce6);
+  color: var(--theme-text-muted, #60788e);
+  background: var(--theme-surfaces-secondary, #f3f7fa);
+  font-size: 11px;
+}
+
+.command-result-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 24px 28px 28px;
+  outline: 0;
+  color: var(--theme-text-primary, #172033);
+  background: var(--theme-application-background, #e9eff4);
+}
+
+.command-result-overlay > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 28px;
+  padding-bottom: 18px;
+}
+
+.command-result-overlay h1 {
+  margin: 0;
+  color: var(--theme-text-primary, #172033);
+  font-size: 28px;
+}
+
+.command-result-overlay header p:not(.eyebrow) {
+  margin: 6px 0 0;
+  color: var(--theme-text-muted, #60788e);
+}
+
+.command-result-overlay header > span {
+  padding: 8px 11px;
+  border: 1px solid var(--theme-lines-default, #b5c7d6);
+  color: var(--theme-text-muted, #60788e);
+  background: var(--theme-surfaces-primary, #ffffff);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.command-result-figure {
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--theme-lines-default, #b5c7d6);
+  background: var(--theme-surfaces-primary, #ffffff);
+  box-shadow: 0 12px 32px rgba(17, 45, 68, 0.1);
+}
+
+.command-result-figure .plotly-chart {
+  height: 100%;
+  min-height: 0;
+}
+
+.command-result-message {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 16px;
+  border: 1px solid var(--theme-lines-default, #b5c7d6);
+  background: var(--theme-surfaces-primary, #ffffff);
+  text-align: center;
+}
+
+.command-result-message.error strong {
+  color: var(--theme-semantic-danger, #a33c3c);
+}
+
 .settings-dialog-heading {
   display: flex;
   align-items: flex-start;

@@ -814,6 +814,12 @@ function buildApplicationMenu() {
     {
       label: "View",
       submenu: [
+        {
+          label: "Command Palette...",
+          accelerator: "CmdOrCtrl+Shift+P",
+          click: () => sendMenuAction("openCommandPalette"),
+        },
+        { type: "separator" },
         ...dashboardViews.map(([id, label]) => ({
           label,
           enabled:
@@ -847,7 +853,6 @@ function buildApplicationMenu() {
         },
         {
           label: "Predictions",
-          accelerator: "CmdOrCtrl+Shift+P",
           enabled:
             activeDatasetPath !== null && enabledReportIds.has("predictions"),
           click: () => sendMenuAction("openWorkspaceTab", { tab: "predictions" }),
@@ -1107,6 +1112,26 @@ ipcMain.handle("dataset:analyze", async (event, request) => {
   buildApplicationMenu();
   sendProgress({ percent: 100, message: "Analysis ready" });
   return payload;
+});
+
+ipcMain.handle("statistics-command:run", async (_event, requestedCommandId) => {
+  if (!activeDatasetPath) {
+    throw new Error("Analyze a dataset before running statistics commands.");
+  }
+  const commandId = String(requestedCommandId ?? "");
+  if (commandId !== "statistics.number-frequency") {
+    throw new Error(`Unknown statistics command: ${commandId}`);
+  }
+  return runBridge(
+    [
+      "statistics-command",
+      "--input",
+      activeDatasetPath,
+      "--command-id",
+      commandId,
+    ],
+    true,
+  );
 });
 
 ipcMain.handle("portfolio-backtest:data", async (event, request) => {

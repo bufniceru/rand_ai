@@ -141,6 +141,15 @@ export interface TablePayload {
   rows: TableRow[];
 }
 
+export type StatisticsCommandId = "statistics.number-frequency";
+
+export interface StatisticsCommandPayload {
+  id: StatisticsCommandId;
+  datasetName: string;
+  drawCount: number;
+  table: TablePayload;
+}
+
 export interface HistoryNumber {
   value: number;
   gap: number;
@@ -605,6 +614,7 @@ export type MenuAction =
   | { action: "openView"; view: ViewId }
   | { action: "openWorkspaceTab"; tab: WorkspaceTabId }
   | { action: "openSettings" }
+  | { action: "openCommandPalette" }
   | { action: "reanalyze" }
   | ({ action: "reportPluginsChanged" } & ReportPluginState)
   | ({ action: "strategyPluginsChanged" } & StrategyPluginState)
@@ -710,6 +720,9 @@ export interface DesktopApi {
     options: AnalysisOptions;
     forceReanalysis?: boolean;
   }): Promise<AnalysisPayload>;
+  runStatisticsCommand(
+    commandId: StatisticsCommandId,
+  ): Promise<StatisticsCommandPayload>;
   onAnalysisProgress(
     callback: (progress: AnalysisProgress) => void,
   ): () => void;

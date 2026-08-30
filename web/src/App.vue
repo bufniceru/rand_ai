@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import CommandPalette from "./components/CommandPalette.vue";
+import CommandResultOverlay from "./components/CommandResultOverlay.vue";
 import SettingsDialog from "./components/SettingsDialog.vue";
 import AppearanceDialog from "./components/AppearanceDialog.vue";
 import TrustDialog from "./components/TrustDialog.vue";
@@ -13,6 +15,11 @@ import {
   themeRevision,
 } from "./lib/colorTemplates";
 import { configurePossibleDrawContext } from "./lib/possibleDrawPlans";
+import {
+  applicationCommands,
+  type CommandExecutionContext,
+  type CommandResultOverlayState,
+} from "./lib/commands";
 import PossibleDrawDialogApp from "./PossibleDrawDialogApp.vue";
 import AutocorrelationView from "./views/AutocorrelationView.vue";
 import CoOccurrenceView from "./views/CoOccurrenceView.vue";
@@ -130,6 +137,8 @@ const enabledReportIds = ref<ReportId[]>([]);
 const enabledStrategyIds = ref<StrategyId[]>([]);
 const strategyPlugins = ref<StrategyPlugin[]>([]);
 const recentDatasets = ref<RecentDataset[]>([]);
+const commandPaletteOpen = ref(false);
+const commandResultState = ref<CommandResultOverlayState | null>(null);
 const settingsOpen = ref(false);
 const savingSettings = ref(false);
 const appearanceOpen = ref(false);
@@ -192,6 +201,8 @@ let progressTimer: ReturnType<typeof setInterval> | null = null;
 let loadingProgressTarget = 1;
 let progressCompletionResolver: (() => void) | null = null;
 let reportRefreshPending = false;
+let commandExecutionToken = 0;
+let commandReturnFocus: HTMLElement | null = null;
 
 const figures = computed(() => {
   themeRevision.value;
@@ -353,6 +364,70 @@ async function openSettings(): Promise<void> {
     settingsOpen.value = true;
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+function commandAvailabilityContext(): { hasDataset: boolean } {
+  return { hasDataset: Boolean(analysis.value) };
+}
+
+function openCommandPalette(): void {
+  if (
+    commandPaletteOpen.value ||
+    commandResultState.value ||
+    loading.value ||
+    settingsOpen.value ||
+    appearanceOpen.value ||
+    pendingDataset.value
+  ) return;
+  commandReturnFocus = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : null;
+  commandPaletteOpen.value = true;
+}
+
+function restoreCommandFocus(): void {
+  const target = commandReturnFocus;
+  commandReturnFocus = null;
+  void nextTick(() => target?.focus());
+}
+
+function closeCommandPalette(): void {
+  commandPaletteOpen.value = false;
+  restoreCommandFocus();
+}
+
+function closeCommandResult(): void {
+  commandExecutionToken += 1;
+  commandResultState.value = null;
+  restoreCommandFocus();
+}
+
+async function executeAppCommand(commandId: string): Promise<void> {
+  const command = applicationCommands.find((entry) => entry.id === commandId);
+  if (!command || command.disabledReason(commandAvailabilityContext())) return;
+  const api = window.randAiDesktop;
+  commandPaletteOpen.value = false;
+  const token = ++commandExecutionToken;
+  commandResultState.value = { status: "loading", title: `${command.category}: ${command.title}` };
+  try {
+    if (!api) throw new Error("Statistics commands require the Electron desktop application.");
+    const context: CommandExecutionContext = {
+      ...commandAvailabilityContext(),
+      runStatisticsCommand: (id) => api.runStatisticsCommand(id),
+    };
+    const result = await command.execute(context);
+    if (token === commandExecutionToken) {
+      commandResultState.value = { status: "ready", result };
+    }
+  } catch (error) {
+    if (token === commandExecutionToken) {
+      commandResultState.value = {
+        status: "error",
+        title: `${command.category}: ${command.title}`,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 }
 
@@ -655,6 +730,25 @@ function handleDrawHistorySaved(): void {
 }
 
 function handleWorkspaceShortcut(event: KeyboardEvent): void {
+  if (commandResultState.value) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeCommandResult();
+    }
+    return;
+  }
+  if (commandPaletteOpen.value) return;
+  const paletteShortcut =
+    event.key === "F1" ||
+    ((event.ctrlKey || event.metaKey) &&
+      event.shiftKey &&
+      !event.altKey &&
+      event.key.toLowerCase() === "p");
+  if (paletteShortcut) {
+    event.preventDefault();
+    openCommandPalette();
+    return;
+  }
   if (
     !event.altKey &&
     !event.ctrlKey &&
@@ -706,6 +800,10 @@ function handleMenuAction(message: MenuAction): void {
   }
   if (message.action === "openSettings") {
     void openSettings();
+    return;
+  }
+  if (message.action === "openCommandPalette") {
+    openCommandPalette();
     return;
   }
   if (message.action === "reanalyze") {
@@ -1152,6 +1250,20 @@ onBeforeUnmount(() => {
       @cancel="cancelAppearance"
       @preview="previewColorTemplate"
       @apply="applyAppearance"
+    />
+
+    <CommandPalette
+      v-if="commandPaletteOpen"
+      :commands="applicationCommands"
+      :has-dataset="Boolean(analysis)"
+      @cancel="closeCommandPalette"
+      @execute="executeAppCommand"
+    />
+
+    <CommandResultOverlay
+      v-if="commandResultState"
+      :state="commandResultState"
+      @close="closeCommandResult"
     />
 
     <footer class="status-bar">

@@ -84,8 +84,8 @@ function heatmap(
   };
 }
 
-function numberFrequencies(analysis: AnalysisPayload): FigureSpec {
-  const rows = table(analysis, "number_frequencies").rows;
+export function numberFrequencyFigure(source: TablePayload): FigureSpec {
+  const rows = source.rows;
   const layout = baseLayout(
     "Number frequency compared with uniform expectation",
     "Number",
@@ -440,13 +440,11 @@ export function buildFigures(analysis: AnalysisPayload): Record<string, FigureSp
   const figures: Record<string, FigureSpec> = {};
 
   if (enabled.has("overview")) {
-    figures.number_frequencies = numberFrequencies(analysis);
     figures.draw_sum_distribution = drawSumDistribution(analysis);
     figures.draw_composition = composition(analysis);
   }
 
   if (enabled.has("numbers")) {
-    figures.number_frequencies = numberFrequencies(analysis);
     figures.position_frequencies = heatmap(
       table(analysis, "position_frequencies"),
       "Number frequency by sorted position",
