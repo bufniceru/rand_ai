@@ -44,7 +44,9 @@ The engine is distinct from:
   signature;
 - **Border Group Bayesian**, which uses five discrete context fields and a
   naïve conditional-independence approximation; and
-- **Border Group Hybrid**, which includes this ML forecast as one of four
+- **Border Group SVC**, which fits a balanced RBF support-vector classifier on
+  the same causal features using bounded scheduled retraining; and
+- **Border Group Hybrid**, which includes this ML forecast as one of five
   log-loss-weighted component distributions.
 
 Selecting only Border Group ML creates the shared `SpaceGroupForecaster`, but

@@ -7,15 +7,16 @@
 `border_group_hybrid`. It is a default-enabled member of the **Border Space
 Groups** family.
 
-The engine combines four different forecasts of the next circular group
+The engine combines five different forecasts of the next circular group
 signature:
 
 1. cumulative statistical frequencies;
 2. a first-order Markov transition model;
 3. a categorical Bayesian context model; and
-4. an online multinomial machine-learning model.
+4. an online multinomial machine-learning model; and
+5. a balanced RBF support-vector classifier with bounded retraining.
 
-The four categorical probability vectors are blended using their recent causal
+The five categorical probability vectors are blended using their recent causal
 log loss. A shared decoder then maps the hybrid signature distribution through
 valid space shapes and historical anchors into a complete ranking of numbers
 1–49.
@@ -43,7 +44,7 @@ audits, effectiveness histories, comparisons, portfolios, exports, and
 Possible Draw.
 
 Selecting only the hybrid creates one `SpaceGroupForecaster` that calculates
-all four component forecasts internally. The component strategies do not have
+all five component forecasts internally. The component strategies do not have
 to be selected for display, and only the requested hybrid is serialized.
 
 The strategy shares the application-wide **Border space** and optional
@@ -144,7 +145,7 @@ at least eight empty positions, exceeding the available total of 43.
 Infeasible signatures receive zero from every component and from the hybrid.
 
 The exact probabilities are a diagnostic and feasibility reference. They are
-not used as the statistical component's prior and are not one of the four
+not used as the statistical component's prior and are not one of the five
 hybrid components.
 
 ## Component 1: statistical frequencies
@@ -264,6 +265,20 @@ Until 50 delayed examples have been trained, the ML component returns the
 statistical forecast. After warm-up, predicted mass for signatures infeasible
 at the selected border is set to zero and the remaining values are normalized.
 
+## Component 5: balanced RBF SVC
+
+The SVC component reuses the exact 82-value ML feature vector, but fits a
+`StandardScaler` and balanced RBF `SVC` with `C=1.0`, `gamma="scale"`,
+probability estimates enabled, and random state 0. The saved pre-draw feature
+vector receives its label only after the next actual signature is known.
+
+Fitting begins after 50 labeled examples, retains at most the latest 500, and
+rebuilds the pipeline every 25 additional examples. Before warm-up, or while
+the current training window has fewer than two classes, SVC returns the
+statistical forecast. Observed SVC class probabilities are mapped into all 11
+signature positions, infeasible classes are assigned zero, and the result is
+normalized. See {ref}`border-group-svc` for the complete model guide.
+
 ## Manual group-count conditioning
 
 **Predicted groups** is **Automatic** by default. If the user selects a feasible
@@ -302,7 +317,7 @@ random null is also excluded from weighting.
 Until every component has at least 30 completed losses, all weights are exactly
 
 ```{math}
-w_m=\frac14=25\%.
+w_m=\frac15=20\%.
 ```
 
 After warm-up, let \(\bar\ell_m\) be component \(m\)'s mean loss over its
@@ -316,11 +331,11 @@ Because log loss is the negative log probability assigned to the realized
 class, \(r_m\) is the geometric mean probability the component assigned to
 recent realized signatures.
 
-Production reserves a 5% floor for each of the four components and distributes
-the remaining 80% in proportion to \(r_m\):
+Production reserves a 5% floor for each of the five components and distributes
+the remaining 75% in proportion to \(r_m\):
 
 ```{math}
-w_m=0.05+0.80\frac{r_m}{\sum_kr_k}.
+w_m=0.05+0.75\frac{r_m}{\sum_kr_k}.
 ```
 
 Consequently,
@@ -342,7 +357,7 @@ probability pool
 
 ```{math}
 P_{\mathrm{hybrid},t+1}(s)
-=\sum_{m\in\{\mathrm{stat},\mathrm{markov},\mathrm{bayes},\mathrm{ML}\}}
+=\sum_{m\in\{\mathrm{stat},\mathrm{markov},\mathrm{bayes},\mathrm{ML},\mathrm{SVC}\}}
 w_mP_{m,t+1}(s).
 ```
 
@@ -454,12 +469,13 @@ For completed draw \(t\), production performs this sequence:
 1. retrieve the pending component forecasts made after draw \(t-1\);
 2. score those forecasts against actual signature \(Z_t\) and append their log
    losses;
-3. train the ML model on the feature vector saved after \(t-1\) with target
-   \(Z_t\);
+3. train the ML model and append the SVC example using the feature vector saved
+   after \(t-1\) with target \(Z_t\), refitting SVC when its bounded schedule is
+   due;
 4. update Bayesian feature counts saved after \(t-1\);
 5. update the first-order transition, lifetime signature count, recent shape
    beam, and lifetime anchor counts with draw \(t\);
-6. calculate all four component forecasts from the resulting completed state;
+6. calculate all five component forecasts from the resulting completed state;
 7. derive hybrid weights from completed losses and blend the components; and
 8. decode and retain the forecast for target draw \(t+1\).
 
@@ -469,7 +485,7 @@ enter the decoder only after their draws are completed.
 
 ## Cold start and warm-up
 
-With no profile, all five Border Group forecasts return the same uniform
+With no profile, all six Border Group forecasts return the same uniform
 distribution over feasible signatures, optionally conditioned on manual group
 count. This differs from the unequal exact 6/49 null distribution.
 
@@ -480,12 +496,14 @@ After the first completed profile:
   statistical backoff;
 - Bayesian context features can be prepared for the next delayed target;
 - ML still returns the statistical forecast; and
-- hybrid component weights remain 25% each.
+- SVC still returns the statistical forecast; and
+- hybrid component weights remain 20% each.
 
 Adaptive hybrid weights begin only after 30 pending forecasts have been
 resolved. The ML component remains a statistical fallback until its 50th
-delayed training example. Its early fallback losses are still attributed to
-the ML component because those were its actual issued forecasts.
+delayed training example. SVC also requires 50 delayed examples, at least two
+classes, and a scheduled fit. Early fallback losses remain attributed to the
+component that issued them because those were its actual forecasts.
 
 ## Interpreting application fields
 
@@ -507,40 +525,14 @@ categorical forecast table.
 
 ## Endpoint diagnostic
 
-After all 771 repository draws at border 7 with automatic group count, every
-component loss buffer contains its maximum 100 completed outcomes:
+The Space Groups analysis reports the current five component vectors, trailing
+losses, adaptive weights, Hybrid vector, and decoded ranking for the active
+database and settings. These values are recalculated from the selected history
+and should be read from the application rather than treated as fixed constants.
 
-| Component | Trailing mean log loss | Current hybrid weight |
-|---|---:|---:|
-| Statistical | 1.949836 | 32.4644% |
-| Markov | 1.984477 | 31.5293% |
-| Bayesian | 2.152021 | 27.4369% |
-| ML | 3.990346 | 8.5693% |
-
-The 5% floor prevents the weaker recent ML component from disappearing. The
-remaining weight ordering follows the exponentiated trailing mean losses, not
-the full-history metrics below.
-
-The endpoint hybrid signature forecast is:
-
-| Signature | Hybrid probability |
-|---|---:|
-| `6` | 12.1021% |
-| `5+1` | 27.8023% |
-| `4+2` | 18.7128% |
-| `4+1+1` | 9.0943% |
-| `3+3` | 5.7330% |
-| `3+2+1` | 20.5131% |
-| `3+1+1+1` | 0.8859% |
-| `2+2+2` | 3.6690% |
-| `2+2+1+1` | 1.4142% |
-| `2+1+1+1+1` | 0.0731% |
-| `1+1+1+1+1+1` | 0% |
-
-The shared decoder contains 2,874 distinct signature-ticket entries across the
-ten feasible signature beams at this endpoint. These are fitted-state
-diagnostics, not evidence that the same weights or signature distribution will
-persist.
+Earlier four-component endpoint snapshots are not applicable after SVC joined
+the Hybrid. Any benchmark intended for comparison with the current strategy
+must be regenerated with the current cache schema and five-component replay.
 
 ## Signature-forecast statistics
 
@@ -561,22 +553,11 @@ Exact-signature accuracy selects the largest-probability state. Group-count
 accuracy compares the number of parts in the predicted and actual signatures;
 group-count MAE is their absolute difference.
 
-On the repository's 671 post-warm-up evaluations at border 7:
-
-| Forecast | Log loss | Brier | Signature accuracy | Group-count accuracy | Group-count MAE |
-|---|---:|---:|---:|---:|---:|
-| Statistical | 1.928158 | 0.835644 | 19.9702% | 41.2817% | 0.663189 |
-| Markov | 1.971747 | 0.847768 | 19.5231% | 41.4307% | 0.667660 |
-| Bayesian | 2.140277 | 0.889186 | 20.2683% | 44.7094% | 0.634873 |
-| ML | 6.315110 | 1.321350 | 19.2250% | 42.7720% | 0.676602 |
-| **Hybrid** | **1.963763** | **0.848200** | **20.4173%** | **44.1133%** | **0.633383** |
-| Exact random 6/49 null | 1.913997 | 0.833116 | 21.3115% | 33.9791% | 0.770492 |
-
-The hybrid has the best group-count MAE among these rows and improves exact
-signature accuracy over every learned component. It does not improve log loss
-or Brier score over the statistical component or exact null, and the Bayesian
-component has slightly higher group-count accuracy. The metrics therefore give
-mixed evidence rather than a general categorical advantage.
+The model-metric table contains Statistical, Markov, Bayesian, ML, SVC,
+Hybrid, and the exact random 6/49 null. Values depend on the complete active
+history, Border space, and optional group-count conditioning. Compare several
+proper and classification metrics rather than declaring a winner from one
+column.
 
 ## Top-6 efficacy reference
 
@@ -595,22 +576,11 @@ with
 \operatorname{Var}(H)=0.577572.
 ```
 
-A leakage-free production replay at border 7 with automatic group count over
-the repository's 771 chronological YAML draws produces 770 target forecasts:
-
-| Slice | Targets | Total Top-6 hits | Mean hits per target | Random expected total |
-|---|---:|---:|---:|---:|
-| Full replay | 770 | 585 | 0.759740 | 565.714 |
-| Validation, target draws 121–520 | 400 | 310 | 0.775000 | 293.878 |
-| Holdout, target draws 521–770 | 250 | 173 | 0.692000 | 183.673 |
-
-The latest 250-target comparison slice, target draws 522–771, records 174 hits
-or 0.696000 per target.
-
-The full replay and validation slice exceed theoretical random expectation,
-but the holdout and latest slice are below it. This lack of persistence is an
-important negative result. The measurements are retrospective and do not
-establish statistical significance, stable future lift, or predictability.
+Top-6 efficacy must be regenerated after a Hybrid component changes because
+the blended signature vector and decoded number ranking also change. Use the
+application's current chronological strategy-effectiveness and comparison
+outputs. Retrospective overlap does not establish statistical significance,
+stable future lift, or predictability.
 
 ## Core mathematical and statistical concepts
 
@@ -628,6 +598,8 @@ establish statistical significance, stable future lift, or predictability.
   conditional-independence approximation.
 - **Online multinomial classification:** delayed averaged stochastic-gradient
   updates learn from an 82-value rolling feature vector.
+- **Kernel classification:** standardized 82-value features feed a balanced RBF
+  SVC retrained on a bounded chronological window.
 - **Proper scoring rules:** recent log loss controls the adaptive weights;
   Brier score supplies a separate categorical evaluation.
 - **Exponentially transformed loss:** \(e^{-\bar\ell}\) converts mean log loss
@@ -644,34 +616,35 @@ establish statistical significance, stable future lift, or predictability.
 
 ## Limitations and responsible interpretation
 
-- **Negative holdout behavior:** current decoded Top-6 holdout performance is
-  below theoretical random expectation despite the stronger full replay.
-- **Categorical baselines remain stronger on loss:** the hybrid trails the
-  statistical component and exact null on full post-warm-up log loss and Brier
-  score.
+- **Dataset-dependent performance:** categorical and decoded Top-6 results must
+  be evaluated on current chronological validation and untouched holdout data.
+  No component is guaranteed to outperform the statistical or random baselines.
 - **Objective mismatch:** weights optimize recent signature log loss, not
   number hits or the final decoded ranking.
 - **Correlated components:** every component uses the same signature history,
-  and Markov, Bayesian, and early ML forecasts reuse statistical information.
-  The mixture is not four independent sources of evidence.
+  and Markov, Bayesian, early ML, and early SVC forecasts reuse statistical
+  information.
+  The mixture is not five independent sources of evidence.
 - **Short adaptive window:** trailing 100-draw losses can make weights sensitive
   to a modest number of rare, high-loss outcomes.
 - **Probability floor:** clipping at \(10^{-15}\) bounds numerical loss but a
   manually excluded actual class still produces a very large penalty.
 - **Minimum component weight:** the 5% floor preserves diversity even when a
   component's recent categorical performance is poor.
-- **Fixed warm-ups and constants:** 30 losses, 50 ML examples, the 100-loss
-  buffer, smoothing strengths, feature thresholds, and SGD settings are
-  engineering choices rather than universally optimal estimates.
+- **Fixed warm-ups and constants:** 30 losses, 50 ML/SVC examples, the 100-loss
+  buffer, the 500-example SVC window, its 25-example refit interval, smoothing
+  strengths, feature thresholds, and estimator settings are engineering
+  choices rather than universally optimal estimates.
 - **Naïve-Bayes dependence:** its context variables overlap substantially, so
   multiplying their likelihoods can produce overconfident probabilities.
-- **ML instability and class imbalance:** rare signatures provide few online
-  examples, while the current historical ML log loss is weak.
+- **Classifier instability and class imbalance:** rare signatures provide few
+  ML or SVC examples. Balanced SVC weights do not manufacture absent classes or
+  guarantee calibrated probabilities.
 - **First-order and compressed state:** canonical signatures discard exact
   group order, most space geometry, number identities, and longer transition
   history.
 - **Threshold sensitivity:** changing border space reclassifies every draw and
-  retrains all four components and the decoder.
+  retrains all five components and the decoder.
 - **Manual-selection bias:** choosing a target group count after reviewing the
   same history adds an external selection step.
 - **Decoder truncation:** only the latest 16 observed shapes per signature are
@@ -699,8 +672,9 @@ categorical evaluation are implemented in `src/rand_ai/space_groups.py`:
   circular profiles and canonical signatures;
 - `exact_null_signature_counts` and `exact_null_probabilities` establish
   feasibility and the exact random reference;
-- `SpaceGroupForecaster._statistical`, `_markov`, `_bayesian`, and the online
-  classifier produce the four component distributions;
+- `SpaceGroupForecaster._statistical`, `_markov`, `_bayesian`, the online
+  classifier, and the bounded SVC pipeline produce the five component
+  distributions;
 - `_bayes_features` and `_ml_features` construct their causal context inputs;
 - `observe` scores pending forecasts, trains delayed components, and remembers
   each completed profile;
@@ -720,6 +694,7 @@ serializes `border_group_hybrid` when requested.
 
 Relevant behavior is covered by `tests/test_space_groups.py` and
 `tests/test_strategy_prediction.py`, including exact null feasibility,
-normalization, delayed training, loss-based weights and their 5% floor, manual
-conditioning, valid decoded tickets, number-score fallback, chronological
-metrics, strategy registration, and prediction serialization.
+normalization, delayed ML and SVC training, bounded SVC refitting, loss-based
+weights and their 5% floor, manual conditioning, valid decoded tickets,
+number-score fallback, chronological metrics, strategy registration, and
+prediction serialization.

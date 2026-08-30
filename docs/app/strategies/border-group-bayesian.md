@@ -42,8 +42,10 @@ The engine is distinct from:
 - **Border Group Markov**, which conditions only on the latest signature using
   a first-order transition row;
 - **Border Group ML**, which learns an online linear classifier from a larger
-  rolling feature vector; and
-- **Border Group Hybrid**, which combines all four component forecasts using
+  rolling feature vector;
+- **Border Group SVC**, which fits a balanced RBF classifier to that larger
+  causal feature vector with bounded scheduled retraining; and
+- **Border Group Hybrid**, which combines all five component forecasts using
   recent log loss.
 
 Selecting Border Group Bayesian creates the shared `SpaceGroupForecaster`, but

@@ -29,6 +29,8 @@ predictable outcome.
 overview
 getting-started
 using-the-application
+commands
+proposed-commands
 architecture
 data-and-security
 contributing

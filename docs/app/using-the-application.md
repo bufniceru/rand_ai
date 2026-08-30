@@ -22,6 +22,19 @@ are enabled. Disabling a report hides its related navigation entry without
 altering the source dataset. Reanalysis applies changed calculation options to
 the active dataset.
 
+## Command palette
+
+Press **Ctrl+Shift+P** (or **Cmd+Shift+P**), press **F1**, or choose **View >
+Command Palette…** to search and run application commands. Use the arrow keys
+to select a result, **Enter** to execute it, and **Esc** to close the palette.
+Commands that require analysis remain visible but disabled until a dataset is
+active.
+
+The initial commands generate Number Frequency and detailed Border Group
+Frequency charts against the complete active database. Results cover the full
+application and are dismissed with **Esc**. See {ref}`command-system` for the
+complete interaction, calculation, and extension guide.
+
 ## Draw-history editor
 
 The editor is available when the active pickle has a matching `.yaml` or

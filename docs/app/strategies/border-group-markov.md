@@ -38,7 +38,8 @@ Border Group Markov differs from the other family members:
   frequencies.
 - Bayesian adds several categorical context variables.
 - ML uses an online multinomial classifier.
-- Hybrid combines all four component forecasts using recent log loss.
+- SVC uses a balanced RBF classifier with bounded scheduled refitting.
+- Hybrid combines all five component forecasts using recent log loss.
 
 The Markov strategy uses only one-step signature transitions with a fixed
 ten-observation statistical backoff. It has no higher-order transition context,

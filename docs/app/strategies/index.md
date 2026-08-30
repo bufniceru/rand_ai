@@ -81,6 +81,7 @@ border-group-statistical
 border-group-markov
 border-group-bayesian
 border-group-ml
+border-group-svc
 border-group-hybrid
 ```
 

@@ -33,8 +33,8 @@ The strategy asks two related questions:
 
 It does not use transitions, contextual Bayesian features, online logistic
 regression, or adaptive component weights. Those belong to the separate Border
-Group Markov, Bayesian, ML, and Hybrid engines. Border Group Statistical uses
-only smoothed cumulative signature counts for its categorical forecast.
+Group Markov, Bayesian, ML, SVC, and Hybrid engines. Border Group Statistical
+uses only smoothed cumulative signature counts for its categorical forecast.
 
 The exact-random signature distribution and chi-square diagnostic shown in the
 Space Groups report are reference statistics. They determine which signatures

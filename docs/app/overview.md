@@ -13,6 +13,8 @@ portable outputs without running Python commands manually.
   comparison, audit, gap, and co-occurrence reports.
 - Use workspace tabs for statistics, last-seen highlights, generated number
   grids, possible draws, portfolio review, and draw-history maintenance.
+- Run on-demand whole-database statistics from the VS Code-style command
+  palette without adding permanent report panels.
 - Enable or disable report areas from Settings or the Reports menu.
 - Customize the interface through importable and exportable color templates.
 - Save analysis tables and metadata in a ZIP archive, save supported views as

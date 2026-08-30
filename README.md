@@ -40,6 +40,8 @@ needed.
 
 The [Sphinx application guide](docs/app/index.md) covers installation, desktop
 workflows, data handling, security, architecture, and contributor operations.
+It also documents the [command palette and its on-demand statistics](docs/app/commands.md)
+and the [Border Group SVC strategy](docs/app/strategies/border-group-svc.md).
 Build it locally with:
 
 ```powershell
