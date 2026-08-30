@@ -268,8 +268,8 @@ onMounted(async () => {
           </button>
         </div>
         <div class="draw-editor-summary">
-          <span>{{ mode === "view" ? "Draw numbers" : mode === "add" ? "New draw" : "Editing draw" }}</span>
-          <div>
+          <span v-if="mode !== 'view'">{{ mode === "add" ? "New draw" : "Editing draw" }}</span>
+          <div v-if="mode !== 'view'">
             <strong v-for="number in displayedNumbers" :key="number">{{ number }}</strong>
             <i v-for="slot in 6 - displayedNumbers.length" :key="`empty-${slot}`">—</i>
           </div>
