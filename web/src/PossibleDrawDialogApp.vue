@@ -460,6 +460,7 @@ function strategyFullName(strategy: StrategyPrediction): string {
     border_group_markov: "Border Group Markov",
     border_group_bayesian: "Border Group Bayesian",
     border_group_ml: "Border Group ML",
+    border_group_svc: "Border Group SVC",
     border_group_hybrid: "Border Group Hybrid",
   }[strategy.id] ?? strategy.name;
 }

@@ -42,6 +42,7 @@ const strategyIds: StrategyId[] = [
   "border_group_markov",
   "border_group_bayesian",
   "border_group_ml",
+  "border_group_svc",
   "border_group_hybrid",
   "residual_coverage",
   "chained",

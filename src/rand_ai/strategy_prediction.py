@@ -5712,8 +5712,13 @@ class _StrategyState:
                 "border_group_ml": (
                     "Online multinomial border-group model with leakage-safe rolling features."
                 ),
+                "border_group_svc": (
+                    "Balanced RBF support-vector border-group model with bounded "
+                    "causal retraining."
+                ),
                 "border_group_hybrid": (
-                    "Log-loss-weighted blend of statistical, Markov, Bayesian, and ML group forecasts."
+                    "Log-loss-weighted blend of statistical, Markov, Bayesian, ML, "
+                    "and SVC group forecasts."
                 ),
             }
             for strategy_id in BORDER_GROUP_MODEL_IDS:
