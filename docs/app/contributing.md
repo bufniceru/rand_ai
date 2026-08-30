@@ -58,8 +58,17 @@ the dedicated **Strategies** section.
 
 Jenkins performs a locked Python sync including the documentation group, builds
 this guide, installs frontend dependencies, and creates the portable Electron
-executable. The executable is the only archived artifact; generated Sphinx HTML
-is a validation result rather than a published artifact.
+executable. After the complete pipeline succeeds for `master`, Jenkins publishes
+the generated Sphinx HTML to the root of the orphan `gh-pages` branch. Other
+source branches validate the documentation but do not update the public site.
+The generated output remains ignored on `master` and is never merged back from
+`gh-pages`.
+
+Pages publication uses the Jenkins SSH Agent plugin and the existing
+`github-rand-ai-ssh` credential. That GitHub SSH key must have repository write
+access. Configure GitHub Pages to deploy from the `gh-pages` branch and its
+repository root. Jenkins skips the publication commit when the generated site
+has not changed.
 
 Portable executable packaging is handled by Jenkins. Local contributors should
 run the Python suite, frontend tests, frontend production build, and Sphinx
