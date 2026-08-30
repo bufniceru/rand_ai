@@ -422,6 +422,46 @@ class DrawsStatistics:
             }
         )
 
+    def group_signature_frequencies(self, border_space: int) -> pd.DataFrame:
+        """Return whole-dataset draw counts for every border-group signature."""
+        border = validate_border_space(border_space)
+        separator_flags = self._spaces > border
+        mask_weights = 1 << np.arange(separator_flags.shape[1], dtype=np.uint8)
+        mask_codes = separator_flags.astype(np.uint8) @ mask_weights
+        _codes, representative_indices, mask_counts = np.unique(
+            mask_codes,
+            return_index=True,
+            return_counts=True,
+        )
+        signature_counts = {signature: 0 for signature in SIGNATURES}
+        for representative_index, mask_count in zip(
+            representative_indices,
+            mask_counts,
+            strict=True,
+        ):
+            signature = profile_from_spaces(
+                tuple(int(value) for value in self._spaces[representative_index]),
+                border,
+            ).signature
+            signature_counts[signature] += int(mask_count)
+        ordered_signatures = [
+            signature
+            for _index, signature in sorted(
+                enumerate(SIGNATURES),
+                key=lambda item: (len(item[1]), item[0]),
+            )
+        ]
+        return pd.DataFrame(
+            [
+                {
+                    "group_count": len(signature),
+                    "signature": "+".join(map(str, signature)),
+                    "count": signature_counts[signature],
+                }
+                for signature in ordered_signatures
+            ]
+        )
+
     def space_group_analysis(
         self,
         border_space: int,

@@ -162,6 +162,42 @@ class TestDrawsStatisticsTables:
             with pytest.raises(ValueError, match="border_space"):
                 statistics.group_count_frequencies(cast(int, value))
 
+    def test_group_signature_frequency_values(self) -> None:
+        """Verify ordered signatures, zero rows, and exact border-dependent counts."""
+        statistics = DrawsStatistics(_sample_draws())
+        signatures = statistics.group_signature_frequencies(7)
+
+        assert signatures["signature"].tolist() == [
+            "6",
+            "5+1",
+            "4+2",
+            "3+3",
+            "4+1+1",
+            "3+2+1",
+            "2+2+2",
+            "3+1+1+1",
+            "2+2+1+1",
+            "2+1+1+1+1",
+            "1+1+1+1+1+1",
+        ]
+        assert signatures["group_count"].tolist() == [1, 2, 2, 2, 3, 3, 3, 4, 4, 5, 6]
+        assert signatures["count"].tolist() == [1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0]
+        assert signatures["count"].sum() == statistics.draw_count
+        assert signatures.groupby("group_count")["count"].sum().tolist() == [
+            1,
+            0,
+            1,
+            0,
+            1,
+            0,
+        ]
+
+        border_zero = statistics.group_signature_frequencies(0)
+        assert border_zero["count"].tolist() == [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]
+        for value in (-1, 44, True, 7.0):
+            with pytest.raises(ValueError, match="border_space"):
+                statistics.group_signature_frequencies(cast(int, value))
+
     def test_position_frequency_values(self) -> None:
         """Verify position tables contain a complete six-by-49 grid."""
         frequencies = DrawsStatistics(_sample_draws()).position_frequencies()

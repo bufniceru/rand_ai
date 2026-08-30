@@ -84,7 +84,10 @@ export const applicationCommands: readonly AppCommand[] = [
         commandId: payload.id,
         title: "Statistics: Group Frequency",
         subtitle: `${payload.datasetName} · ${payload.drawCount.toLocaleString()} draws · Border space ${payload.borderSpace}`,
-        figure: groupFrequencyFigure(payload.table),
+        figure: groupFrequencyFigure(payload.table, {
+          datasetName: payload.datasetName,
+          borderSpace: payload.borderSpace,
+        }),
       };
     },
   },
