@@ -5,7 +5,10 @@ from __future__ import annotations
 from math import comb
 from typing import cast
 
+import numpy as np
 import pytest
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 
 import rand_ai.space_groups as groups
 from rand_ai.draw import Draw
@@ -185,8 +188,124 @@ def test_online_forecaster_normalizes_models_and_decodes_valid_marginals(
         forecaster.decoded_tickets((1.0,))
 
 
+def test_svc_configuration_and_bounded_retraining_schedule(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configured = SpaceGroupForecaster(7)
+    assert groups.SVC_WARMUP == 50
+    assert groups.SVC_REFIT_INTERVAL == 25
+    assert configured.svc_training_features.maxlen == 500
+    assert configured.svc_training_targets.maxlen == 500
+    pipeline = configured._new_svc_model()
+    assert isinstance(pipeline.named_steps["scaler"], StandardScaler)
+    svc = pipeline.named_steps["svc"]
+    assert isinstance(svc, SVC)
+    assert svc.kernel == "rbf"
+    assert svc.C == 1.0
+    assert svc.gamma == "scale"
+    assert svc.class_weight == "balanced"
+    assert svc.probability is True
+    assert svc.random_state == 0
+
+    monkeypatch.setattr(groups, "SVC_WARMUP", 2)
+    monkeypatch.setattr(groups, "SVC_REFIT_INTERVAL", 2)
+    monkeypatch.setattr(groups, "SVC_TRAINING_WINDOW", 3)
+    forecaster = SpaceGroupForecaster(7)
+    one_group = profile_from_spaces(SPACE_PATTERNS[0], 7)
+    two_groups = profile_from_spaces(SPACE_PATTERNS[3], 7)
+
+    def advance(profile: groups.SpaceGroupProfile) -> dict[str, tuple[float, ...]]:
+        forecaster.observe(profile)
+        return forecaster.forecast()
+
+    advance(one_group)
+    pending = forecaster.pending_features
+    assert forecaster.svc_training_count == 0
+    advance(one_group)
+    assert forecaster.svc_training_features[-1] == pending
+    assert forecaster.svc_training_targets[-1] == groups.SIGNATURE_INDEX[(6,)]
+    assert forecaster.svc is None
+    single_class = advance(one_group)
+    assert forecaster.svc_last_fit_count == 2
+    assert forecaster.svc is None
+    assert single_class["border_group_svc"] == single_class["border_group_statistical"]
+    advance(two_groups)
+    assert forecaster.svc_training_count == 3
+    assert forecaster.svc_last_fit_count == 2
+    fitted_forecast = advance(two_groups)
+    first_model = forecaster.svc
+    assert first_model is not None
+    assert forecaster.svc_last_fit_count == 4
+    assert len(forecaster.svc_training_features) == 3
+    assert len(forecaster.svc_training_targets) == 3
+    assert sum(fitted_forecast["border_group_svc"]) == pytest.approx(1)
+    single_window = advance(two_groups)
+    assert forecaster.svc is first_model
+    assert single_window["border_group_svc"] == single_window[
+        "border_group_statistical"
+    ]
+    final_forecast = advance(one_group)
+    assert forecaster.svc is not first_model
+    assert forecaster.svc_last_fit_count == 6
+    assert sum(final_forecast["border_group_svc"]) == pytest.approx(1)
+
+    replica = SpaceGroupForecaster(7)
+    replica_forecast: dict[str, tuple[float, ...]] = {}
+    for profile in (
+        one_group,
+        one_group,
+        one_group,
+        two_groups,
+        two_groups,
+        two_groups,
+        one_group,
+    ):
+        replica.observe(profile)
+        replica_forecast = replica.forecast()
+    assert replica_forecast["border_group_svc"] == pytest.approx(
+        final_forecast["border_group_svc"]
+    )
+
+
+def test_svc_maps_classes_to_signatures_and_conditions_target() -> None:
+    class FakeSVCStep:
+        classes_ = np.arange(len(SIGNATURES))
+
+    class FakePipeline:
+        named_steps = {"svc": FakeSVCStep()}
+
+        @staticmethod
+        def predict_proba(_features: np.ndarray) -> np.ndarray:
+            return np.asarray([[float(index + 1) for index in range(len(SIGNATURES))]])
+
+    forecaster = SpaceGroupForecaster(7)
+    forecaster.observe(profile_from_spaces(SPACE_PATTERNS[0], 7))
+    forecaster.forecast()
+    forecaster.svc = cast(groups.Pipeline, FakePipeline())
+    probabilities = forecaster.forecast()["border_group_svc"]
+    assert len(probabilities) == len(SIGNATURES)
+    assert sum(probabilities) == pytest.approx(1)
+    assert all(
+        probability == 0
+        for probability, feasible in zip(
+            probabilities, forecaster.feasible_signatures, strict=True
+        )
+        if not feasible
+    )
+
+    forecaster.target_group_count = 3
+    conditioned = forecaster.forecast()["border_group_svc"]
+    assert sum(conditioned) == pytest.approx(1)
+    assert all(
+        probability == 0 or len(signature) == 3
+        for signature, probability in zip(SIGNATURES, conditioned, strict=True)
+    )
+
+
 def test_hybrid_uses_trailing_losses_and_number_fallback() -> None:
     forecaster = SpaceGroupForecaster(7)
+    assert set(forecaster.hybrid_weights().values()) == {0.2}
+    assert tuple(forecaster.hybrid_weights()) == groups.COMPONENT_MODEL_IDS
     impossible = (0.0,) * (len(SIGNATURES) - 1) + (1.0,)
     uniform_scores, _details = forecaster.number_scores(impossible)
     assert set(uniform_scores.values()) == {0.0}
@@ -249,7 +368,7 @@ def test_walk_forward_metrics_and_pattern_diagnostics(
     result = walk_forward_models(history, 7)
     assert result["best_model_id"] in MODEL_IDS
     assert result["provisional"] is False
-    assert len(result["metrics"]) == 6
+    assert len(result["metrics"]) == 7
     assert all(metric.evaluated_draws == 14 for metric in result["metrics"])
     assert all(metric.log_loss is not None for metric in result["metrics"])
 
@@ -291,4 +410,4 @@ def test_short_walk_forward_is_provisional_and_statistics_exports_tables() -> No
     assert payload["provisional"] is True
     forecasts = payload["forecasts"]
     assert isinstance(forecasts, list)
-    assert len(forecasts) == 5
+    assert len(forecasts) == 6

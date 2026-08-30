@@ -80,6 +80,7 @@ def test_parses_strategy_plugin_selection_in_stable_order() -> None:
     assert "svc_recurrence_proximity_hybrid" not in DEFAULT_STRATEGY_IDS
     assert "srph_residual_diversity_hybrid" not in DEFAULT_STRATEGY_IDS
     assert "srph_minimax_regret_hybrid" not in DEFAULT_STRATEGY_IDS
+    assert "border_group_svc" in DEFAULT_STRATEGY_IDS
     assert parse_strategy_ids("") == ()
     with pytest.raises(argparse.ArgumentTypeError, match="unknown prediction strategy"):
         parse_strategy_ids("freshness,unknown")
@@ -165,6 +166,7 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
         "Border Group Markov",
         "Border Group Bayesian",
         "Border Group ML",
+        "Border Group SVC",
         "Border Group Hybrid",
         "RCOV",
         "Chained Strategy",

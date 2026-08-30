@@ -12,6 +12,9 @@ from typing import TypedDict
 import numpy as np
 from scipy.stats import chi2
 from sklearn.linear_model import SGDClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 
 NUMBER_COUNT = 49
 NUMBERS_PER_DRAW = 6
@@ -23,6 +26,9 @@ MIN_TARGET_GROUP_COUNT = 1
 MAX_TARGET_GROUP_COUNT = NUMBERS_PER_DRAW
 MODEL_EVALUATION_WARMUP = 100
 ML_WARMUP = 50
+SVC_WARMUP = 50
+SVC_TRAINING_WINDOW = 500
+SVC_REFIT_INTERVAL = 25
 
 SIGNATURES: tuple[tuple[int, ...], ...] = (
     (6,),
@@ -45,6 +51,7 @@ MODEL_IDS = (
     "border_group_markov",
     "border_group_bayesian",
     "border_group_ml",
+    "border_group_svc",
     "border_group_hybrid",
 )
 COMPONENT_MODEL_IDS = MODEL_IDS[:-1]
@@ -53,6 +60,7 @@ MODEL_NAMES = {
     "border_group_markov": "Border Group Markov",
     "border_group_bayesian": "Border Group Bayesian",
     "border_group_ml": "Border Group ML",
+    "border_group_svc": "Border Group SVC",
     "border_group_hybrid": "Border Group Hybrid",
     "random_null": "Exact random 6/49 null",
 }
@@ -367,7 +375,7 @@ def _trend_category(profiles: Sequence[SpaceGroupProfile]) -> int:
 
 
 class SpaceGroupForecaster:
-    """Maintain five online, next-signature probability forecasts."""
+    """Maintain six online, next-signature probability forecasts."""
 
     def __init__(
         self,
@@ -406,6 +414,13 @@ class SpaceGroupForecaster:
             random_state=0,
         )
         self.ml_training_count = 0
+        self.svc: Pipeline | None = None
+        self.svc_training_features: deque[tuple[float, ...]] = deque(
+            maxlen=SVC_TRAINING_WINDOW
+        )
+        self.svc_training_targets: deque[int] = deque(maxlen=SVC_TRAINING_WINDOW)
+        self.svc_training_count = 0
+        self.svc_last_fit_count = 0
         self.pending_features: tuple[float, ...] | None = None
         self.pending_bayes: tuple[int, ...] | None = None
         self.pending_forecasts: dict[str, tuple[float, ...]] | None = None
@@ -511,6 +526,44 @@ class SpaceGroupForecaster:
         features.append(_trend_category(self.profiles) / 2)
         return tuple(features)
 
+    @staticmethod
+    def _new_svc_model() -> Pipeline:
+        return Pipeline(
+            (
+                ("scaler", StandardScaler()),
+                (
+                    "svc",
+                    SVC(
+                        kernel="rbf",
+                        C=1.0,
+                        gamma="scale",
+                        class_weight="balanced",
+                        probability=True,
+                        random_state=0,
+                    ),
+                ),
+            )
+        )
+
+    def _fit_svc_if_due(self) -> None:
+        if self.svc_training_count < SVC_WARMUP:
+            return
+        if (
+            self.svc_training_count != SVC_WARMUP
+            and self.svc_training_count - self.svc_last_fit_count < SVC_REFIT_INTERVAL
+        ):
+            return
+        self.svc_last_fit_count = self.svc_training_count
+        if len(set(self.svc_training_targets)) < 2:
+            self.svc = None
+            return
+        model = self._new_svc_model()
+        model.fit(
+            np.asarray(self.svc_training_features, dtype=np.float64),
+            np.asarray(self.svc_training_targets, dtype=np.int64),
+        )
+        self.svc = model
+
     def _hybrid_weights(self) -> dict[str, float]:
         if min((len(values) for values in self.losses.values()), default=0) < 30:
             return {model_id: 1 / len(COMPONENT_MODEL_IDS) for model_id in COMPONENT_MODEL_IDS}
@@ -549,6 +602,10 @@ class SpaceGroupForecaster:
             else:
                 self.ml.partial_fit(features, target)
             self.ml_training_count += 1
+            self.svc_training_features.append(self.pending_features)
+            self.svc_training_targets.append(actual)
+            self.svc_training_count += 1
+            self._fit_svc_if_due()
         if self.pending_bayes is not None:
             for feature_index, value in enumerate(self.pending_bayes):
                 self.bayes_counts[feature_index][(actual, value)] += 1
@@ -592,6 +649,22 @@ class SpaceGroupForecaster:
             )
         else:
             forecasts["border_group_ml"] = baseline
+        if self.svc is None or len(set(self.svc_training_targets)) < 2:
+            forecasts["border_group_svc"] = baseline
+        else:
+            probabilities = self.svc.predict_proba(
+                np.asarray([ml_features], dtype=np.float64)
+            )[0]
+            svc_step = self.svc.named_steps["svc"]
+            classes = np.asarray(svc_step.classes_, dtype=np.int64)
+            mapped = [0.0] * len(SIGNATURES)
+            for signature_index, probability in zip(
+                classes, probabilities, strict=True
+            ):
+                index = int(signature_index)
+                if self.feasible_signatures[index]:
+                    mapped[index] = float(probability)
+            forecasts["border_group_svc"] = _normalize(tuple(mapped))
         forecasts = {
             model_id: condition_signature_probabilities(
                 probabilities, self.target_group_count

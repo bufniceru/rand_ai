@@ -59,7 +59,7 @@ from rand_ai.strategy_prediction import (
 )
 
 
-def test_builds_thirty_seven_named_rankings_and_reports_progress() -> None:
+def test_builds_thirty_eight_named_rankings_and_reports_progress() -> None:
     draws = Draws()
     draws.add(Draw(1, 2, 8, 17, 31, 49))
     draws.add(Draw(3, 6, 12, 22, 36, 47))
@@ -111,6 +111,7 @@ def test_builds_thirty_seven_named_rankings_and_reports_progress() -> None:
         "Border Group Markov",
         "Border Group Bayesian",
         "Border Group ML",
+        "Border Group SVC",
         "Border Group Hybrid",
         "RCOV",
         "Chained Strategy",
@@ -323,6 +324,37 @@ def test_builds_only_one_selected_border_group_strategy() -> None:
         detail == "Manual target 3 groups"
         for detail in targeted[-1].strategies[0].numbers[0].details
     )
+
+
+def test_border_group_svc_is_independent_of_a_future_draw() -> None:
+    number_sets = (
+        (1, 2, 3, 4, 5, 6),
+        (1, 2, 3, 25, 26, 27),
+        (1, 2, 20, 21, 39, 40),
+    )
+    prefix_draws = Draws()
+    extended_draws = Draws()
+    for index in range(56):
+        numbers = number_sets[index % len(number_sets)]
+        prefix_draws.add(Draw(*numbers))
+        extended_draws.add(Draw(*numbers))
+    extended_draws.add(Draw(7, 14, 22, 31, 39, 48))
+    prefix_draws.prepare_predictions()
+    extended_draws.prepare_predictions()
+
+    prefix = build_prediction_suites(
+        prefix_draws.draws,
+        history_start=55,
+        enabled_strategy_ids=("border_group_svc",),
+    )[0].strategies[0]
+    extended = build_prediction_suites(
+        extended_draws.draws,
+        history_start=55,
+        enabled_strategy_ids=("border_group_svc",),
+    )[0].strategies[0]
+
+    assert prefix.top_numbers == extended.top_numbers
+    assert prefix.numbers == extended.numbers
 
 
 def test_sklearn_svm_builds_bounded_features_and_hidden_dependencies() -> None:

@@ -97,6 +97,7 @@ export const STRATEGY_FAMILY_BY_ID = {
   border_group_markov: "border-space-groups",
   border_group_bayesian: "border-space-groups",
   border_group_ml: "border-space-groups",
+  border_group_svc: "border-space-groups",
   border_group_hybrid: "border-space-groups",
   residual_coverage: "ensembles-coverage",
   chained: "ensembles-coverage",
