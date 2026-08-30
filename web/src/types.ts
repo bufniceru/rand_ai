@@ -44,6 +44,7 @@ export type StrategyId =
   | "svc_recurrence_hybrid"
   | "svc_recurrence_proximity_hybrid"
   | "srph_residual_diversity_hybrid"
+  | "srph_minimax_regret_hybrid"
   | "tbl"
   | "sklearn_svm"
   | "lag_logistic"

@@ -169,3 +169,36 @@ The fixed historical replay improves the earlier validation slice but trails SRP
 on the nominal holdout. Candidate and weight selection also make the evidence
 selection-biased, so SRD is not promoted. See the
 [fixed SRD benchmark](../reports/srph_residual_diversity_hybrid_benchmark.md).
+
+## SRPH Minimax Regret Hybrid
+
+**SRPH Minimax Regret Hybrid** (`srph_minimax_regret_hybrid`, engine `SMR`)
+is a separate default-disabled shadow strategy. It treats 503 guarded blends
+of SRPH, Freshness, EMD, Bayesian, and Doublet/Triplet Markov as the player's
+fixed actions. The adversary chooses among completed, non-overlapping 40-draw
+historical blocks.
+
+For mixture (m), number (n), and residual source ranks (r_j(n)),
+
+\[
+S_m(n)=w_0S_{\mathrm{SRPH}}(n)+
+\sum_{j=1}^{4}w_j\frac{49-r_j(n)}{48}.
+\]
+
+The grid uses 5% increments, requires at least 50% SRPH, and caps each
+residual at 20%. For completed block (b), its payoff is the blend's total
+Top-6 hits (U_{m,b}). SMR minimizes
+
+\[
+R_m=\max_b\left(\max_k U_{k,b}-U_{m,b}\right).
+\]
+
+It reproduces SRPH for the first four completed blocks. Pending
+counterfactuals are evaluated only after their targets occur, and the open
+block never influences selection. Equal regret favors greater cumulative
+hits, then greater SRPH weight, then the frozen source order.
+
+The fixed replay records 635 hits over all 770 targets and 197 over the
+250-target holdout, versus SRPH's 643 and 205. The negative result prevents
+promotion. See the
+[fixed SMR benchmark](../reports/srph_minimax_regret_hybrid_benchmark.md).
