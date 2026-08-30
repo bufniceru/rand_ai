@@ -80,6 +80,10 @@ DEFAULT_STRATEGY_IDS = tuple(
     }
 )
 MAX_HISTORY_WINDOW = 250
+STATISTICS_COMMAND_IDS = (
+    "statistics.number-frequency",
+    "statistics.group-frequency",
+)
 STRATEGY_CACHE_SCHEMA_VERSION = 20
 STRATEGY_CACHE_MAX_ENTRIES = 20
 STRATEGY_CACHE_MAX_BYTES = 1024 * 1024 * 1024
@@ -316,13 +320,10 @@ def _analysis_tables(
     tables: dict[str, pd.DataFrame] = {}
     if "overview" in reports:
         tables["summary"] = statistics.summary()
-        tables["number_frequencies"] = statistics.number_frequencies()
         tables["draw_structure_distributions"] = (
             statistics.draw_structure_distributions()
         )
     if "numbers" in reports:
-        if "number_frequencies" not in tables:
-            tables["number_frequencies"] = statistics.number_frequencies()
         tables["position_frequencies"] = statistics.position_frequencies()
         tables["number_descriptive"] = statistics.number_descriptive()
         tables["pair_cooccurrence"] = statistics.pair_cooccurrence()
@@ -940,6 +941,36 @@ def load_trusted_draws(
         )
 
 
+def statistics_command_data(
+    source_path: Path,
+    command_id: str,
+    *,
+    border_space: int = DEFAULT_BORDER_SPACE,
+) -> dict[str, Any]:
+    """Calculate one whitelisted statistic against the complete trusted dataset."""
+    if command_id not in STATISTICS_COMMAND_IDS:
+        raise ValueError(f"Unknown statistics command: {command_id}")
+    draws = load_trusted_draws(source_path, prepare_predictions=False)
+    statistics = DrawsStatistics(draws)
+    if command_id == "statistics.number-frequency":
+        table = statistics.number_frequencies()
+        validated_border = None
+    elif command_id == "statistics.group-frequency":
+        validated_border = validate_border_space(border_space)
+        table = statistics.group_count_frequencies(validated_border)
+    else:  # pragma: no cover - guarded by the whitelist above
+        raise ValueError(f"Unsupported statistics command: {command_id}")
+    payload: dict[str, Any] = {
+        "id": command_id,
+        "datasetName": source_path.name,
+        "drawCount": statistics.draw_count,
+        "table": _table_payload(table),
+    }
+    if validated_border is not None:
+        payload["borderSpace"] = validated_border
+    return payload
+
+
 def analyze_file(
     source_path: Path,
     *,
@@ -1179,6 +1210,19 @@ def _argument_parser() -> argparse.ArgumentParser:
         type=int,
         choices=range(1, 7),
     )
+    statistics_parser = subparsers.add_parser("statistics-command")
+    statistics_parser.add_argument("--input", required=True, type=Path)
+    statistics_parser.add_argument(
+        "--command-id",
+        required=True,
+        choices=STATISTICS_COMMAND_IDS,
+    )
+    statistics_parser.add_argument(
+        "--border-space",
+        default=DEFAULT_BORDER_SPACE,
+        type=int,
+        choices=range(44),
+    )
     return parser
 
 
@@ -1234,6 +1278,17 @@ def main(arguments: Sequence[str] | None = None) -> None:
         )
         _write_progress(97, "Transferring full-history portfolio inputs")
         json.dump(payload, sys.stdout, separators=(",", ":"))
+        return
+    if options.command == "statistics-command":
+        json.dump(
+            statistics_command_data(
+                options.input,
+                options.command_id,
+                border_space=options.border_space,
+            ),
+            sys.stdout,
+            separators=(",", ":"),
+        )
         return
     selected_numbers = cast(tuple[int, ...], options.selected_numbers)
     correlation_method = cast(CorrelationMethod, options.correlation_method)

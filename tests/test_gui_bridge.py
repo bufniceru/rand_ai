@@ -21,6 +21,7 @@ from rand_ai.gui_bridge import (
     parse_selected_numbers,
     parse_strategy_ids,
     portfolio_backtest_data,
+    statistics_command_data,
     write_export_archive,
 )
 
@@ -275,7 +276,6 @@ def test_disabled_report_plugins_are_not_calculated_or_returned(
     assert payload["options"]["enabledReports"] == ["overview"]
     assert set(payload["tables"]) == {
         "summary",
-        "number_frequencies",
         "draw_structure_distributions",
     }
     assert payload["history"] == []
@@ -290,17 +290,107 @@ def test_disabled_report_plugins_are_not_calculated_or_returned(
     assert payload["nonlinearDynamics"] is None
 
 
-def test_numbers_report_builds_shared_frequency_table_without_overview(
+def test_numbers_report_leaves_frequency_for_on_demand_command(
     tmp_path: Path,
 ) -> None:
-    """Verify the Numbers plugin can calculate its shared table independently."""
+    """Verify the normal Numbers report excludes command-generated frequency."""
     payload = build_analysis_payload(
         _draws(),
         _pickle_path(tmp_path),
         enabled_reports=("numbers",),
     )
 
-    assert "number_frequencies" in payload["tables"]
+    assert "number_frequencies" not in payload["tables"]
+    assert set(payload["tables"]) == {
+        "position_frequencies",
+        "number_descriptive",
+        "pair_cooccurrence",
+        "number_trends",
+    }
+
+
+def test_statistics_command_returns_complete_number_frequency(
+    tmp_path: Path,
+) -> None:
+    source_path = _pickle_path(tmp_path)
+
+    payload = statistics_command_data(
+        source_path,
+        "statistics.number-frequency",
+    )
+
+    assert payload["id"] == "statistics.number-frequency"
+    assert payload["datasetName"] == "draws.pkl"
+    assert payload["drawCount"] == 3
+    assert payload["table"]["columns"] == [
+        "number",
+        "count",
+        "appearance_rate",
+        "observation_percentage",
+        "expected_count",
+        "deviation",
+        "standardized_residual",
+    ]
+    assert len(payload["table"]["rows"]) == 49
+    number_one = payload["table"]["rows"][0]
+    assert number_one["number"] == 1
+    assert number_one["count"] == 2
+    assert number_one["appearance_rate"] == pytest.approx(200 / 3)
+    assert number_one["observation_percentage"] == pytest.approx(200 / 18)
+    assert number_one["expected_count"] == pytest.approx(18 / 49)
+    assert number_one["deviation"] == pytest.approx(2 - 18 / 49)
+    assert isinstance(number_one["standardized_residual"], float)
+
+
+def test_statistics_command_returns_complete_group_frequency(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_path = _pickle_path(tmp_path)
+    original_loader = gui_bridge.load_trusted_draws
+    load_requests: list[tuple[Path, bool]] = []
+
+    def tracked_loader(
+        path: Path,
+        *,
+        prepare_predictions: bool = True,
+    ) -> Draws:
+        load_requests.append((path, prepare_predictions))
+        return original_loader(path, prepare_predictions=prepare_predictions)
+
+    monkeypatch.setattr(gui_bridge, "load_trusted_draws", tracked_loader)
+    payload = statistics_command_data(
+        source_path,
+        "statistics.group-frequency",
+        border_space=7,
+    )
+
+    assert load_requests == [(source_path, False)]
+    assert payload["id"] == "statistics.group-frequency"
+    assert payload["datasetName"] == "draws.pkl"
+    assert payload["drawCount"] == 3
+    assert payload["borderSpace"] == 7
+    assert payload["table"]["columns"] == ["group_count", "count"]
+    assert payload["table"]["rows"] == [
+        {"group_count": 1, "count": 1},
+        {"group_count": 2, "count": 0},
+        {"group_count": 3, "count": 1},
+        {"group_count": 4, "count": 0},
+        {"group_count": 5, "count": 1},
+        {"group_count": 6, "count": 0},
+    ]
+
+    with pytest.raises(ValueError, match="border_space"):
+        statistics_command_data(
+            source_path,
+            "statistics.group-frequency",
+            border_space=44,
+        )
+
+
+def test_statistics_command_rejects_unknown_id(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="Unknown statistics command"):
+        statistics_command_data(_pickle_path(tmp_path), "statistics.unknown")
 
 
 def test_co_occurrence_report_receives_complete_history_without_autocorrelation(
@@ -959,6 +1049,63 @@ def test_cli_returns_portfolio_backtest_data(
     assert payload["strategyIds"] == ["freshness", "entropy"]
     assert len(payload["records"]) == 2
     assert "RAND_AI_PROGRESS" in output.err
+
+
+def test_cli_returns_number_frequency_command_data(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source_path = _pickle_path(tmp_path)
+    main(
+        [
+            "statistics-command",
+            "--input",
+            str(source_path),
+            "--command-id",
+            "statistics.number-frequency",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["id"] == "statistics.number-frequency"
+    assert payload["drawCount"] == 3
+    assert len(payload["table"]["rows"]) == 49
+
+
+def test_cli_returns_group_frequency_command_data(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source_path = _pickle_path(tmp_path)
+    main(
+        [
+            "statistics-command",
+            "--input",
+            str(source_path),
+            "--command-id",
+            "statistics.group-frequency",
+            "--border-space",
+            "7",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["id"] == "statistics.group-frequency"
+    assert payload["borderSpace"] == 7
+    assert [row["count"] for row in payload["table"]["rows"]] == [1, 0, 1, 0, 1, 0]
+
+
+def test_cli_rejects_unknown_statistics_command(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit):
+        main(
+            [
+                "statistics-command",
+                "--input",
+                str(_pickle_path(tmp_path)),
+                "--command-id",
+                "statistics.unknown",
+            ]
+        )
 
 
 def test_cli_draw_editor_reads_and_saves_yaml_first(

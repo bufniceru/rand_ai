@@ -814,6 +814,12 @@ function buildApplicationMenu() {
     {
       label: "View",
       submenu: [
+        {
+          label: "Command Palette...",
+          accelerator: "CmdOrCtrl+Shift+P",
+          click: () => sendMenuAction("openCommandPalette"),
+        },
+        { type: "separator" },
         ...dashboardViews.map(([id, label]) => ({
           label,
           enabled:
@@ -847,7 +853,6 @@ function buildApplicationMenu() {
         },
         {
           label: "Predictions",
-          accelerator: "CmdOrCtrl+Shift+P",
           enabled:
             activeDatasetPath !== null && enabledReportIds.has("predictions"),
           click: () => sendMenuAction("openWorkspaceTab", { tab: "predictions" }),
@@ -1107,6 +1112,37 @@ ipcMain.handle("dataset:analyze", async (event, request) => {
   buildApplicationMenu();
   sendProgress({ percent: 100, message: "Analysis ready" });
   return payload;
+});
+
+ipcMain.handle("statistics-command:run", async (_event, request) => {
+  if (!activeDatasetPath) {
+    throw new Error("Analyze a dataset before running statistics commands.");
+  }
+  const commandId = String(request?.id ?? "");
+  if (![
+    "statistics.number-frequency",
+    "statistics.group-frequency",
+  ].includes(commandId)) {
+    throw new Error(`Unknown statistics command: ${commandId}`);
+  }
+  const bridgeArguments = [
+    "statistics-command",
+    "--input",
+    activeDatasetPath,
+    "--command-id",
+    commandId,
+  ];
+  if (commandId === "statistics.group-frequency") {
+    const borderSpace = request?.borderSpace;
+    if (!Number.isInteger(borderSpace) || borderSpace < 0 || borderSpace > 43) {
+      throw new Error("Border space must be an integer between 0 and 43.");
+    }
+    bridgeArguments.push("--border-space", String(borderSpace));
+  }
+  return runBridge(
+    bridgeArguments,
+    true,
+  );
 });
 
 ipcMain.handle("portfolio-backtest:data", async (event, request) => {

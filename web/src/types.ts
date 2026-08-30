@@ -141,6 +141,33 @@ export interface TablePayload {
   rows: TableRow[];
 }
 
+export type StatisticsCommandId =
+  | "statistics.number-frequency"
+  | "statistics.group-frequency";
+
+export type StatisticsCommandRequest =
+  | { id: "statistics.number-frequency" }
+  | { id: "statistics.group-frequency"; borderSpace: number };
+
+interface StatisticsCommandPayloadBase {
+  datasetName: string;
+  drawCount: number;
+  table: TablePayload;
+}
+
+export interface NumberFrequencyCommandPayload extends StatisticsCommandPayloadBase {
+  id: "statistics.number-frequency";
+}
+
+export interface GroupFrequencyCommandPayload extends StatisticsCommandPayloadBase {
+  id: "statistics.group-frequency";
+  borderSpace: number;
+}
+
+export type StatisticsCommandPayload =
+  | NumberFrequencyCommandPayload
+  | GroupFrequencyCommandPayload;
+
 export interface HistoryNumber {
   value: number;
   gap: number;
@@ -605,6 +632,7 @@ export type MenuAction =
   | { action: "openView"; view: ViewId }
   | { action: "openWorkspaceTab"; tab: WorkspaceTabId }
   | { action: "openSettings" }
+  | { action: "openCommandPalette" }
   | { action: "reanalyze" }
   | ({ action: "reportPluginsChanged" } & ReportPluginState)
   | ({ action: "strategyPluginsChanged" } & StrategyPluginState)
@@ -710,6 +738,9 @@ export interface DesktopApi {
     options: AnalysisOptions;
     forceReanalysis?: boolean;
   }): Promise<AnalysisPayload>;
+  runStatisticsCommand(
+    request: StatisticsCommandRequest,
+  ): Promise<StatisticsCommandPayload>;
   onAnalysisProgress(
     callback: (progress: AnalysisProgress) => void,
   ): () => void;
