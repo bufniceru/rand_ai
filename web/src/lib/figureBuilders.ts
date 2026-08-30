@@ -115,20 +115,65 @@ export function numberFrequencyFigure(source: TablePayload): FigureSpec {
   };
 }
 
-export function groupFrequencyFigure(source: TablePayload): FigureSpec {
+export function groupFrequencyFigure(
+  source: TablePayload,
+  metadata: { datasetName: string; borderSpace: number },
+): FigureSpec {
   const rows = source.rows;
   const layout = baseLayout("Border Group Frequency", "Number of groups", "Draws");
+  const rowsPerGroup = new Map<number, number>();
+  for (const row of rows) {
+    const groupCount = numberValue(row, "group_count");
+    rowsPerGroup.set(groupCount, (rowsPerGroup.get(groupCount) ?? 0) + 1);
+  }
+  const groupOffsets = new Map<number, number>();
   return {
-    data: [{
-      type: "bar",
-      name: "Observed",
-      x: rows.map((row) => numberValue(row, "group_count")),
-      y: rows.map((row) => numberValue(row, "count")),
-      marker: { color: themeColor("charts.series1") },
-      hovertemplate: "%{x} groups<br>%{y} draws<extra></extra>",
-    }],
+    data: rows.map((row, index) => {
+      const groupCount = numberValue(row, "group_count");
+      const signature = String(row.signature);
+      const count = numberValue(row, "count");
+      const barCount = rowsPerGroup.get(groupCount) ?? 1;
+      const barIndex = groupOffsets.get(groupCount) ?? 0;
+      groupOffsets.set(groupCount, barIndex + 1);
+      const barWidth = Math.min(0.5, (0.72 - (barCount - 1) * 0.03) / barCount);
+      const xPosition = groupCount
+        + (barIndex - (barCount - 1) / 2) * (barWidth + 0.03);
+      return {
+        type: "bar",
+        name: signature,
+        x: [xPosition],
+        y: [count],
+        width: [barWidth],
+        marker: { color: chartColors()[index % chartColors().length] },
+        text: [`${signature} · ${count.toLocaleString()}`],
+        texttemplate: "%{text}",
+        textposition: "inside",
+        insidetextanchor: "middle",
+        constraintext: "inside",
+        customdata: [[metadata.datasetName, metadata.borderSpace, groupCount, signature]],
+        hovertemplate:
+          "Dataset %{customdata[0]}<br>Border space %{customdata[1]}<br>" +
+          "%{customdata[2]} groups<br>Signature %{customdata[3]}<br>" +
+          "%{y} draws<extra></extra>",
+      };
+    }),
     layout: {
       ...layout,
+      barmode: "group",
+      bargap: 0.18,
+      uniformtext: { minsize: 9, mode: "hide" },
+      margin: {
+        ...(layout.margin as Record<string, unknown>),
+        t: 108,
+      },
+      legend: {
+        ...(layout.legend as Record<string, unknown>),
+        orientation: "h",
+        x: 0,
+        xanchor: "left",
+        y: 1.18,
+        traceorder: "normal",
+      },
       xaxis: {
         ...(layout.xaxis as Record<string, unknown>),
         tickmode: "array",

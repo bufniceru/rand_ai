@@ -30,14 +30,19 @@ function groupPayload(): StatisticsCommandPayload {
     drawCount: 3,
     borderSpace: 7,
     table: {
-      columns: ["group_count", "count"],
+      columns: ["group_count", "signature", "count"],
       rows: [
-        { group_count: 1, count: 1 },
-        { group_count: 2, count: 0 },
-        { group_count: 3, count: 1 },
-        { group_count: 4, count: 0 },
-        { group_count: 5, count: 1 },
-        { group_count: 6, count: 0 },
+        { group_count: 1, signature: "6", count: 1 },
+        { group_count: 2, signature: "5+1", count: 0 },
+        { group_count: 2, signature: "4+2", count: 0 },
+        { group_count: 2, signature: "3+3", count: 0 },
+        { group_count: 3, signature: "4+1+1", count: 1 },
+        { group_count: 3, signature: "3+2+1", count: 0 },
+        { group_count: 3, signature: "2+2+2", count: 0 },
+        { group_count: 4, signature: "3+1+1+1", count: 0 },
+        { group_count: 4, signature: "2+2+1+1", count: 0 },
+        { group_count: 5, signature: "2+1+1+1+1", count: 1 },
+        { group_count: 6, signature: "1+1+1+1+1+1", count: 0 },
       ],
     },
   };
@@ -88,7 +93,7 @@ describe("application command registry", () => {
     expect(result.figure.data[1].y).toEqual([18 / 49, 18 / 49]);
   });
 
-  it("executes Group Frequency with the current border and one count trace", async () => {
+  it("executes Group Frequency with grouped signature bars and embedded labels", async () => {
     const runStatisticsCommand = vi.fn(async (
       _request: StatisticsCommandRequest,
     ) => groupPayload());
@@ -104,12 +109,35 @@ describe("application command registry", () => {
     });
     expect(result.title).toBe("Statistics: Group Frequency");
     expect(result.subtitle).toContain("Border space 7");
-    expect(result.figure.data).toHaveLength(1);
-    expect(result.figure.data[0].x).toEqual([1, 2, 3, 4, 5, 6]);
-    expect(result.figure.data[0].y).toEqual([1, 0, 1, 0, 1, 0]);
+    expect(result.figure.data).toHaveLength(11);
+    expect(result.figure.data.map((trace) => trace.name)).toEqual([
+      "6",
+      "5+1",
+      "4+2",
+      "3+3",
+      "4+1+1",
+      "3+2+1",
+      "2+2+2",
+      "3+1+1+1",
+      "2+2+1+1",
+      "2+1+1+1+1",
+      "1+1+1+1+1+1",
+    ]);
+    expect(result.figure.data.map((trace) => trace.y)).toEqual([
+      [1], [0], [0], [0], [1], [0], [0], [0], [0], [1], [0],
+    ]);
+    expect(result.figure.data[4]).toMatchObject({
+      text: ["4+1+1 · 1"],
+      textposition: "inside",
+      customdata: [["draws.pkl", 7, 3, "4+1+1"]],
+    });
+    expect(String(result.figure.data[4].hovertemplate)).toContain("Border space");
+    expect(result.figure.data.some((trace) => trace.name === "Observed")).toBe(false);
     expect(result.figure.layout).toMatchObject({
+      barmode: "group",
       xaxis: { tickvals: [1, 2, 3, 4, 5, 6] },
       yaxis: { title: { text: "Draws" }, rangemode: "tozero" },
+      legend: { orientation: "h" },
     });
   });
 });

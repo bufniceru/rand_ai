@@ -370,14 +370,19 @@ def test_statistics_command_returns_complete_group_frequency(
     assert payload["datasetName"] == "draws.pkl"
     assert payload["drawCount"] == 3
     assert payload["borderSpace"] == 7
-    assert payload["table"]["columns"] == ["group_count", "count"]
+    assert payload["table"]["columns"] == ["group_count", "signature", "count"]
     assert payload["table"]["rows"] == [
-        {"group_count": 1, "count": 1},
-        {"group_count": 2, "count": 0},
-        {"group_count": 3, "count": 1},
-        {"group_count": 4, "count": 0},
-        {"group_count": 5, "count": 1},
-        {"group_count": 6, "count": 0},
+        {"group_count": 1, "signature": "6", "count": 1},
+        {"group_count": 2, "signature": "5+1", "count": 0},
+        {"group_count": 2, "signature": "4+2", "count": 0},
+        {"group_count": 2, "signature": "3+3", "count": 0},
+        {"group_count": 3, "signature": "4+1+1", "count": 1},
+        {"group_count": 3, "signature": "3+2+1", "count": 0},
+        {"group_count": 3, "signature": "2+2+2", "count": 0},
+        {"group_count": 4, "signature": "3+1+1+1", "count": 0},
+        {"group_count": 4, "signature": "2+2+1+1", "count": 0},
+        {"group_count": 5, "signature": "2+1+1+1+1", "count": 1},
+        {"group_count": 6, "signature": "1+1+1+1+1+1", "count": 0},
     ]
 
     with pytest.raises(ValueError, match="border_space"):
@@ -1092,7 +1097,11 @@ def test_cli_returns_group_frequency_command_data(
     payload = json.loads(capsys.readouterr().out)
     assert payload["id"] == "statistics.group-frequency"
     assert payload["borderSpace"] == 7
-    assert [row["count"] for row in payload["table"]["rows"]] == [1, 0, 1, 0, 1, 0]
+    rows = payload["table"]["rows"]
+    assert sum(row["count"] for row in rows) == 3
+    assert {
+        row["signature"]: row["count"] for row in rows if row["count"]
+    } == {"6": 1, "4+1+1": 1, "2+1+1+1+1": 1}
 
 
 def test_cli_rejects_unknown_statistics_command(tmp_path: Path) -> None:
