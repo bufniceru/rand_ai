@@ -1,8 +1,9 @@
-import { groupFrequencyFigure, numberFrequencyFigure } from "./figureBuilders";
+import { freshnessGapDistribution, freshnessGapHitRate, groupFrequencyFigure, numberFrequencyFigure } from "./figureBuilders";
 import type {
   FigureSpec,
   StatisticsCommandPayload,
   StatisticsCommandRequest,
+  TablePayload,
 } from "../types";
 
 export interface CommandAvailabilityContext {
@@ -24,7 +25,16 @@ export interface FigureCommandResult {
   figure: FigureSpec;
 }
 
-export type AppCommandResult = FigureCommandResult;
+export interface GapStatisticsCommandResult {
+  kind: "gap-statistics";
+  commandId: string;
+  title: string;
+  subtitle: string;
+  table: TablePayload;
+  figures: Record<string, FigureSpec>;
+}
+
+export type AppCommandResult = FigureCommandResult | GapStatisticsCommandResult;
 
 export interface AppCommand {
   id: string;
@@ -41,6 +51,31 @@ export type CommandResultOverlayState =
   | { status: "error"; title: string; message: string };
 
 export const applicationCommands: readonly AppCommand[] = [
+  {
+    id: "statistics.gap-statistics",
+    title: "Gap Statistics vs Fair Randomness",
+    category: "Statistics",
+    keywords: ["gaps", "freshness", "hits", "opportunities", "random", "baseline", "waiting"],
+    disabledReason: ({ hasDataset }) =>
+      hasDataset ? null : "Analyze a dataset first",
+    execute: async (context) => {
+      const payload = await context.runStatisticsCommand({ id: "statistics.gap-statistics" });
+      if (payload.id !== "statistics.gap-statistics") {
+        throw new Error("Unexpected Gap Statistics response.");
+      }
+      return {
+        kind: "gap-statistics",
+        commandId: payload.id,
+        title: "Statistics: Gap Statistics vs Fair Randomness",
+        subtitle: `${payload.datasetName} · ${payload.drawCount.toLocaleString()} draws`,
+        table: payload.table,
+        figures: {
+          freshness_gap_distribution: freshnessGapDistribution(payload.table),
+          freshness_gap_hit_rate: freshnessGapHitRate(payload.table),
+        },
+      };
+    },
+  },
   {
     id: "statistics.number-frequency",
     title: "Number Frequency",

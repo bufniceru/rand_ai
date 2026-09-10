@@ -144,10 +144,12 @@ export interface TablePayload {
 
 export type StatisticsCommandId =
   | "statistics.number-frequency"
+  | "statistics.gap-statistics"
   | "statistics.group-frequency";
 
 export type StatisticsCommandRequest =
   | { id: "statistics.number-frequency" }
+  | { id: "statistics.gap-statistics" }
   | { id: "statistics.group-frequency"; borderSpace: number };
 
 interface StatisticsCommandPayloadBase {
@@ -166,6 +168,7 @@ export interface GroupFrequencyCommandPayload extends StatisticsCommandPayloadBa
 }
 
 export type StatisticsCommandPayload =
+  | (StatisticsCommandPayloadBase & { id: "statistics.gap-statistics" })
   | NumberFrequencyCommandPayload
   | GroupFrequencyCommandPayload;
 

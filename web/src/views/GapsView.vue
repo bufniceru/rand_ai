@@ -2,15 +2,15 @@
 import { computed } from "vue";
 import DataTable from "../components/DataTable.vue";
 import PlotlyChart from "../components/PlotlyChart.vue";
-import type { AnalysisPayload, FigureSpec, TableRow } from "../types";
+import type { TablePayload, FigureSpec, TableRow } from "../types";
 
 const props = defineProps<{
-  analysis: AnalysisPayload;
+  table: TablePayload;
   figures: Record<string, FigureSpec>;
 }>();
 
 const rows = computed(
-  () => props.analysis.tables.freshness_gap_distribution?.rows ?? [],
+  () => props.table.rows,
 );
 const maximumGap = computed(() =>
   rows.value.reduce(
@@ -89,7 +89,7 @@ const mostFrequentGap = computed(() =>
     <article class="table-card">
       <h3>Exact gap statistics</h3>
       <DataTable
-        :table="analysis.tables.freshness_gap_distribution"
+        :table="table"
         :searchable="false"
       />
     </article>

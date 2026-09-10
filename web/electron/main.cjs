@@ -1123,6 +1123,7 @@ ipcMain.handle("statistics-command:run", async (_event, request) => {
   if (![
     "statistics.number-frequency",
     "statistics.group-frequency",
+    "statistics.gap-statistics",
   ].includes(commandId)) {
     throw new Error(`Unknown statistics command: ${commandId}`);
   }

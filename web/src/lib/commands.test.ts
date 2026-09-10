@@ -55,9 +55,38 @@ function command(id: string) {
 }
 
 describe("application command registry", () => {
+  it("finds and runs the gap comparison with both charts and its table", async () => {
+    for (const query of ["gap", "gaps", "randomness", "freshness", "opportunities"]) {
+      expect(filterApplicationCommands(applicationCommands, query).map((item) => item.id))
+        .toContain("statistics.gap-statistics");
+    }
+    const table = {
+      columns: ["gap", "hits", "opportunities", "expected_hits", "hit_rate", "expected_hit_rate"],
+      rows: [{ gap: 0, hits: 6, opportunities: 49, expected_hits: 6,
+        hit_rate: 600 / 49, expected_hit_rate: 600 / 49 }],
+    };
+    const runStatisticsCommand = vi.fn(async (): Promise<StatisticsCommandPayload> => ({
+      id: "statistics.gap-statistics", datasetName: "draws.pkl", drawCount: 1, table,
+    }));
+    const result = await command("statistics.gap-statistics").execute({
+      hasDataset: true, borderSpace: 7, runStatisticsCommand,
+    });
+    expect(runStatisticsCommand).toHaveBeenCalledWith({ id: "statistics.gap-statistics" });
+    if (result.kind !== "gap-statistics") throw new Error("Expected gap statistics result");
+    expect(result.table).toBe(table);
+    expect(result.figures.freshness_gap_distribution.data[1].y).toEqual([6]);
+    expect(result.figures.freshness_gap_hit_rate.data[1].y).toEqual([600 / 49]);
+  });
+
+  it("rejects a mismatched gap command response", async () => {
+    await expect(command("statistics.gap-statistics").execute({
+      hasDataset: true, borderSpace: 7, runStatisticsCommand: async () => payload(),
+    })).rejects.toThrow("Unexpected Gap Statistics response");
+  });
+
   it("filters commands by category, title, keywords, and palette prefix", () => {
     expect(filterApplicationCommands(applicationCommands, "frequency")).toHaveLength(2);
-    expect(filterApplicationCommands(applicationCommands, "> statistics")).toHaveLength(2);
+    expect(filterApplicationCommands(applicationCommands, "> statistics")).toHaveLength(3);
     expect(filterApplicationCommands(applicationCommands, "appearances expected")).toHaveLength(1);
     expect(filterApplicationCommands(applicationCommands, "border count").map((item) => item.id)).toEqual([
       "statistics.group-frequency",
@@ -87,6 +116,7 @@ describe("application command registry", () => {
     expect(runStatisticsCommand).toHaveBeenCalledWith({ id: "statistics.number-frequency" });
     expect(result.title).toBe("Statistics: Number Frequency");
     expect(result.subtitle).toContain("3 draws");
+    if (result.kind !== "figure") throw new Error("Expected figure result");
     expect(result.figure.data).toHaveLength(2);
     expect(result.figure.data[0].x).toEqual([1, 2]);
     expect(result.figure.data[0].y).toEqual([2, 1]);
@@ -109,6 +139,7 @@ describe("application command registry", () => {
     });
     expect(result.title).toBe("Statistics: Group Frequency");
     expect(result.subtitle).toContain("Border space 7");
+    if (result.kind !== "figure") throw new Error("Expected figure result");
     expect(result.figure.data).toHaveLength(11);
     expect(result.figure.data.map((trace) => trace.name)).toEqual([
       "6",

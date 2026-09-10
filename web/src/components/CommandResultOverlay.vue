@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 import type { CommandResultOverlayState } from "../lib/commands";
 import PlotlyChart from "./PlotlyChart.vue";
+import GapsView from "../views/GapsView.vue";
 
 defineProps<{ state: CommandResultOverlayState }>();
 defineEmits<{ close: [] }>();
@@ -35,8 +36,18 @@ onMounted(() => dialog.value?.focus());
       <strong>Command failed</strong>
       <p>{{ state.message }}</p>
     </div>
+    <div v-else-if="state.result.kind === 'gap-statistics'" class="command-result-report">
+      <GapsView :table="state.result.table" :figures="state.result.figures" />
+    </div>
     <article v-else class="command-result-figure">
       <PlotlyChart :figure="state.result.figure" />
     </article>
   </section>
 </template>
+
+<style scoped>
+.command-result-report {
+  min-height: 0;
+  overflow: auto;
+}
+</style>

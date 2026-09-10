@@ -1026,7 +1026,7 @@ onBeforeUnmount(() => {
         />
         <GapsView
           v-else-if="activeView === 'gaps' && analysis.options.enabledReports.includes('gaps')"
-          :analysis="analysis"
+          :table="analysis.tables.freshness_gap_distribution"
           :figures="figures"
         />
         <ExportView

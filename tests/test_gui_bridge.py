@@ -1083,6 +1083,30 @@ def test_cli_returns_number_frequency_command_data(
     assert len(payload["table"]["rows"]) == 49
 
 
+def test_cli_returns_gap_statistics_command_data(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source_path = _pickle_path(tmp_path)
+    main([
+        "statistics-command", "--input", str(source_path),
+        "--command-id", "statistics.gap-statistics",
+    ])
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["id"] == "statistics.gap-statistics"
+    assert payload["datasetName"] == "draws.pkl"
+    assert payload["drawCount"] == 3
+    assert "borderSpace" not in payload
+    rows = payload["table"]["rows"]
+    assert sum(row["hits"] for row in rows) == 18
+    assert sum(row["expected_hits"] for row in rows) == pytest.approx(18)
+    for row in rows:
+        assert row["expected_hits"] == pytest.approx(row["opportunities"] * 6 / 49)
+        assert row["expected_hit_rate"] == pytest.approx(600 / 49)
+        assert row["hit_difference"] == pytest.approx(row["hits"] - row["expected_hits"])
+        assert row["hit_rate_difference_pp"] == pytest.approx(row["hit_rate"] - 600 / 49)
+
+
 def test_cli_returns_group_frequency_command_data(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],

@@ -350,8 +350,8 @@ function matchingPairs(analysis: AnalysisPayload): FigureSpec {
   };
 }
 
-function freshnessGapDistribution(analysis: AnalysisPayload): FigureSpec {
-  const rows = table(analysis, "freshness_gap_distribution").rows;
+export function freshnessGapDistribution(source: TablePayload): FigureSpec {
+  const rows = source.rows;
   const layout = baseLayout(
     "Number hits by exact freshness gap",
     "Gap (intervening draws since the previous hit)",
@@ -406,8 +406,8 @@ function freshnessGapDistribution(analysis: AnalysisPayload): FigureSpec {
   };
 }
 
-function freshnessGapHitRate(analysis: AnalysisPayload): FigureSpec {
-  const rows = table(analysis, "freshness_gap_distribution").rows;
+export function freshnessGapHitRate(source: TablePayload): FigureSpec {
+  const rows = source.rows;
   return {
     data: [{
       type: "scatter",
@@ -628,8 +628,9 @@ export function buildFigures(analysis: AnalysisPayload): Record<string, FigureSp
     figures.matching_pairs = matchingPairs(analysis);
   }
   if (enabled.has("gaps")) {
-    figures.freshness_gap_distribution = freshnessGapDistribution(analysis);
-    figures.freshness_gap_hit_rate = freshnessGapHitRate(analysis);
+    const gaps = table(analysis, "freshness_gap_distribution");
+    figures.freshness_gap_distribution = freshnessGapDistribution(gaps);
+    figures.freshness_gap_hit_rate = freshnessGapHitRate(gaps);
   }
   return figures;
 }

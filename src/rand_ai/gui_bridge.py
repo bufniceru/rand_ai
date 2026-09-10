@@ -83,6 +83,7 @@ MAX_HISTORY_WINDOW = 250
 STATISTICS_COMMAND_IDS = (
     "statistics.number-frequency",
     "statistics.group-frequency",
+    "statistics.gap-statistics",
 )
 STRATEGY_CACHE_SCHEMA_VERSION = 21
 STRATEGY_CACHE_MAX_ENTRIES = 20
@@ -958,6 +959,9 @@ def statistics_command_data(
     elif command_id == "statistics.group-frequency":
         validated_border = validate_border_space(border_space)
         table = statistics.group_signature_frequencies(validated_border)
+    elif command_id == "statistics.gap-statistics":
+        table = statistics.freshness_gap_distribution()
+        validated_border = None
     else:  # pragma: no cover - guarded by the whitelist above
         raise ValueError(f"Unsupported statistics command: {command_id}")
     payload: dict[str, Any] = {
