@@ -246,6 +246,10 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
         "opportunities",
         "hit_rate",
         "hit_percentage",
+        "expected_hits",
+        "hit_difference",
+        "expected_hit_rate",
+        "hit_rate_difference_pp",
     ]
     assert (
         sum(

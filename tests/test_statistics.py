@@ -232,6 +232,14 @@ class TestDrawsStatisticsTables:
         assert distribution["opportunities"].sum() == 3 * 49
         assert distribution.loc[0, "hit_rate"] == pytest.approx(700 / 61)
         assert distribution.loc[2, "hit_percentage"] == pytest.approx(250 / 9)
+        assert distribution["expected_hits"].sum() == pytest.approx(18)
+        for row in distribution.itertuples(index=False):
+            assert row.expected_hits == pytest.approx(row.opportunities * 6 / 49)
+            assert row.hit_difference == pytest.approx(row.hits - row.expected_hits)
+            assert row.expected_hit_rate == pytest.approx(600 / 49)
+            assert row.hit_rate_difference_pp == pytest.approx(
+                row.hit_rate - 600 / 49
+            )
 
     def test_freshness_gaps_support_numbers_never_drawn_again(self) -> None:
         """Verify trailing and never-hit candidate gaps remain opportunities."""
@@ -243,6 +251,10 @@ class TestDrawsStatisticsTables:
         assert distribution["gap"].tolist() == [0, 1]
         assert distribution["hits"].tolist() == [12, 0]
         assert distribution["opportunities"].tolist() == [55, 43]
+        assert distribution.loc[1, "expected_hits"] == pytest.approx(43 * 6 / 49)
+        assert distribution.loc[1, "hit_difference"] == pytest.approx(-43 * 6 / 49)
+        assert distribution.loc[1, "hit_rate_difference_pp"] == pytest.approx(-600 / 49)
+        assert distribution["expected_hits"].sum() == pytest.approx(12)
 
     def test_draw_structure_distributions(self) -> None:
         """Verify sums, parity, ranges, and consecutive-pair counts."""

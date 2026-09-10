@@ -360,12 +360,15 @@ function freshnessGapDistribution(analysis: AnalysisPayload): FigureSpec {
   return {
     data: [{
       type: "bar",
+      name: "Observed hits",
       x: rows.map((row) => numberValue(row, "gap")),
       y: rows.map((row) => numberValue(row, "hits")),
       customdata: rows.map((row) => [
         numberValue(row, "opportunities"),
         numberValue(row, "hit_rate"),
         numberValue(row, "hit_percentage"),
+        numberValue(row, "expected_hits"),
+        numberValue(row, "hit_difference"),
       ]),
       marker: {
         color: rows.map((row) => numberValue(row, "hit_rate")),
@@ -377,16 +380,65 @@ function freshnessGapDistribution(analysis: AnalysisPayload): FigureSpec {
         colorbar: { title: { text: "Hit rate %" } },
       },
       hovertemplate:
-        "Gap %{x}<br>Hits %{y:,}<br>Opportunities %{customdata[0]:,}<br>Hit rate %{customdata[1]:.3f}%<br>Share of all hits %{customdata[2]:.3f}%<extra></extra>",
+        "Gap %{x}<br>Hits %{y:,}<br>Opportunities %{customdata[0]:,}<br>Hit rate %{customdata[1]:.3f}%<br>Share of all hits %{customdata[2]:.3f}%<br>Expected hits %{customdata[3]:.3f}<br>Hit difference %{customdata[4]:.3f}<extra></extra>",
+    }, {
+      type: "scatter",
+      mode: "lines+markers",
+      name: "Expected hits (fair draws)",
+      x: rows.map((row) => numberValue(row, "gap")),
+      y: rows.map((row) => numberValue(row, "expected_hits")),
+      customdata: rows.map((row) => numberValue(row, "opportunities")),
+      line: { color: themeColor("charts.series2"), width: 3 },
+      hovertemplate:
+        "Gap %{x}<br>Expected hits %{y:.3f}<br>Opportunities %{customdata:,}<extra></extra>",
     }],
     layout: {
       ...layout,
+      legend: { orientation: "h", y: -0.25, x: 0 },
+      margin: { l: 62, r: 24, t: 62, b: 105 },
       bargap: 0.08,
       xaxis: {
         title: { text: "Gap (intervening draws since the previous hit)" },
         dtick: rows.length > 60 ? 5 : 1,
         gridcolor: themeColor("charts.grid"),
       },
+    },
+  };
+}
+
+function freshnessGapHitRate(analysis: AnalysisPayload): FigureSpec {
+  const rows = table(analysis, "freshness_gap_distribution").rows;
+  return {
+    data: [{
+      type: "scatter",
+      mode: "lines+markers",
+      name: "Observed hit rate",
+      x: rows.map((row) => numberValue(row, "gap")),
+      y: rows.map((row) => numberValue(row, "hit_rate")),
+      customdata: rows.map((row) => [
+        numberValue(row, "opportunities"),
+        numberValue(row, "hits"),
+        numberValue(row, "hit_rate_difference_pp"),
+      ]),
+      line: { color: themeColor("charts.series1") },
+      hovertemplate:
+        "Gap %{x}<br>Hit rate %{y:.3f}%<br>Opportunities %{customdata[0]:,}<br>Hits %{customdata[1]:,}<br>Rate difference %{customdata[2]:.3f} pp<extra></extra>",
+    }, {
+      type: "scatter",
+      mode: "lines+markers",
+      name: "Fair baseline (12.24%)",
+      x: rows.map((row) => numberValue(row, "gap")),
+      y: rows.map((row) => numberValue(row, "expected_hit_rate")),
+      customdata: rows.map((row) => numberValue(row, "opportunities")),
+      line: { color: themeColor("charts.series2"), dash: "dash" },
+      hovertemplate:
+        "Gap %{x}<br>Expected hit rate %{y:.3f}%<br>Opportunities %{customdata:,}<extra></extra>",
+    }],
+    layout: {
+      ...baseLayout("Hit rate by exact freshness gap", "Gap (intervening draws since the previous hit)", "Hit rate (%)"),
+      legend: { orientation: "h", y: -0.25, x: 0 },
+      margin: { l: 62, r: 24, t: 62, b: 105 },
+      yaxis: { title: { text: "Hit rate (%)" }, rangemode: "tozero", ticksuffix: "%", gridcolor: themeColor("charts.grid") },
     },
   };
 }
@@ -577,6 +629,7 @@ export function buildFigures(analysis: AnalysisPayload): Record<string, FigureSp
   }
   if (enabled.has("gaps")) {
     figures.freshness_gap_distribution = freshnessGapDistribution(analysis);
+    figures.freshness_gap_hit_rate = freshnessGapHitRate(analysis);
   }
   return figures;
 }

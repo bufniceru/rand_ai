@@ -290,6 +290,8 @@ class DrawsStatistics:
             out=np.zeros(maximum_gap + 1, dtype=np.float64),
             where=opportunities != 0,
         )
+        expected_hit_rate = 6 / 49
+        expected_hits = opportunities * expected_hit_rate
         return pd.DataFrame(
             {
                 "gap": gaps,
@@ -297,6 +299,10 @@ class DrawsStatistics:
                 "opportunities": opportunities,
                 "hit_rate": hit_rate * 100,
                 "hit_percentage": hits / (self._draw_count * 6) * 100,
+                "expected_hits": expected_hits,
+                "hit_difference": hits - expected_hits,
+                "expected_hit_rate": expected_hit_rate * 100,
+                "hit_rate_difference_pp": (hit_rate - expected_hit_rate) * 100,
             }
         )
 

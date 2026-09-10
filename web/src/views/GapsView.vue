@@ -45,6 +45,8 @@ const mostFrequentGap = computed(() =>
       <p>
         How many historical number hits occurred at each exact pre-draw gap.
         Gap 0 means the number also appeared in the immediately preceding draw.
+        Gap 5 means five intervening draws. Before a number's first appearance,
+        its gap counts draws since the dataset started.
       </p>
     </header>
 
@@ -68,12 +70,20 @@ const mostFrequentGap = computed(() =>
     </div>
 
     <aside class="warning-banner">
-      Hit count and hit rate answer different questions. Hover a bar to compare
-      its hits with the number of historical opportunities at that gap.
+      An opportunity is one number entering one draw at that gap. For fair,
+      independent 6-from-49 draws, each opportunity has a 6/49 (about 12.24%)
+      chance of a hit, regardless of gap. Expected hits equal the observed
+      opportunities × 6/49. Positive differences mean more hits than this
+      baseline; they do not imply a predictive advantage. Rate differences are
+      in percentage points. Hover for opportunity counts, especially at sparse gaps.
     </aside>
 
     <article class="chart-card wide">
       <PlotlyChart :figure="figures.freshness_gap_distribution" />
+    </article>
+
+    <article class="chart-card wide">
+      <PlotlyChart :figure="figures.freshness_gap_hit_rate" />
     </article>
 
     <article class="table-card">
