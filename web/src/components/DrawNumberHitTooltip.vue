@@ -69,15 +69,20 @@ onBeforeUnmount(() => {
   max-height: min(420px, calc(100vh - 16px));
   overflow: auto;
   padding: 16px;
-  border: 1px solid var(--line);
+  border: 2px solid #64748b;
   border-radius: 10px;
-  background: var(--surface);
-  color: var(--theme-text-primary, #fcfcfa);
-  box-shadow: 0 8px 28px #0003;
+  background: #ffffff;
+  color: #172033;
+  color-scheme: light;
+  font-size: 16px;
+  line-height: 1.55;
+  text-align: left;
+  box-shadow: 0 8px 28px #0006;
 }
-strong, small { display: block; }
-small { color: var(--text-muted); margin-top: 4px; }
-p { margin: 10px 0; }
-ul { margin: 0; padding-left: 20px; }
-li + li { margin-top: 6px; }
+.draw-number-hit-tooltip :is(strong, p, ul, li) { color: #172033; }
+.draw-number-hit-tooltip strong { display: block; font-size: 17px; }
+.draw-number-hit-tooltip small { display: block; color: #374151; font-size: 14px; margin-top: 4px; }
+.draw-number-hit-tooltip p { margin: 10px 0; }
+.draw-number-hit-tooltip ul { margin: 0; padding-left: 20px; }
+.draw-number-hit-tooltip li + li { margin-top: 6px; }
 </style>
