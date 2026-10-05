@@ -733,7 +733,7 @@ def build_analysis_payload(
         if strategy_id in enabled_strategies
     )
     history_start = max(0, len(draws) - MAX_HISTORY_WINDOW)
-    prediction_suites_required = bool(
+    prediction_suites_required = bool(strategy_ids) or bool(
         report_set.intersection(
             {
                 "predictions",
@@ -903,11 +903,7 @@ def build_analysis_payload(
         "strategyEfficacyHistory": strategy_analysis[
             "strategyEfficacyHistory"
         ],
-        "predictionAuditHistory": (
-            strategy_analysis["predictionAuditHistory"]
-            if report_set.intersection({"prediction-audit", "strategy-hit-statistics"})
-            else []
-        ),
+        "predictionAuditHistory": strategy_analysis["predictionAuditHistory"],
         "drawComparisonHistory": (
             strategy_analysis["drawComparisonHistory"]
             if "draw-comparison" in report_set

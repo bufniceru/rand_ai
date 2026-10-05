@@ -277,6 +277,7 @@ def test_disabled_report_plugins_are_not_calculated_or_returned(
         _draws(),
         source_path,
         enabled_reports=("overview",),
+        enabled_strategies=(),
     )
 
     assert payload["options"]["enabledReports"] == ["overview"]
@@ -294,6 +295,18 @@ def test_disabled_report_plugins_are_not_calculated_or_returned(
     assert payload["latestDrawComparison"] is None
     assert payload["possibleDraw"]["relationshipEdges"] == []
     assert payload["nonlinearDynamics"] is None
+
+
+def test_draw_history_hits_available_with_hit_reports_disabled(tmp_path: Path) -> None:
+    payload = build_analysis_payload(
+        _draws(), _pickle_path(tmp_path),
+        enabled_reports=("overview",),
+        enabled_strategies=("freshness", "entropy"),
+    )
+    assert payload["options"]["enabledReports"] == ["overview"]
+    assert payload["predictionSuites"] == []
+    assert len(payload["predictionAuditHistory"]) == 2
+    assert len(payload["strategyEfficacyHistory"]) == 2
 
 
 def test_numbers_report_leaves_frequency_for_on_demand_command(
@@ -640,7 +653,7 @@ def test_draw_comparison_returns_only_the_latest_compact_result(
 
     comparison = payload["latestDrawComparison"]
     assert payload["predictionSuites"] == []
-    assert payload["predictionAuditHistory"] == []
+    assert len(payload["predictionAuditHistory"]) == 2
     assert payload["options"]["enabledReports"] == ["draw-comparison"]
     assert len(payload["drawComparisonHistory"]) == 2
     assert comparison["targetDrawNumber"] == 3

@@ -1145,6 +1145,9 @@ onBeforeUnmount(() => {
       <DrawEditorDialogApp
         :key="analysis.dataset.path"
         embedded
+        :audit-history="analysis.predictionAuditHistory"
+        :enabled-strategies="analysis.options.enabledStrategies"
+        :analysis-stale="analysisStale"
         @saved="handleDrawHistorySaved"
       />
     </section>

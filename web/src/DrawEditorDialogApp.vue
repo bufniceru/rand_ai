@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import type { DrawEditorData, DrawEditorEntry } from "./types";
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
+import type { DrawEditorData, DrawEditorEntry, PredictionAuditRecord, StrategyId } from "./types";
+import DrawNumberHitTooltip from "./components/DrawNumberHitTooltip.vue";
+import { drawHistoryNumberHits } from "./lib/drawHistoryHits";
 
 type EditorMode = "view" | "add" | "edit";
 type DrawVisualization = "grid" | "circle";
@@ -12,7 +14,12 @@ interface CircularSpace {
   wraparound: boolean;
 }
 
-defineProps<{ embedded?: boolean }>();
+const props = withDefaults(defineProps<{
+  embedded?: boolean;
+  auditHistory?: PredictionAuditRecord[];
+  enabledStrategies?: StrategyId[];
+  analysisStale?: boolean;
+}>(), { auditHistory: () => [], enabledStrategies: () => [], analysisStale: false });
 const emit = defineEmits<{ saved: [] }>();
 
 const data = ref<DrawEditorData | null>(null);
@@ -26,6 +33,41 @@ const loading = ref(true);
 const saving = ref(false);
 const message = ref("");
 const errorMessage = ref("");
+const locallyStale = ref(false);
+const hoveredNumber = ref<number | null>(null);
+const hoverAnchor = shallowRef<HTMLElement | null>(null);
+let hideTimer: ReturnType<typeof setTimeout> | undefined;
+
+function keepHitsOpen() { clearTimeout(hideTimer); }
+function closeHits() {
+  keepHitsOpen();
+  hoveredNumber.value = null;
+  hoverAnchor.value = null;
+}
+function scheduleHitsClose() {
+  keepHitsOpen();
+  hideTimer = setTimeout(() => {
+    if (hoverAnchor.value?.matches(':hover, :focus')
+      || document.getElementById('draw-number-hit-tooltip')?.matches(':hover')) return;
+    closeHits();
+  }, 180);
+}
+function showHits(number: number, event: Event) {
+  if (mode.value !== "view" || !displayedSet.value.has(number)) return;
+  keepHitsOpen();
+  hoveredNumber.value = number;
+  hoverAnchor.value = event.currentTarget as HTMLElement;
+}
+const hoverResult = computed(() => currentDraw.value && hoveredNumber.value !== null
+  ? drawHistoryNumberHits(currentDraw.value, hoveredNumber.value, props.auditHistory,
+    props.enabledStrategies, props.analysisStale || locallyStale.value)
+  : null);
+watch([currentIndex, mode, visualization], closeHits);
+watch(() => props.auditHistory, () => {
+  locallyStale.value = false;
+  closeHits();
+});
+onBeforeUnmount(closeHits);
 
 const draws = computed(() => data.value?.draws ?? []);
 const currentDraw = computed<DrawEditorEntry | null>(
@@ -122,6 +164,7 @@ async function save(): Promise<void> {
       numbers: [...editNumbers.value],
       ...(mode.value === "edit" ? { originalDate: originalDate.value } : {}),
     });
+    locallyStale.value = true;
     currentIndex.value = Math.max(
       data.value.draws.findIndex((draw) => draw.date === savedDate),
       0,
@@ -235,6 +278,11 @@ onMounted(async () => {
             role="gridcell"
             :class="{ selected: displayedSet.has(number), editable: mode !== 'view' }"
             :aria-pressed="displayedSet.has(number)"
+            :aria-describedby="hoveredNumber === number ? 'draw-number-hit-tooltip' : undefined"
+            @mouseenter="showHits(number, $event)"
+            @mouseleave="scheduleHitsClose"
+            @focus="showHits(number, $event)"
+            @blur="scheduleHitsClose"
             @click="toggleNumber(number)"
           >
             {{ number }}
@@ -262,6 +310,11 @@ onMounted(async () => {
             }"
             :style="{ left: entry.left, top: entry.top }"
             :aria-pressed="displayedSet.has(entry.number)"
+            :aria-describedby="hoveredNumber === entry.number ? 'draw-number-hit-tooltip' : undefined"
+            @mouseenter="showHits(entry.number, $event)"
+            @mouseleave="scheduleHitsClose"
+            @focus="showHits(entry.number, $event)"
+            @blur="scheduleHitsClose"
             @click="toggleNumber(entry.number)"
           >
             {{ entry.number }}
@@ -308,5 +361,8 @@ onMounted(async () => {
       <p v-if="message" class="draw-editor-status success">{{ message }}</p>
       <p v-if="errorMessage" class="draw-editor-status error">{{ errorMessage }}</p>
     </section>
+    <DrawNumberHitTooltip v-if="hoveredNumber !== null && hoverAnchor && currentDraw && hoverResult"
+      :anchor="hoverAnchor" :draw="currentDraw" :number="hoveredNumber" :result="hoverResult"
+      @enter="keepHitsOpen" @leave="scheduleHitsClose" @dismiss="closeHits" />
   </main>
 </template>

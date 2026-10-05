@@ -64,6 +64,18 @@ The editor is available when the active pickle has a matching `.yaml` or
 `.yml` source beside it. It supports adding a draw or updating an existing draw
 by ISO date.
 
+In viewing mode, hover over a drawn number in the **7×7 Grid** or **PyLotto
+Circle**, or focus it with the keyboard, to see which enabled strategies
+included it in their prior Top 6. The hover window shows full strategy names,
+the hit count, draw, and date. Move onto the window to read or scroll a long
+list; press **Esc** to dismiss it. Non-drawn numbers have no hit window.
+
+These records are available independently of the Prediction Audit and Strategy
+Hit Statistics report switches. Enabled strategies are evaluated during
+analysis and cached results are reused. A draw without a recorded forecast
+shows “No prior prediction available for this draw.” After editing history,
+reanalyze before inspecting refreshed hits.
+
 When a draw is saved, Rand AI validates that it contains six unique numbers,
 sorts the history by date, updates the YAML metadata, and regenerates the
 paired pickle. Duplicate dates and invalid draw values are rejected.
