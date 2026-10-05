@@ -1146,6 +1146,7 @@ onBeforeUnmount(() => {
         :key="analysis.dataset.path"
         embedded
         :audit-history="analysis.predictionAuditHistory"
+        :efficacy-history="analysis.strategyEfficacyHistory"
         :enabled-strategies="analysis.options.enabledStrategies"
         :analysis-stale="analysisStale"
         @saved="handleDrawHistorySaved"

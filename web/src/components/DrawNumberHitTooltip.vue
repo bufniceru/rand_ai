@@ -6,7 +6,7 @@ const props = defineProps<{
   anchor: HTMLElement;
   draw: DrawEditorEntry;
   number: number;
-  result: { message: string; strategies: { id: StrategyId; name: string }[] };
+  result: { message: string; strategies: { id: StrategyId; name: string; averageHits: number | null }[] };
 }>();
 const emit = defineEmits<{ enter: []; leave: []; dismiss: [] }>();
 const panel = ref<HTMLElement>();
@@ -54,7 +54,8 @@ onBeforeUnmount(() => {
       <p v-if="result.message">{{ result.message }}</p>
       <template v-else>
         <p>{{ result.strategies.length }} successful {{ result.strategies.length === 1 ? 'strategy' : 'strategies' }} · Prior Top 6</p>
-        <ul><li v-for="strategy in result.strategies" :key="strategy.id">{{ strategy.name }}</li></ul>
+        <small>Most effective first · Average hits per earlier draw</small>
+        <ul><li v-for="strategy in result.strategies" :key="strategy.id">{{ strategy.name }} <small>{{ strategy.averageHits === null ? 'No earlier evaluations' : `${strategy.averageHits.toFixed(2)} hits / draw` }}</small></li></ul>
       </template>
     </aside>
   </Teleport>

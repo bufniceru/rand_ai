@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
-import type { DrawEditorData, DrawEditorEntry, PredictionAuditRecord, StrategyId } from "./types";
+import type { DrawEditorData, DrawEditorEntry, PredictionAuditRecord, StrategyEfficacyRecord, StrategyId } from "./types";
 import DrawNumberHitTooltip from "./components/DrawNumberHitTooltip.vue";
 import { drawHistoryNumberHits } from "./lib/drawHistoryHits";
 
@@ -17,9 +17,10 @@ interface CircularSpace {
 const props = withDefaults(defineProps<{
   embedded?: boolean;
   auditHistory?: PredictionAuditRecord[];
+  efficacyHistory?: StrategyEfficacyRecord[];
   enabledStrategies?: StrategyId[];
   analysisStale?: boolean;
-}>(), { auditHistory: () => [], enabledStrategies: () => [], analysisStale: false });
+}>(), { auditHistory: () => [], efficacyHistory: () => [], enabledStrategies: () => [], analysisStale: false });
 const emit = defineEmits<{ saved: [] }>();
 
 const data = ref<DrawEditorData | null>(null);
@@ -60,7 +61,7 @@ function showHits(number: number, event: Event) {
 }
 const hoverResult = computed(() => currentDraw.value && hoveredNumber.value !== null
   ? drawHistoryNumberHits(currentDraw.value, hoveredNumber.value, props.auditHistory,
-    props.enabledStrategies, props.analysisStale || locallyStale.value)
+    props.enabledStrategies, props.analysisStale || locallyStale.value, props.efficacyHistory)
   : null);
 watch([currentIndex, mode, visualization], closeHits);
 watch(() => props.auditHistory, () => {

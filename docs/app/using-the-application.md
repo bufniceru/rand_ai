@@ -67,7 +67,9 @@ by ISO date.
 In viewing mode, hover over a drawn number in the **7×7 Grid** or **PyLotto
 Circle**, or focus it with the keyboard, to see which enabled strategies
 included it in their prior Top 6. The hover window shows full strategy names,
-the hit count, draw, and date. Move onto the window to read or scroll a long
+the hit count, draw, and date. Strategies are ordered by descending average
+hits per evaluated draw before the displayed draw, with alphabetical ties.
+Strategies without earlier evaluations appear last. Move onto the window to read or scroll a long
 list; press **Esc** to dismiss it. Non-drawn numbers have no hit window.
 
 These records are available independently of the Prediction Audit and Strategy
