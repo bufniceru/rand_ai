@@ -40,6 +40,7 @@ import RelationshipsView from "./views/RelationshipsView.vue";
 import SpacesView from "./views/SpacesView.vue";
 import SpaceGroupsView from "./views/SpaceGroupsView.vue";
 import StrategyEffectivenessView from "./views/StrategyEffectivenessView.vue";
+import StrategyHitStatisticsView from "./views/StrategyHitStatisticsView.vue";
 import type {
   AnalysisOptions,
   AnalysisPayload,
@@ -95,6 +96,7 @@ const views: { id: ViewId; label: string; shortLabel: string }[] = [
     label: "Strategy Effectiveness",
     shortLabel: "Effectiveness",
   },
+  { id: "strategy-hit-statistics", label: "Strategy Hit Statistics", shortLabel: "Strategy Hits" },
   { id: "gaps", label: "Gaps", shortLabel: "Gaps" },
   { id: "export", label: "Export", shortLabel: "Export" },
 ];
@@ -1022,6 +1024,10 @@ onBeforeUnmount(() => {
         />
         <StrategyEffectivenessView
           v-else-if="activeView === 'strategy-effectiveness' && analysis.options.enabledReports.includes('strategy-effectiveness')"
+          :analysis="analysis"
+        />
+        <StrategyHitStatisticsView
+          v-else-if="activeView === 'strategy-hit-statistics' && analysis.options.enabledReports.includes('strategy-hit-statistics')"
           :analysis="analysis"
         />
         <GapsView

@@ -30,6 +30,7 @@ const reportPlugins = [
   { id: "prediction-audit", label: "Prediction Audit" },
   { id: "draw-comparison", label: "Latest Draw vs Predictions" },
   { id: "strategy-effectiveness", label: "Strategy Effectiveness" },
+  { id: "strategy-hit-statistics", label: "Strategy Hit Statistics" },
   { id: "gaps", label: "Gaps" },
   { id: "last-seen", label: "Last Seen Highlight" },
   { id: "last-seen-gap", label: "Last Seen Gap Highlight" },
@@ -48,6 +49,7 @@ const legacyReportPluginIds = reportPlugins
       reportId !== "prediction-audit" &&
       reportId !== "draw-comparison" &&
       reportId !== "strategy-effectiveness" &&
+      reportId !== "strategy-hit-statistics" &&
       reportId !== "last-seen-space" &&
       reportId !== "draw-portfolio",
   );
@@ -157,6 +159,7 @@ const dashboardViews = [
   ["prediction-audit", "Prediction Audit"],
   ["draw-comparison", "Latest Draw vs Predictions"],
   ["strategy-effectiveness", "Strategy Effectiveness"],
+  ["strategy-hit-statistics", "Strategy Hit Statistics"],
   ["gaps", "Gaps"],
   ["export", "Export"],
 ];

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { strategyNames } from "../lib/strategyNames";
 import { strategyColor } from "../lib/strategyColors";
 import type {
   AnalysisPayload,
@@ -25,49 +26,7 @@ const effectivenessMode = ref<EffectivenessMode>("cumulative");
 const rollingWindow = ref(25);
 const visibleStrategyIds = ref<Set<StrategyId>>(new Set());
 
-const strategyNames: Record<StrategyId, string> = {
-  proximity: "Proximity",
-  freshness: "Freshness",
-  emd: "Earth Mover Distance",
-  randomness: "Random baseline",
-  recurrence_dynamics: "Recurrence Dynamics",
-  fresh_random: "Fresh Random",
-  chi_square: "Chi-square Frequency",
-  categorical_chi_square: "Categorical Chi-square",
-  entropy: "Entropy",
-  markov100: "Markov 100",
-  mkgsv: "Markov Gap-Space Vector",
-  mkfr: "Markov Freshness",
-  mksp: "Markov Spaces",
-  mknp: "Markov Normalized Positions",
-  mkrd: "Markov Relative Dispersion",
-  bayesian: "Bayesian",
-  predictive_grid: "Predictive Score Grid",
-  co_occurrence: "Next Draw Co-occurrence",
-  doublet_triplet_markov: "Doublet & Triplet Markov",
-  mixed: "Mixed Prediction",
-  svc: "Support Vector Classifier",
-  svc_recurrence_hybrid: "SVC–Recurrence Hybrid",
-  svc_recurrence_proximity_hybrid:
-    "SVC–Recurrence–Proximity Hybrid",
-  srph_residual_diversity_hybrid:
-    "SRPH Residual Diversity Hybrid",
-  srph_minimax_regret_hybrid: "SRPH Minimax Regret Hybrid",
-  tbl: "Temporal Behavior Learning",
-  sklearn_svm: "Scikit Online SVM",
-  lag_logistic: "Lagged Logistic",
-  sparse_neural_ticket: "Sparse Neural Ticket",
-  cis: "Collective Intelligence Strategy",
-  decision_tree_selector: "Decision Tree Selector",
-  border_group_statistical: "Border Group Statistical",
-  border_group_markov: "Border Group Markov",
-  border_group_bayesian: "Border Group Bayesian",
-  border_group_ml: "Border Group ML",
-  border_group_svc: "Border Group SVC",
-  border_group_hybrid: "Border Group Hybrid",
-  residual_coverage: "Residual Coverage",
-  chained: "Chained Strategy",
-};
+
 
 const records = computed(() => props.analysis.strategyEfficacyHistory);
 const scopedRecords = computed(() => {

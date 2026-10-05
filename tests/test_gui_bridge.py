@@ -606,6 +606,28 @@ def test_full_history_prediction_reports_use_compact_audit_records(
     )
 
 
+def test_strategy_hit_statistics_supplies_histories_independently(tmp_path: Path) -> None:
+    payload = build_analysis_payload(
+        _draws(),
+        _pickle_path(tmp_path),
+        enabled_reports=("strategy-hit-statistics",),
+        enabled_strategies=("freshness", "entropy", "randomness"),
+    )
+    assert payload["options"]["enabledReports"] == ["strategy-hit-statistics"]
+    assert payload["predictionSuites"] == []
+    assert len(payload["predictionAuditHistory"]) == 2
+    assert len(payload["strategyEfficacyHistory"]) == 2
+    for audit, efficacy in zip(
+        payload["predictionAuditHistory"], payload["strategyEfficacyHistory"]
+    ):
+        assert audit["targetDrawNumber"] == efficacy["targetDrawNumber"]
+        for strategy_id, hits in efficacy["strategyHits"].items():
+            assert hits == sum(
+                any(strategy["id"] == strategy_id for strategy in item["strategies"])
+                for item in audit["numbers"]
+            )
+
+
 def test_draw_comparison_returns_only_the_latest_compact_result(
     tmp_path: Path,
 ) -> None:

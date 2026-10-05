@@ -12,6 +12,7 @@ export type ReportId =
   | "prediction-audit"
   | "draw-comparison"
   | "strategy-effectiveness"
+  | "strategy-hit-statistics"
   | "gaps"
   | "last-seen"
   | "last-seen-gap"
@@ -72,6 +73,7 @@ export type ViewId =
   | "prediction-audit"
   | "draw-comparison"
   | "strategy-effectiveness"
+  | "strategy-hit-statistics"
   | "gaps"
   | "export";
 export type WorkspaceTabId =

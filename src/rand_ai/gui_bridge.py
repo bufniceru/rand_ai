@@ -52,6 +52,7 @@ REPORT_IDS = (
     "prediction-audit",
     "draw-comparison",
     "strategy-effectiveness",
+    "strategy-hit-statistics",
     "gaps",
     "last-seen",
     "last-seen-gap",
@@ -741,6 +742,7 @@ def build_analysis_payload(
                 "prediction-audit",
                 "draw-comparison",
                 "strategy-effectiveness",
+                "strategy-hit-statistics",
             }
         )
     )
@@ -903,7 +905,7 @@ def build_analysis_payload(
         ],
         "predictionAuditHistory": (
             strategy_analysis["predictionAuditHistory"]
-            if "prediction-audit" in report_set
+            if report_set.intersection({"prediction-audit", "strategy-hit-statistics"})
             else []
         ),
         "drawComparisonHistory": (

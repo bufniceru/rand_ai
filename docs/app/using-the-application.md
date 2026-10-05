@@ -22,6 +22,29 @@ are enabled. Disabling a report hides its related navigation entry without
 altering the source dataset. Reanalysis applies changed calculation options to
 the active dataset.
 
+## Strategy Hit Statistics
+
+Enable **Strategy Hit Statistics** in Settings or the Reports menu, then open
+its navigation entry. It works independently of Prediction Audit and Strategy
+Effectiveness and uses the same walk-forward predictions: a hit means the
+strategy's prior Top 6 included an actual winning number.
+
+Choose all evaluated draws or the latest 100, 250, or 500. The selected range
+applies to draw selection, strategy totals, and relationships. The latest
+evaluated draw is selected initially. Draw details list every winning number
+and its successful strategies, plus each strategy's matched numbers and hit
+count, including zero hits. Totals show hits, draws with hits, averages per
+evaluated draw, and the distribution of exactly zero through six hits.
+
+The relationship heatmap and sortable pair table show **Shared winning
+numbers** (distinct draw-and-number events) and **Both hit in the same draw**
+(including hits on different numbers). The table also counts draws with shared
+hits. Click a heatmap cell or pair to inspect contributing draws and matched
+numbers; click a draw in the detail table to select it above. Self-pairs are
+excluded and each unordered pair appears once in the table. These observed
+relationships do not establish predictive causation. Enabled random strategies
+are included. Only draws with recorded prior predictions are evaluated.
+
 ## Command palette
 
 Press **Ctrl+Shift+P** (or **Cmd+Shift+P**), press **F1**, or choose **View >
