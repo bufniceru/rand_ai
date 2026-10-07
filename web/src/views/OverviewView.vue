@@ -44,9 +44,9 @@ const summary = computed(() => summaryLookup(props.analysis));
       <article class="chart-card"><PlotlyChart :figure="figures.draw_sum_distribution" /></article>
       <article class="chart-card"><PlotlyChart :figure="figures.draw_composition" /></article>
     </div>
-    <article class="table-card">
-      <h3>Overview statistics</h3>
+    <details class="table-card">
+      <summary>Overview statistics · complete descriptive table</summary>
       <DataTable :table="analysis.tables.summary" :searchable="false" />
-    </article>
+    </details>
   </section>
 </template>

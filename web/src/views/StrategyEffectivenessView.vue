@@ -2,6 +2,9 @@
 import { computed, ref, watch } from "vue";
 import { strategyNames } from "../lib/strategyNames";
 import { strategyColor } from "../lib/strategyColors";
+import { strategyHitCurve, strategyPerformance } from "../lib/strategyPerformance";
+import { primaryStudyStrategies, strategyStudyScope } from "../lib/strategyStudy";
+import StrategyPerformanceLegend from "../components/StrategyPerformanceLegend.vue";
 import type {
   AnalysisPayload,
   StrategyEfficacyRecord,
@@ -14,7 +17,7 @@ type HistoryScope = "all" | 100 | 250 | 500;
 type EffectivenessMode = "cumulative" | "rolling";
 
 const randomExpectedHits = 36 / 49;
-const exactHitLevels = [6, 5, 4, 3, 2, 1] as const;
+const exactHitLevels = [6, 5, 4, 3, 2, 1, 0] as const;
 const chartWidth = 1100;
 const chartHeight = 500;
 const chartLeft = 64;
@@ -45,17 +48,10 @@ const strategyIds = computed(() => {
 const strategyRows = computed(() =>
   strategyIds.value
     .map((id) => {
-      const hits = scopedRecords.value.reduce(
-        (total, record) => total + (record.strategyHits[id] ?? 0),
-        0,
-      );
-      const average =
-        scopedRecords.value.length > 0 ? hits / scopedRecords.value.length : 0;
+      const { hits, average, drawCount, distribution } = strategyPerformance(scopedRecords.value, id);
       const exactHitDraws = exactHitLevels.map((hitCount) => ({
         hitCount,
-        draws: scopedRecords.value.filter(
-          (record) => (record.strategyHits[id] ?? 0) === hitCount,
-        ).length,
+        draws: distribution[hitCount],
       }));
       return {
         id,
@@ -63,30 +59,25 @@ const strategyRows = computed(() =>
         color: strategyColor(id),
         hits,
         average,
+        drawCount,
         lift: average - randomExpectedHits,
         exactHitDraws,
       };
     })
+    .filter(row => row.drawCount > 0)
     .sort(
       (left, right) =>
         right.average - left.average || left.name.localeCompare(right.name),
     ),
 );
-const allStrategiesExactHitDraws = computed(() =>
-  exactHitLevels.map((hitCount, index) => ({
-    hitCount,
-    draws: strategyRows.value.reduce(
-      (total, row) => total + (row.exactHitDraws[index]?.draws ?? 0),
-      0,
-    ),
-  })),
-);
+const primaryRows = computed(() => primaryStudyStrategies(strategyRows.value));
+const alternativeRows = computed(() => strategyRows.value.filter(row => !primaryRows.value.includes(row)));
 
 watch(
   strategyRows,
   (rows) => {
     if (visibleStrategyIds.value.size > 0 || rows.length === 0) return;
-    visibleStrategyIds.value = new Set(rows.slice(0, 6).map((row) => row.id));
+    visibleStrategyIds.value = new Set(primaryStudyStrategies(rows).slice(0, 6).map((row) => row.id));
   },
   { immediate: true },
 );
@@ -100,7 +91,7 @@ const lineSeries = computed(() =>
     })),
 );
 const chartMaximum = computed(() => {
-  const values = lineSeries.value.flatMap((series) => series.values);
+  const values = lineSeries.value.flatMap((series) => series.values).filter((value): value is number => value !== null);
   const maximum = Math.max(randomExpectedHits, ...values, 1);
   return Math.ceil(maximum * 4) / 4;
 });
@@ -124,27 +115,12 @@ const xTicks = computed(() => {
   }));
 });
 const bestStrategy = computed(() => strategyRows.value[0] ?? null);
-const totalStrategyHits = computed(() =>
-  strategyRows.value.reduce((total, row) => total + row.hits, 0),
-);
 
 function effectivenessValues(
   source: StrategyEfficacyRecord[],
   strategyId: StrategyId,
-): number[] {
-  const hits = source.map((record) => record.strategyHits[strategyId] ?? 0);
-  if (effectivenessMode.value === "cumulative") {
-    let total = 0;
-    return hits.map((value, index) => {
-      total += value;
-      return total / (index + 1);
-    });
-  }
-  return hits.map((_value, index) => {
-    const start = Math.max(0, index - rollingWindow.value + 1);
-    const window = hits.slice(start, index + 1);
-    return window.reduce((total, value) => total + value, 0) / window.length;
-  });
+): (number | null)[] {
+  return strategyHitCurve(source, strategyId, effectivenessMode.value === "rolling" ? rollingWindow.value : undefined);
 }
 
 function xForIndex(index: number): number {
@@ -157,12 +133,15 @@ function yForValue(value: number): number {
   return chartTop + plotHeight - (value / chartMaximum.value) * plotHeight;
 }
 
-function seriesPath(values: number[]): string {
+function seriesPath(values: (number | null)[]): string {
+  let connected = false;
   return values
-    .map(
-      (value, index) =>
-        `${index === 0 ? "M" : "L"} ${xForIndex(index).toFixed(2)} ${yForValue(value).toFixed(2)}`,
-    )
+    .map((value, index) => {
+      if (value === null) { connected = false; return ""; }
+      const command = connected ? "L" : "M";
+      connected = true;
+      return `${command} ${xForIndex(index).toFixed(2)} ${yForValue(value).toFixed(2)}`;
+    })
     .join(" ");
 }
 
@@ -175,7 +154,7 @@ function setStrategyVisible(strategyId: StrategyId, visible: boolean): void {
 
 function showTopStrategies(): void {
   visibleStrategyIds.value = new Set(
-    strategyRows.value.slice(0, 6).map((row) => row.id),
+    primaryRows.value.slice(0, 6).map((row) => row.id),
   );
 }
 
@@ -202,6 +181,7 @@ function signed(value: number): string {
           Follow each strategy’s average correct Top‑6 hits per draw through
           time, using only predictions made before the target draw.
         </p>
+        <p>Historical strategy selection makes these comparisons exploratory. Unavailable forecasts are excluded from each strategy’s denominator.</p>
       </div>
       <div class="prediction-analysis-controls">
         <label>
@@ -242,9 +222,9 @@ function signed(value: number): string {
         <small>{{ bestStrategy?.average.toFixed(3) ?? "0.000" }} hits/draw</small>
       </article>
       <article>
-        <span>All correct implications</span>
-        <strong>{{ totalStrategyHits.toLocaleString() }}</strong>
-        <small>Random expectation {{ randomExpectedHits.toFixed(3) }}/draw</small>
+        <span>Random expectation</span>
+        <strong>{{ randomExpectedHits.toFixed(3) }} hits/draw</strong>
+        <small>Six selections from 49 numbers</small>
       </article>
     </div>
 
@@ -254,8 +234,7 @@ function signed(value: number): string {
           <h2>Draws by exact match count</h2>
           <p>
             Number of evaluated draws where each strategy’s prior Top‑6
-            prediction matched exactly 6, 5, 4, 3, 2, or 1 winning numbers.
-            The first row is the sum of every strategy row below it.
+            prediction matched exactly 0–6 winning numbers. Each strategy uses its own available forecasts.
           </p>
         </div>
       </header>
@@ -270,22 +249,6 @@ function signed(value: number): string {
             </tr>
           </thead>
           <tbody>
-            <tr class="all-strategies-summary">
-              <th scope="row">
-                <div class="hit-distribution-total-label">
-                  <strong>All strategies</strong>
-                  <small>Sum of {{ strategyRows.length }} strategy rows</small>
-                </div>
-              </th>
-              <td
-                v-for="bucket in allStrategiesExactHitDraws"
-                :key="bucket.hitCount"
-                :class="{ 'has-exact-hits': bucket.draws > 0 }"
-                :title="`All strategies: ${bucket.draws} total strategy-draw results with exactly ${bucket.hitCount} hits`"
-              >
-                {{ bucket.draws.toLocaleString() }}
-              </td>
-            </tr>
             <tr v-for="row in strategyRows" :key="row.id">
               <th scope="row">
                 <i
@@ -397,29 +360,12 @@ function signed(value: number): string {
           </p>
         </div>
 
-        <div class="strategy-timeline-legend" role="group" aria-label="Visible strategies">
-          <label
-            v-for="row in strategyRows"
-            :key="row.id"
-            :class="{ selected: visibleStrategyIds.has(row.id) }"
-          >
-            <input
-              type="checkbox"
-              :checked="visibleStrategyIds.has(row.id)"
-              @change="
-                setStrategyVisible(
-                  row.id,
-                  ($event.target as HTMLInputElement).checked,
-                )
-              "
-            >
-            <i :style="{ '--strategy-line-color': row.color }" />
-            <span>
-              <strong>{{ row.name }}</strong>
-              <small>{{ row.average.toFixed(3) }} · {{ signed(row.lift) }} lift</small>
-            </span>
-          </label>
-        </div>
+        <StrategyPerformanceLegend :rows="primaryRows" :selected="visibleStrategyIds" @toggle="setStrategyVisible" />
+        <details v-if="alternativeRows.length" class="table-card">
+          <summary>Similar methods from the study · {{ alternativeRows.length }} individual controls</summary>
+          <p>{{ strategyStudyScope }}. All methods remain in the ranking and can be plotted individually.</p>
+          <StrategyPerformanceLegend :rows="alternativeRows" :selected="visibleStrategyIds" @toggle="setStrategyVisible" />
+        </details>
       </div>
     </section>
 
@@ -436,6 +382,7 @@ function signed(value: number): string {
             <tr>
               <th>Rank</th>
               <th>Strategy</th>
+              <th>Evaluated draws</th>
               <th>Correct numbers</th>
               <th>Hits/draw</th>
               <th>Lift vs random</th>
@@ -452,6 +399,7 @@ function signed(value: number): string {
                 />
                 {{ row.name }}
               </th>
+              <td>{{ row.drawCount }}</td>
               <td>{{ row.hits }}</td>
               <td>{{ row.average.toFixed(3) }}</td>
               <td :class="row.lift >= 0 ? 'positive-lift' : 'negative-lift'">

@@ -8934,3 +8934,46 @@ svg text {
   font-size: 0.72rem;
   font-style: normal;
 }
+
+/* Shared Possible Draw states in the Last Seen number header. */
+.last-seen-selection-help,
+.last-seen-selection-message {
+  margin: 0 0 8px;
+  color: var(--theme-text-muted);
+  font-size: 12px;
+}
+.last-seen-header-number { cursor: pointer; outline: none; }
+.last-seen-header-number.possible-readonly { cursor: help; }
+.last-seen-header-number:focus-visible .top-number-circle {
+  stroke: var(--theme-text-primary);
+  stroke-width: 3;
+  stroke-dasharray: 3 2;
+}
+.last-seen-header-number.possible-candidate .top-number-circle {
+  fill: var(--theme-numbers-candidate);
+  stroke: var(--theme-numbers-candidateBorder);
+  stroke-width: 3;
+}
+.last-seen-header-number.possible-candidate .top-number-circle-label { fill: var(--theme-numbers-candidateText); }
+.last-seen-header-number.possible-fixed .top-number-circle {
+  fill: var(--theme-numbers-fixed);
+  stroke: var(--theme-numbers-fixedBorder);
+  stroke-width: 3;
+}
+.last-seen-header-number.possible-fixed .top-number-circle-label { fill: var(--theme-numbers-fixedText); }
+.last-seen-header-number.possible-excluded .top-number-circle {
+  fill: var(--theme-numbers-excluded);
+  stroke: var(--theme-numbers-excludedText);
+  stroke-width: 2;
+}
+.last-seen-header-number.possible-excluded .top-number-circle-label { fill: var(--theme-numbers-excludedText); }
+.last-seen-selection-badge {
+  pointer-events: none;
+  font-size: 10px;
+  font-weight: 900;
+  text-anchor: middle;
+  fill: var(--theme-text-primary);
+  stroke: var(--theme-surfaces-primary);
+  stroke-width: 3px;
+  paint-order: stroke;
+}

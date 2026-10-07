@@ -13,16 +13,16 @@ defineProps<{
   <section class="workspace-view">
     <header class="view-header">
       <div><p class="eyebrow">Number analysis</p><h2>Positions and relationships</h2></div>
-      <p>Sorted positions, pair co-occurrence, binned trends, and descriptive statistics.</p>
+      <p>Historical positions, pair co-occurrence, and trends. Predictive usefulness requires a separate comparison of future number hits.</p>
     </header>
     <div class="chart-grid">
       <article class="chart-card"><PlotlyChart :figure="figures.position_frequencies" /></article>
       <article class="chart-card"><PlotlyChart :figure="figures.pair_cooccurrence" /></article>
     </div>
     <article class="chart-card wide"><PlotlyChart :figure="figures.number_trends" /></article>
-    <article class="table-card">
-      <h3>Descriptive statistics</h3>
+    <details class="table-card">
+      <summary>Descriptive statistics</summary>
       <DataTable :table="analysis.tables.number_descriptive" :searchable="false" />
-    </article>
+    </details>
   </section>
 </template>

@@ -1,0 +1,45 @@
+{
+  "datasetSha256": "e46d899b32e8056580d68c86d7c7a623d96e25317e5469e1613600f531ca7a2b",
+  "drawCount": 771,
+  "scope": "Historical equivalence in the lotto_results_2019.yaml study; future results may differ",
+  "groups": [
+    {
+      "representative": "border_group_bayesian",
+      "alternatives": [
+        "border_group_hybrid",
+        "border_group_markov"
+      ]
+    },
+    {
+      "representative": "border_group_statistical",
+      "alternatives": [
+        "border_group_svc"
+      ]
+    },
+    {
+      "representative": "categorical_chi_square",
+      "alternatives": [
+        "chi_square"
+      ]
+    },
+    {
+      "representative": "markov100",
+      "alternatives": [
+        "mkgsv"
+      ]
+    },
+    {
+      "representative": "mknp",
+      "alternatives": [
+        "mkrd"
+      ]
+    },
+    {
+      "representative": "svc_recurrence_proximity_hybrid",
+      "alternatives": [
+        "srph_minimax_regret_hybrid",
+        "srph_residual_diversity_hybrid"
+      ]
+    }
+  ]
+}

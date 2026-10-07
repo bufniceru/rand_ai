@@ -1,0 +1,14 @@
+{
+  "datasetSha256": "abc",
+  "drawCount": 121,
+  "blockTargets": [],
+  "strategies": {},
+  "skipped": {
+    "missing": "unevaluated"
+  },
+  "redundancy": [],
+  "ablations": [],
+  "merges": [],
+  "statistics": [],
+  "allStrategySeconds": 1
+}

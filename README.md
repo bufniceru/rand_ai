@@ -53,6 +53,24 @@ uv run --group docs sphinx-build -W --keep-going -b html docs/app docs/_build/ht
 Open `docs/_build/html/index.html` after the build completes. The application
 guide is intentionally separate from the algorithm-specific papers below.
 
+### Statistics simplification study
+
+Run the frozen exploratory comparison with:
+
+```powershell
+uv run python scripts/study_statistics.py
+```
+
+The runner uses `data/lotto_results_2019.yaml`, reserves 120 initial draws,
+and compares six-number predictions across five chronological blocks. It
+writes the [study report](reports/statistics_study.md), machine-readable
+results, full rankings and predictions, and hit counts under `reports/`.
+The report covers strategy redundancy, input removal experiments in SVC,
+TBL and the online SVM, and up to three rank-blend experiments. Historical
+results remain exploratory because this dataset previously influenced
+strategy selection. Original statistics remain accessible in expandable
+panels; saved settings, exports and internal strategy dependencies are preserved.
+
 ### Strategy documentation
 
 - [Chi-Square Frequency strategy](docs/chi-square-frequency-strategy.md) —

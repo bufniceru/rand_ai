@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { buildLastSeenModel } from "../lib/lastSeen";
+import {
+  cyclePossibleDrawNumberState, getPossibleDrawNumberState,
+  possibleDrawPlanRevision, setPossibleDrawNumberState, togglePossibleDrawExcluded,
+} from "../lib/possibleDrawPlans";
 import type { HistoryDraw } from "../types";
 
 const props = defineProps<{
@@ -18,6 +22,36 @@ const rowHeight = 30;
 const pointRadius = 13.5;
 const undrawnStripWidth = (pointRadius * 2) / 3;
 const plotWidth = svgWidth - chartLeft - chartRight;
+
+const numberActionMessage = ref("");
+const selectionEditable = computed(() => props.referenceDrawOffset === 0 && props.history.length > 0);
+function numberState(number: number) {
+  possibleDrawPlanRevision.value;
+  return getPossibleDrawNumberState(number);
+}
+function applyNumberAction(number: number, result: { ok: boolean; message?: string }): void {
+  numberActionMessage.value = result.message ?? "";
+  if (!result.ok && result.message) void window.randAiDesktop?.showForSureLimitError(number);
+}
+function handleHeaderClick(event: MouseEvent, number: number): void {
+  if (!selectionEditable.value) return;
+  event.preventDefault();
+  applyNumberAction(number, event.altKey ? togglePossibleDrawExcluded(number) : cyclePossibleDrawNumberState(number));
+}
+function handleHeaderKeydown(event: KeyboardEvent, number: number): void {
+  if (!selectionEditable.value) return;
+  const key = event.key.toLowerCase();
+  let result: { ok: boolean; message?: string } | null = null;
+  if (key === "enter" || key === " ") result = cyclePossibleDrawNumberState(number);
+  if (key === "c") result = setPossibleDrawNumberState(number, "candidate");
+  if (key === "f") result = setPossibleDrawNumberState(number, "fixed");
+  if (key === "x") result = togglePossibleDrawExcluded(number);
+  if (key === "delete" || key === "backspace") result = setPossibleDrawNumberState(number, "neutral");
+  if (!result) return;
+  event.preventDefault();
+  event.stopPropagation();
+  applyNumberAction(number, result);
+}
 
 const selectedPoint = ref<{
   number: number;
@@ -152,9 +186,23 @@ function showPoint(
 
 <template>
   <section class="workspace-view last-seen-view last-seen-number-view">
+    <p class="last-seen-selection-help">
+      {{ selectionEditable
+        ? "Possible Draw: click to cycle Neutral → Candidate → Fixed; Alt-click to exclude. Keys: C candidate, F fixed, X exclude, Delete clear."
+        : "Possible Draw selection is read-only at this reference. Return to the latest draw to edit." }}
+    </p>
+    <p v-if="numberActionMessage" role="status" class="last-seen-selection-message">{{ numberActionMessage }}</p>
     <div class="highlight-chart-scroll">
-      <svg :width="svgWidth" height="42" class="highlight-chart-header" role="presentation">
-        <g v-for="number in 49" :key="`header-${number}`">
+      <svg :width="svgWidth" height="42" class="highlight-chart-header" role="group" aria-label="Last Seen Possible Draw number selection">
+        <g
+          v-for="number in 49" :key="`header-${number}`"
+          class="last-seen-header-number"
+          :class="[`possible-${numberState(number)}`, { 'possible-readonly': !selectionEditable }]"
+          role="button" tabindex="0" :aria-disabled="!selectionEditable"
+          :aria-label="`Number ${number}; Possible Draw state ${numberState(number)}${selectionEditable ? '' : '; read-only historical reference'}`"
+          @click="handleHeaderClick($event, number)"
+          @keydown="handleHeaderKeydown($event, number)"
+        >
           <circle
             :cx="xForNumber(number)"
             cy="21"
@@ -166,6 +214,10 @@ function showPoint(
             y="26"
             class="top-number-circle-label"
           >{{ number }}</text>
+          <text v-if="numberState(number) !== 'neutral'"
+            :x="xForNumber(number) + 10" y="12"
+            class="last-seen-selection-badge" aria-hidden="true"
+          >{{ numberState(number) === 'candidate' ? 'C' : numberState(number) === 'fixed' ? '🔒' : '×' }}</text>
         </g>
       </svg>
       <svg :height="chartHeight" :width="svgWidth" class="highlight-chart" role="img">

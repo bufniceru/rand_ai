@@ -41,7 +41,7 @@ function sortBy(key: typeof sort.value) {
 <template>
   <section class="workspace-view strategy-hit-statistics-view">
     <header class="prediction-analysis-header">
-      <div><h1>Strategy Hit Statistics</h1><p>A hit is a winning number included in a strategy’s prior Top 6. Relationships describe observed hits.</p></div>
+      <div><h1>Strategy Hit Statistics</h1><p>A hit is a winning number included in a strategy’s prior Top 6. Relationships describe observed hits.</p><p>Historical comparisons are exploratory when strategies were selected using this dataset. A random six-number selection averages 36/49 (about 0.735) hits per draw.</p></div>
       <label>History <select v-model="scope"><option value="all">All evaluated draws</option><option :value="100">Latest 100</option><option :value="250">Latest 250</option><option :value="500">Latest 500</option></select></label>
     </header>
     <p v-if="stats.draws.length">{{ stats.draws.length }} evaluated draws · Draw {{ stats.draws[0].record.targetDrawNumber }}–{{ stats.draws.at(-1)?.record.targetDrawNumber }}</p>
