@@ -47,6 +47,7 @@ export const STRATEGY_TONE_POSITION_BY_ID = {
   residual_coverage: 7,
   chained: 8,
   emd_positional_shape_v2_hybrid: 9,
+  adaptive_shape_recurrence_blend: 10,
   randomness: 0,
   fresh_random: 1,
 } as const satisfies Record<StrategyId, number>;

@@ -40,6 +40,7 @@ const strategyDescriptions: Record<StrategyId, string> = {
   recurrence_dynamics:
     "Experimental V2 three-draw recurrence using eight causal value analogues.",
   randomness: "Deterministic random comparison baseline.",
+  adaptive_shape_recurrence_blend: "SVC, three-draw recurrence, EMD and positional V2 ranks, weighted by completed lifetime/recent forecasts and V2 confidence. Experimental scores.",
   emd_positional_shape_v2_hybrid: "Equal-weight blend of EMD and Positional Shape Successor V2 rankings. Experimental rank scores.",
   positional_shape_successor: "Joint positional and group shapes: scores from the successors of 32 similar historical draws. Experimental model scores.",
   fresh_random: "Seeded random ranking guided 35% by freshness.",

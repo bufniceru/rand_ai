@@ -13,6 +13,7 @@ const strategyIds: StrategyId[] = [
   "recurrence_dynamics",
   "positional_shape_successor",
   "emd_positional_shape_v2_hybrid",
+  "adaptive_shape_recurrence_blend",
   "randomness",
   "fresh_random",
   "chi_square",

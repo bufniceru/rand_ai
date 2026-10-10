@@ -104,6 +104,7 @@ function strategyFullName(strategy: DrawComparisonStrategy): string {
     recurrence_dynamics: "Recurrence Dynamics",
     positional_shape_successor: "Positional Shape Successor",
     emd_positional_shape_v2_hybrid: "EMD + Positional Shape V2",
+    adaptive_shape_recurrence_blend: "Adaptive Shape–Recurrence Blend",
     randomness: "Random Baseline",
     fresh_random: "Fresh Random",
     chi_square: "Chi-square Frequency",

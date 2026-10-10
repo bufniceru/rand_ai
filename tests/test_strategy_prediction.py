@@ -83,6 +83,7 @@ def test_builds_thirty_eight_named_rankings_and_reports_progress() -> None:
         "Recurrence Dynamics (Experimental)",
         "Positional Shape Successor",
         "EMD + Positional Shape V2",
+        "Adaptive Shape–Recurrence Blend",
         "Rand",
         "FRnd",
         "Chi²",

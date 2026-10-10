@@ -1,0 +1,508 @@
+{
+  "source": "D:\\LOTTO\\lotto_results_2019.yaml",
+  "source_sha256": "3ed97ac331b5e442b8924389e09ff2f790811a2dfc216f1b0cabceb6920a794b",
+  "method": "Fixed settings; chronological observed prefixes including warm-up. Previously examined history: final 30% is a diagnostic subset, not a fresh holdout. No hyperparameter selection.",
+  "parameters": {
+    "prior_forecasts": 24,
+    "recent_window": 40,
+    "lifetime_recent_weights": [
+      0.75,
+      0.25
+    ],
+    "weight_bounds": [
+      0.1,
+      0.5
+    ],
+    "v2_multiplier": "0.5 + 0.5 * confidence"
+  },
+  "full": {
+    "evaluated_draws": 791,
+    "strategies": {
+      "emd": {
+        "total_hits": 612,
+        "average_hits": 0.7737041719342604,
+        "hit_distribution": {
+          "0": 306,
+          "1": 373,
+          "2": 97,
+          "3": 15,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "recurrence_dynamics": {
+        "total_hits": 638,
+        "average_hits": 0.8065739570164349,
+        "hit_distribution": {
+          "0": 314,
+          "1": 340,
+          "2": 116,
+          "3": 18,
+          "4": 3,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "emd_positional_shape_v2_hybrid": {
+        "total_hits": 647,
+        "average_hits": 0.8179519595448799,
+        "hit_distribution": {
+          "0": 303,
+          "1": 349,
+          "2": 119,
+          "3": 20,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "adaptive_shape_recurrence_blend": {
+        "total_hits": 673,
+        "average_hits": 0.8508217446270544,
+        "hit_distribution": {
+          "0": 294,
+          "1": 343,
+          "2": 133,
+          "3": 20,
+          "4": 1,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "svc": {
+        "total_hits": 649,
+        "average_hits": 0.820480404551201,
+        "hit_distribution": {
+          "0": 307,
+          "1": 337,
+          "2": 129,
+          "3": 18,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "svc_recurrence_hybrid": {
+        "total_hits": 655,
+        "average_hits": 0.8280657395701644,
+        "hit_distribution": {
+          "0": 309,
+          "1": 329,
+          "2": 133,
+          "3": 20,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "positional_shape_successor_v2": {
+        "total_hits": 619,
+        "average_hits": 0.7825537294563844,
+        "hit_distribution": {
+          "0": 323,
+          "1": 335,
+          "2": 116,
+          "3": 16,
+          "4": 1,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "adaptive_without_confidence": {
+        "total_hits": 675,
+        "average_hits": 0.8533501896333755,
+        "hit_distribution": {
+          "0": 292,
+          "1": 344,
+          "2": 136,
+          "3": 17,
+          "4": 2,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "fixed_equal_blend": {
+        "total_hits": 676,
+        "average_hits": 0.854614412136536,
+        "hit_distribution": {
+          "0": 292,
+          "1": 344,
+          "2": 135,
+          "3": 18,
+          "4": 2,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "random_baseline": {
+        "total_hits": 590,
+        "average_hits": 0.7458912768647282,
+        "hit_distribution": {
+          "0": 331,
+          "1": 346,
+          "2": 98,
+          "3": 16,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      }
+    },
+    "overlap_with_parents": {
+      "svc_recurrence_hybrid": {
+        "average_shared_numbers": 3.56890012642225,
+        "identical_tickets": 9,
+        "additional_adaptive_hits": 271,
+        "draws_adding_hit": 244,
+        "parent_only_hits": 253
+      },
+      "emd_positional_shape_v2_hybrid": {
+        "average_shared_numbers": 3.5170670037926675,
+        "identical_tickets": 6,
+        "additional_adaptive_hits": 269,
+        "draws_adding_hit": 242,
+        "parent_only_hits": 243
+      }
+    },
+    "mean_weights": {
+      "svc": 0.26988075701131753,
+      "recurrence_dynamics": 0.2591431609105222,
+      "emd": 0.2553984803195222,
+      "positional_shape_successor_v2": 0.2155776017586381
+    }
+  },
+  "latest_100": {
+    "evaluated_draws": 100,
+    "strategies": {
+      "emd": {
+        "total_hits": 67,
+        "average_hits": 0.67,
+        "hit_distribution": {
+          "0": 50,
+          "1": 37,
+          "2": 9,
+          "3": 4,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "recurrence_dynamics": {
+        "total_hits": 77,
+        "average_hits": 0.77,
+        "hit_distribution": {
+          "0": 41,
+          "1": 43,
+          "2": 14,
+          "3": 2,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "emd_positional_shape_v2_hybrid": {
+        "total_hits": 80,
+        "average_hits": 0.8,
+        "hit_distribution": {
+          "0": 35,
+          "1": 50,
+          "2": 15,
+          "3": 0,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "adaptive_shape_recurrence_blend": {
+        "total_hits": 78,
+        "average_hits": 0.78,
+        "hit_distribution": {
+          "0": 41,
+          "1": 42,
+          "2": 15,
+          "3": 2,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "svc": {
+        "total_hits": 76,
+        "average_hits": 0.76,
+        "hit_distribution": {
+          "0": 41,
+          "1": 45,
+          "2": 11,
+          "3": 3,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "svc_recurrence_hybrid": {
+        "total_hits": 87,
+        "average_hits": 0.87,
+        "hit_distribution": {
+          "0": 37,
+          "1": 41,
+          "2": 20,
+          "3": 2,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "positional_shape_successor_v2": {
+        "total_hits": 59,
+        "average_hits": 0.59,
+        "hit_distribution": {
+          "0": 52,
+          "1": 39,
+          "2": 7,
+          "3": 2,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "adaptive_without_confidence": {
+        "total_hits": 79,
+        "average_hits": 0.79,
+        "hit_distribution": {
+          "0": 39,
+          "1": 45,
+          "2": 14,
+          "3": 2,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "fixed_equal_blend": {
+        "total_hits": 81,
+        "average_hits": 0.81,
+        "hit_distribution": {
+          "0": 38,
+          "1": 45,
+          "2": 15,
+          "3": 2,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "random_baseline": {
+        "total_hits": 80,
+        "average_hits": 0.8,
+        "hit_distribution": {
+          "0": 36,
+          "1": 50,
+          "2": 12,
+          "3": 2,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      }
+    },
+    "overlap_with_parents": {
+      "svc_recurrence_hybrid": {
+        "average_shared_numbers": 3.68,
+        "identical_tickets": 0,
+        "additional_adaptive_hits": 26,
+        "draws_adding_hit": 23,
+        "parent_only_hits": 35
+      },
+      "emd_positional_shape_v2_hybrid": {
+        "average_shared_numbers": 3.51,
+        "identical_tickets": 1,
+        "additional_adaptive_hits": 29,
+        "draws_adding_hit": 24,
+        "parent_only_hits": 31
+      }
+    },
+    "mean_weights": {
+      "svc": 0.2643908246995995,
+      "recurrence_dynamics": 0.2680258714720443,
+      "emd": 0.25167650101884215,
+      "positional_shape_successor_v2": 0.21590680280951408
+    }
+  },
+  "final_30_percent": {
+    "evaluated_draws": 238,
+    "strategies": {
+      "emd": {
+        "total_hits": 180,
+        "average_hits": 0.7563025210084033,
+        "hit_distribution": {
+          "0": 99,
+          "1": 107,
+          "2": 23,
+          "3": 9,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "recurrence_dynamics": {
+        "total_hits": 185,
+        "average_hits": 0.7773109243697479,
+        "hit_distribution": {
+          "0": 99,
+          "1": 97,
+          "2": 38,
+          "3": 4,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "emd_positional_shape_v2_hybrid": {
+        "total_hits": 198,
+        "average_hits": 0.8319327731092437,
+        "hit_distribution": {
+          "0": 87,
+          "1": 109,
+          "2": 37,
+          "3": 5,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "adaptive_shape_recurrence_blend": {
+        "total_hits": 195,
+        "average_hits": 0.819327731092437,
+        "hit_distribution": {
+          "0": 94,
+          "1": 99,
+          "2": 39,
+          "3": 6,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "svc": {
+        "total_hits": 189,
+        "average_hits": 0.7941176470588235,
+        "hit_distribution": {
+          "0": 93,
+          "1": 107,
+          "2": 32,
+          "3": 6,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "svc_recurrence_hybrid": {
+        "total_hits": 198,
+        "average_hits": 0.8319327731092437,
+        "hit_distribution": {
+          "0": 90,
+          "1": 102,
+          "2": 42,
+          "3": 4,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "positional_shape_successor_v2": {
+        "total_hits": 169,
+        "average_hits": 0.7100840336134454,
+        "hit_distribution": {
+          "0": 108,
+          "1": 95,
+          "2": 31,
+          "3": 4,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "adaptive_without_confidence": {
+        "total_hits": 196,
+        "average_hits": 0.8235294117647058,
+        "hit_distribution": {
+          "0": 91,
+          "1": 104,
+          "2": 37,
+          "3": 6,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "fixed_equal_blend": {
+        "total_hits": 197,
+        "average_hits": 0.8277310924369747,
+        "hit_distribution": {
+          "0": 91,
+          "1": 103,
+          "2": 38,
+          "3": 6,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "random_baseline": {
+        "total_hits": 173,
+        "average_hits": 0.726890756302521,
+        "hit_distribution": {
+          "0": 100,
+          "1": 107,
+          "2": 27,
+          "3": 4,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      }
+    },
+    "overlap_with_parents": {
+      "svc_recurrence_hybrid": {
+        "average_shared_numbers": 3.735294117647059,
+        "identical_tickets": 2,
+        "additional_adaptive_hits": 74,
+        "draws_adding_hit": 67,
+        "parent_only_hits": 77
+      },
+      "emd_positional_shape_v2_hybrid": {
+        "average_shared_numbers": 3.5504201680672267,
+        "identical_tickets": 1,
+        "additional_adaptive_hits": 69,
+        "draws_adding_hit": 60,
+        "parent_only_hits": 72
+      }
+    },
+    "mean_weights": {
+      "svc": 0.2644154370234495,
+      "recurrence_dynamics": 0.26317418322381425,
+      "emd": 0.2543388673863451,
+      "positional_shape_successor_v2": 0.2180715123663912
+    }
+  },
+  "latest_forecast": {
+    "reference_draw": 792,
+    "prediction": [
+      6,
+      7,
+      26,
+      18,
+      36,
+      5
+    ],
+    "weights": {
+      "svc": 0.27716883648868845,
+      "recurrence_dynamics": 0.25713241137741105,
+      "emd": 0.25311629626303134,
+      "positional_shape_successor_v2": 0.21258245587086913
+    },
+    "v2_confidence": 0.7000126676053782,
+    "evaluated_forecasts": 791
+  }
+}

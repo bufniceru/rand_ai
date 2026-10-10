@@ -13,6 +13,7 @@ import numpy as np
 from sklearn.linear_model import SGDClassifier
 from sklearn.tree import DecisionTreeRegressor
 
+from rand_ai.adaptive_shape_recurrence import AdaptiveShapeRecurrenceModel
 from rand_ai.categorical_chi_square import CategoricalChiSquareModel
 from rand_ai.draw import Draw
 from rand_ai.mkgsv import MkgsvModel
@@ -201,6 +202,7 @@ _BASE_STRATEGY_IDS = (
     "recurrence_dynamics",
     "positional_shape_successor",
     "emd_positional_shape_v2_hybrid",
+    "adaptive_shape_recurrence_blend",
     "randomness",
     "fresh_random",
     "chi_square",
@@ -344,6 +346,9 @@ _DECISION_TREE_FEATURE_NAMES = (
     ),
 )
 _STRATEGY_DEPENDENCIES = {
+    "adaptive_shape_recurrence_blend": {
+        "svc", "recurrence_dynamics", "emd", "positional_shape_successor_v2",
+    },
     "emd_positional_shape_v2_hybrid": {"emd", "positional_shape_successor_v2"},
     "mkgsv": {"markov100"},
     "tbl": {"freshness", "proximity", "randomness"},
@@ -383,6 +388,7 @@ _STRATEGY_DEPENDENCIES = {
             "positional_shape_successor",
             "positional_shape_successor_v2",
             "emd_positional_shape_v2_hybrid",
+            "adaptive_shape_recurrence_blend",
             "mknp",
             "mkrd",
             "mkgsv",
@@ -855,6 +861,11 @@ class _StrategyState:
         self.border_groups = (
             SpaceGroupForecaster(self.border_space, target_group_count)
             if self.enabled_strategy_ids.intersection(BORDER_GROUP_MODEL_IDS)
+            else None
+        )
+        self.adaptive_shape_recurrence = (
+            AdaptiveShapeRecurrenceModel()
+            if "adaptive_shape_recurrence_blend" in self.enabled_strategy_ids
             else None
         )
         self.positional_shape_successor_v2 = (
@@ -2619,6 +2630,8 @@ class _StrategyState:
 
     def train(self, drawn: set[int]) -> None:
         """Learn the current draw using only the state available before it."""
+        if self.adaptive_shape_recurrence is not None:
+            self.adaptive_shape_recurrence.observe_completed(drawn)
         if self.recurrence_dynamics is not None:
             self.recurrence_dynamics.train(drawn)
         if self.border_groups is not None:
@@ -5407,6 +5420,25 @@ class _StrategyState:
                     svc_scores,
                     gaps,
                     svc_details,
+                )
+
+        if self.adaptive_shape_recurrence is not None:
+            if self.positional_shape_successor_v2 is None:  # pragma: no cover - dependency invariant
+                raise RuntimeError("Adaptive blend requires positional V2")
+            adaptive_scores, adaptive_details = self.adaptive_shape_recurrence.predict(
+                rankings, self.positional_shape_successor_v2.last_confidence
+            )
+            rankings["adaptive_shape_recurrence_blend"] = _ranking_from_scores(
+                adaptive_scores, gaps
+            )
+            if "adaptive_shape_recurrence_blend" in requested:
+                built["adaptive_shape_recurrence_blend"] = _strategy(
+                    "adaptive_shape_recurrence_blend",
+                    "Adaptive Shape–Recurrence Blend",
+                    "Four-model rank blend with completed-forecast effectiveness and V2 confidence.",
+                    adaptive_scores,
+                    gaps,
+                    adaptive_details,
                 )
 
         proximity_hybrid_scores: dict[int, float] = {}

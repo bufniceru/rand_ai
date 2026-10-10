@@ -77,6 +77,7 @@ const strategyPlugins = [
   { id: "randomness", label: "Random baseline" },
   { id: "positional_shape_successor", label: "Positional Shape Successor" },
   { id: "emd_positional_shape_v2_hybrid", label: "EMD + Positional Shape V2" },
+  { id: "adaptive_shape_recurrence_blend", label: "Adaptive Shape–Recurrence Blend" },
   { id: "fresh_random", label: "Fresh Random" },
   { id: "chi_square", label: "Chi-square Frequency" },
   { id: "categorical_chi_square", label: "Categorical Chi-square" },
@@ -143,6 +144,7 @@ const defaultStrategyPluginIds = strategyPlugins
       strategyId !== "recurrence_dynamics" &&
       strategyId !== "positional_shape_successor" &&
       strategyId !== "emd_positional_shape_v2_hybrid" &&
+      strategyId !== "adaptive_shape_recurrence_blend" &&
       strategyId !== "svc_recurrence_hybrid" &&
       strategyId !== "svc_recurrence_proximity_hybrid" &&
       strategyId !== "srph_residual_diversity_hybrid" &&

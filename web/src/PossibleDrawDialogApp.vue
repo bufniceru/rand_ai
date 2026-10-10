@@ -427,6 +427,7 @@ function strategyFullName(strategy: StrategyPrediction): string {
     recurrence_dynamics: "Recurrence Dynamics",
     positional_shape_successor: "Positional Shape Successor",
     emd_positional_shape_v2_hybrid: "EMD + Positional Shape V2",
+    adaptive_shape_recurrence_blend: "Adaptive Shape–Recurrence Blend",
     chi_square: "Chi-Square",
     categorical_chi_square: "Categorical Chi-square",
     entropy: "Entropy",

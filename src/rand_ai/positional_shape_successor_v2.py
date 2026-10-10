@@ -70,6 +70,12 @@ class PositionalShapeSuccessorV2Model(PositionalShapeSuccessorModel):
         super().__init__()
         self.use_profile = use_profile
         self.use_confidence = use_confidence
+        self._last_confidence = 0.0
+
+    @property
+    def last_confidence(self) -> float:
+        """Return similarity confidence from the latest prediction, initially zero."""
+        return self._last_confidence
 
     def predict(self) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
         """Return successor scores shrunk toward uniform when evidence is weak.
@@ -107,6 +113,7 @@ class PositionalShapeSuccessorV2Model(PositionalShapeSuccessorModel):
             / (effective_neighbors + CONFIDENCE_SUPPORT)
         )
         blend = confidence if self.use_confidence else 1.0
+        self._last_confidence = confidence
         baseline = 6 / 49
         scores = {
             number: float(
