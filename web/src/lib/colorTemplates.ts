@@ -56,6 +56,7 @@ export const COLOR_TOKEN_GROUPS: ReadonlyArray<{
 
 const staticDefinitions: ColorTokenDefinition[] = [
   { id: "application.background", label: "Application background", group: "application", defaultValue: "#E9EFF4" },
+  { id: "application.workspaceBackground", label: "Main workspace background", group: "application", defaultValue: "#484848" },
   { id: "application.backgroundAccent", label: "Background accent", group: "application", defaultValue: "#2E63C52E" },
   { id: "application.toolbarStart", label: "Toolbar gradient start", group: "application", defaultValue: "#0E2438" },
   { id: "application.toolbarMiddle", label: "Toolbar gradient middle", group: "application", defaultValue: "#173D64" },

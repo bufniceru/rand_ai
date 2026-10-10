@@ -493,6 +493,11 @@ button:disabled {
   margin-bottom: 16px;
 }
 
+.app-shell > main {
+  --monokai-bg: var(--theme-application-workspaceBackground, #484848);
+  background: var(--monokai-bg);
+}
+
 .metric-card,
 .chart-card,
 .table-card,
