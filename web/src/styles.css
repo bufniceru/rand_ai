@@ -9009,7 +9009,3 @@ svg text {
   --theme-numbers-fixedText: var(--theme-numbers-selectionGreenText);
 }
 
-.all-predictions-cell.possible-candidate > strong,
-.all-predictions-cell.possible-fixed > strong {
-  color: var(--theme-numbers-selectionGreenText);
-}

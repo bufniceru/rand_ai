@@ -548,10 +548,6 @@ function selectAdjacentControlTab(offset: number): void {
 }
 
 function sectorStyle(cell: (typeof allReportCells.value)[number]): Record<string, string> {
-  const state = possibleDrawState(cell.number);
-  if (state === "candidate" || state === "fixed") {
-    return { background: "var(--theme-numbers-selectionGreen)" };
-  }
   if (cell.reports.length === 0) return {};
   if (cell.reports.length === 1) {
     return { background: cell.reports[0].color };
