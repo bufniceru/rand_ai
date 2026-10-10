@@ -99,6 +99,7 @@ const staticDefinitions: ColorTokenDefinition[] = [
   { id: "numbers.selected", label: "Selected number", group: "numbers", defaultValue: "#2E63C5" },
   { id: "numbers.selectionGreen", label: "Selected circle background", group: "numbers", defaultValue: "#A9DC76" },
   { id: "numbers.selectionGreenText", label: "Selected circle text", group: "numbers", defaultValue: "#10283F" },
+  { id: "numbers.selectionRing", label: "Selected prediction ring", group: "numbers", defaultValue: "#166534" },
   { id: "numbers.unavailable", label: "Unavailable number", group: "numbers", defaultValue: "#E8ECEF" },
   { id: "numbers.candidate", label: "Possible Draw candidate", group: "numbers", defaultValue: "#FFF0BD" },
   { id: "numbers.candidateBorder", label: "Possible Draw candidate border", group: "numbers", defaultValue: "#D7AA3B" },

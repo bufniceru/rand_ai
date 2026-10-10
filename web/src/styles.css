@@ -2701,12 +2701,12 @@ tbody tr:nth-child(even) {
 }
 
 .all-predictions-cell.possible-candidate {
-  box-shadow: 0 0 0 5px var(--theme-numbers-candidateBorder);
+  box-shadow: 0 0 0 5px var(--theme-numbers-selectionRing);
   cursor: pointer;
 }
 
 .all-predictions-cell.possible-fixed {
-  box-shadow: 0 0 0 6px var(--theme-numbers-fixedBorder), 0 0 0 9px var(--theme-numbers-fixed);
+  box-shadow: 0 0 0 9px var(--theme-numbers-selectionRing);
   cursor: pointer;
 }
 
