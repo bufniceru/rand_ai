@@ -8977,3 +8977,22 @@ svg text {
   stroke-width: 3px;
   paint-order: stroke;
 }
+
+.circle-number-scroll {
+  width: 100%;
+  max-height: calc(100vh - 240px);
+  overflow: auto;
+}
+.circle-number-canvas {
+  display: block;
+  width: 580px;
+  height: 580px;
+  min-width: 580px;
+  max-width: none;
+  margin: 0 auto;
+  background: var(--monokai-surface);
+}
+.circle-number-view h2 span {
+  color: var(--monokai-muted);
+  font-size: 0.8em;
+}

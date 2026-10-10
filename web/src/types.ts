@@ -82,6 +82,7 @@ export type ViewId =
 export type WorkspaceTabId =
   | "statistics"
   | "last-seen"
+  | "circle"
   | "last-seen-gap"
   | "last-seen-space"
   | "predictions"

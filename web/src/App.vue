@@ -23,6 +23,7 @@ import {
 import PossibleDrawDialogApp from "./PossibleDrawDialogApp.vue";
 import AutocorrelationView from "./views/AutocorrelationView.vue";
 import CoOccurrenceView from "./views/CoOccurrenceView.vue";
+import CircleNumberSelectorView from "./views/CircleNumberSelectorView.vue";
 import CombinedPredictionGridView from "./views/CombinedPredictionGridView.vue";
 import DrawPortfolioView from "./views/DrawPortfolioView.vue";
 import ExportView from "./views/ExportView.vue";
@@ -108,6 +109,7 @@ const workspaceTabs: {
 }[] = [
   { id: "statistics", label: "Statistics" },
   { id: "last-seen", label: "Last seen", reportId: "last-seen" },
+  { id: "circle", label: "Circle" },
   {
     id: "last-seen-gap",
     label: "Last seen gaps",
@@ -247,14 +249,19 @@ const combinedPredictionData = computed<CombinedPredictionDialogData | null>(
         }
       : null,
 );
+const latestTargetDrawNumber = computed(() => {
+  const latest = analysis.value?.history.at(-1);
+  return latest ? latest.drawNumber + 1 : null;
+});
 watch(
   combinedPredictionData,
   (data) => {
     const latestSuite = data?.predictionSuites.at(-1);
-    if (!data || !latestSuite) return;
+    const targetDrawNumber = latestSuite?.targetDrawNumber ?? latestTargetDrawNumber.value;
+    if (!data || targetDrawNumber === null) return;
     configurePossibleDrawContext({
       datasetId: data.dataset.path,
-      targetDrawId: String(latestSuite.targetDrawNumber),
+      targetDrawId: String(targetDrawNumber),
     });
   },
   { immediate: true },
@@ -1057,6 +1064,14 @@ onBeforeUnmount(() => {
         :draw-count="lastSeenDrawCount"
         :reference-draw-offset="lastSeenReferenceOffset"
       />
+    </main>
+
+    <main
+      v-if="analysis && visitedWorkspaceTabs.has('circle')"
+      v-show="activeWorkspaceTab === 'circle'"
+      class="workspace-tab-panel embedded-workspace-panel"
+      role="tabpanel" aria-label="Circle">
+      <CircleNumberSelectorView :history="analysis.history" :target-draw-number="latestTargetDrawNumber" />
     </main>
 
     <main

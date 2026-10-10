@@ -849,6 +849,11 @@ function buildApplicationMenu() {
           click: () => sendMenuAction("openWorkspaceTab", { tab: "last-seen" }),
         },
         {
+          label: "Circle",
+          enabled: activeDatasetPath !== null,
+          click: () => sendMenuAction("openWorkspaceTab", { tab: "circle" }),
+        },
+        {
           label: "Last Seen Gap Highlight",
           accelerator: "CmdOrCtrl+Shift+G",
           enabled:

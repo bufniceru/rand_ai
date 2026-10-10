@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { buildLastSeenModel } from "../lib/lastSeen";
-import {
-  cyclePossibleDrawNumberState, getPossibleDrawNumberState,
-  possibleDrawPlanRevision, setPossibleDrawNumberState, togglePossibleDrawExcluded,
-} from "../lib/possibleDrawPlans";
+import { NUMBER_BALL_RADIUS, POSSIBLE_DRAW_SELECTION_HELP, usePossibleDrawNumberControls } from "../lib/possibleDrawNumberControls";
 import type { HistoryDraw } from "../types";
 
 const props = defineProps<{
@@ -19,39 +16,13 @@ const chartTop = 30;
 const chartBottom = 36;
 const chartRight = 30;
 const rowHeight = 30;
-const pointRadius = 13.5;
+const pointRadius = NUMBER_BALL_RADIUS;
 const undrawnStripWidth = (pointRadius * 2) / 3;
 const plotWidth = svgWidth - chartLeft - chartRight;
 
-const numberActionMessage = ref("");
 const selectionEditable = computed(() => props.referenceDrawOffset === 0 && props.history.length > 0);
-function numberState(number: number) {
-  possibleDrawPlanRevision.value;
-  return getPossibleDrawNumberState(number);
-}
-function applyNumberAction(number: number, result: { ok: boolean; message?: string }): void {
-  numberActionMessage.value = result.message ?? "";
-  if (!result.ok && result.message) void window.randAiDesktop?.showForSureLimitError(number);
-}
-function handleHeaderClick(event: MouseEvent, number: number): void {
-  if (!selectionEditable.value) return;
-  event.preventDefault();
-  applyNumberAction(number, event.altKey ? togglePossibleDrawExcluded(number) : cyclePossibleDrawNumberState(number));
-}
-function handleHeaderKeydown(event: KeyboardEvent, number: number): void {
-  if (!selectionEditable.value) return;
-  const key = event.key.toLowerCase();
-  let result: { ok: boolean; message?: string } | null = null;
-  if (key === "enter" || key === " ") result = cyclePossibleDrawNumberState(number);
-  if (key === "c") result = setPossibleDrawNumberState(number, "candidate");
-  if (key === "f") result = setPossibleDrawNumberState(number, "fixed");
-  if (key === "x") result = togglePossibleDrawExcluded(number);
-  if (key === "delete" || key === "backspace") result = setPossibleDrawNumberState(number, "neutral");
-  if (!result) return;
-  event.preventDefault();
-  event.stopPropagation();
-  applyNumberAction(number, result);
-}
+const { numberActionMessage, numberState, handleHeaderClick, handleHeaderKeydown } =
+  usePossibleDrawNumberControls(selectionEditable);
 
 const selectedPoint = ref<{
   number: number;
@@ -188,7 +159,7 @@ function showPoint(
   <section class="workspace-view last-seen-view last-seen-number-view">
     <p class="last-seen-selection-help">
       {{ selectionEditable
-        ? "Possible Draw: click to cycle Neutral → Candidate → Fixed; Alt-click to exclude. Keys: C candidate, F fixed, X exclude, Delete clear."
+        ? POSSIBLE_DRAW_SELECTION_HELP
         : "Possible Draw selection is read-only at this reference. Return to the latest draw to edit." }}
     </p>
     <p v-if="numberActionMessage" role="status" class="last-seen-selection-message">{{ numberActionMessage }}</p>
