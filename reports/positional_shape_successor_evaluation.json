@@ -1,0 +1,33 @@
+{
+  "source": "D:\\LOTTO\\lotto_results_2019.yaml",
+  "source_sha256": "3ed97ac331b5e442b8924389e09ff2f790811a2dfc216f1b0cabceb6920a794b",
+  "evaluated_draws": 791,
+  "expected_random_average": 0.7346938775510204,
+  "method": "Chronological observed prefixes; includes warm-up forecasts",
+  "strategy": {
+    "total_hits": 636,
+    "average_hits": 0.8040455120101138,
+    "distribution": {
+      "0": 303,
+      "1": 354,
+      "2": 120,
+      "3": 14,
+      "4": 0,
+      "5": 0,
+      "6": 0
+    }
+  },
+  "random_baseline": {
+    "total_hits": 590,
+    "average_hits": 0.7458912768647282,
+    "distribution": {
+      "0": 331,
+      "1": 346,
+      "2": 98,
+      "3": 16,
+      "4": 0,
+      "5": 0,
+      "6": 0
+    }
+  }
+}

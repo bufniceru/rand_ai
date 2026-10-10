@@ -17,6 +17,7 @@ export const STRATEGY_TONE_POSITION_BY_ID = {
   emd: 1,
   recurrence_dynamics: 2,
   predictive_grid: 3,
+  positional_shape_successor: 4,
   markov100: 0,
   mkgsv: 1,
   mkfr: 2,

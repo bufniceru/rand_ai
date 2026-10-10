@@ -66,6 +66,7 @@ export const STRATEGY_FAMILY_BY_ID = {
   freshness: "frequency-recency",
   emd: "shape-similarity",
   recurrence_dynamics: "shape-similarity",
+  positional_shape_successor: "shape-similarity",
   randomness: "random-baselines",
   fresh_random: "random-baselines",
   chi_square: "frequency-recency",

@@ -75,6 +75,7 @@ const strategyPlugins = [
     label: "Recurrence Dynamics (Experimental)",
   },
   { id: "randomness", label: "Random baseline" },
+  { id: "positional_shape_successor", label: "Positional Shape Successor" },
   { id: "fresh_random", label: "Fresh Random" },
   { id: "chi_square", label: "Chi-square Frequency" },
   { id: "categorical_chi_square", label: "Categorical Chi-square" },
@@ -139,6 +140,7 @@ const defaultStrategyPluginIds = strategyPlugins
       strategyId !== "sparse_neural_ticket" &&
       strategyId !== "decision_tree_selector" &&
       strategyId !== "recurrence_dynamics" &&
+      strategyId !== "positional_shape_successor" &&
       strategyId !== "svc_recurrence_hybrid" &&
       strategyId !== "svc_recurrence_proximity_hybrid" &&
       strategyId !== "srph_residual_diversity_hybrid" &&

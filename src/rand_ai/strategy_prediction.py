@@ -21,6 +21,7 @@ from rand_ai.nonlinear_dynamics import (
     RecurrenceEvidence,
 )
 from rand_ai.prediction import CombinedPrediction
+from rand_ai.positional_shape_successor import PositionalShapeSuccessorModel
 from rand_ai.sparse_neural_ticket import (
     SparseNeuralTicketArtifact,
     history_fingerprint,
@@ -197,6 +198,7 @@ _BASE_STRATEGY_IDS = (
     "freshness",
     "emd",
     "recurrence_dynamics",
+    "positional_shape_successor",
     "randomness",
     "fresh_random",
     "chi_square",
@@ -375,6 +377,7 @@ _STRATEGY_DEPENDENCIES = {
     "sparse_neural_ticket": {"sklearn_svm", "lag_logistic"},
     "residual_coverage": set(_BASE_STRATEGY_IDS).difference(
         {
+            "positional_shape_successor",
             "mknp",
             "mkrd",
             "mkgsv",
@@ -817,6 +820,11 @@ class _StrategyState:
         self.border_groups = (
             SpaceGroupForecaster(self.border_space, target_group_count)
             if self.enabled_strategy_ids.intersection(BORDER_GROUP_MODEL_IDS)
+            else None
+        )
+        self.positional_shape_successor = (
+            PositionalShapeSuccessorModel()
+            if "positional_shape_successor" in self.enabled_strategy_ids
             else None
         )
         self.recurrence_dynamics = (
@@ -2753,6 +2761,8 @@ class _StrategyState:
         )
         entropy_percent = _gap_entropy_percent(tuple(drawn)) if entropy_enabled else 0.0
         ordered = sorted(drawn)
+        if self.positional_shape_successor is not None:
+            self.positional_shape_successor.observe(drawn)
         if self.recurrence_dynamics is not None:
             self.recurrence_dynamics.observe(drawn)
         for index, number in enumerate(ordered):
@@ -5023,6 +5033,21 @@ class _StrategyState:
                     gaps,
                     recurrence_prediction.details,
                     _recurrence_evidence(recurrence_prediction.evidence),
+                )
+
+        if self.positional_shape_successor is not None:
+            shape_scores, shape_details = self.positional_shape_successor.predict()
+            rankings["positional_shape_successor"] = _ranking_from_scores(
+                shape_scores, gaps
+            )
+            if "positional_shape_successor" in requested:
+                built["positional_shape_successor"] = _strategy(
+                    "positional_shape_successor",
+                    "Positional Shape Successor",
+                    "Joint positional/group shape similarity with known historical successors.",
+                    shape_scores,
+                    gaps,
+                    shape_details,
                 )
 
         random_ranking: list[int] = []

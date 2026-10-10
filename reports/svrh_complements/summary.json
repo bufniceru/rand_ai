@@ -1,0 +1,2153 @@
+{
+  "dataset": "D:\\LOTTO\\lotto_results_2019.yaml",
+  "dataset_sha256": "3ed97ac331b5e442b8924389e09ff2f790811a2dfc216f1b0cabceb6920a794b",
+  "enabled_strategies": [
+    "emd",
+    "recurrence_dynamics",
+    "randomness",
+    "categorical_chi_square",
+    "entropy",
+    "mksp",
+    "bayesian",
+    "predictive_grid",
+    "doublet_triplet_markov",
+    "svc_recurrence_hybrid",
+    "tbl",
+    "decision_tree_selector",
+    "border_group_bayesian",
+    "residual_coverage"
+  ],
+  "border_space": 7,
+  "draws": 791,
+  "selection_target_range": [
+    2,
+    554
+  ],
+  "evaluation_target_range": [
+    555,
+    792
+  ],
+  "singles": {
+    "full": [
+      {
+        "strategies": [
+          "residual_coverage"
+        ],
+        "draws": 791,
+        "extra_hits": 541,
+        "extra_per_draw": 0.683944374209861,
+        "adds_hit_pct": 53.22376738305942,
+        "mean_new_numbers": 6.0,
+        "mean_overlap": 0.0,
+        "combined_hits": 1196,
+        "combined_per_draw": 1.5120101137800253,
+        "union_at_least_3_pct": 17.06700379266751,
+        "union_all_6_draws": 0,
+        "companion_hits": 541,
+        "base_hits": 655,
+        "extra_when_base_zero": 228,
+        "base_zero_draws": 309,
+        "random_expected_extra": 581.1428571428571,
+        "extra_above_random": -40.14285714285711,
+        "hits_per_100_new_numbers": 11.399072903497682
+      },
+      {
+        "strategies": [
+          "randomness"
+        ],
+        "draws": 791,
+        "extra_hits": 508,
+        "extra_per_draw": 0.6422250316055625,
+        "adds_hit_pct": 51.45385587863464,
+        "mean_new_numbers": 5.233881163084703,
+        "mean_overlap": 0.7661188369152971,
+        "combined_hits": 1163,
+        "combined_per_draw": 1.470290771175727,
+        "union_at_least_3_pct": 14.791403286978507,
+        "union_all_6_draws": 0,
+        "companion_hits": 590,
+        "base_hits": 655,
+        "extra_when_base_zero": 227,
+        "base_zero_draws": 309,
+        "random_expected_extra": 506.9387755102041,
+        "extra_above_random": 1.0612244897959044,
+        "hits_per_100_new_numbers": 12.270531400966183
+      },
+      {
+        "strategies": [
+          "entropy"
+        ],
+        "draws": 791,
+        "extra_hits": 500,
+        "extra_per_draw": 0.6321112515802781,
+        "adds_hit_pct": 50.31605562579014,
+        "mean_new_numbers": 5.079646017699115,
+        "mean_overlap": 0.9203539823008849,
+        "combined_hits": 1155,
+        "combined_per_draw": 1.4601769911504425,
+        "union_at_least_3_pct": 14.791403286978507,
+        "union_all_6_draws": 0,
+        "companion_hits": 595,
+        "base_hits": 655,
+        "extra_when_base_zero": 218,
+        "base_zero_draws": 309,
+        "random_expected_extra": 492.0,
+        "extra_above_random": 8.0,
+        "hits_per_100_new_numbers": 12.444001991040318
+      },
+      {
+        "strategies": [
+          "doublet_triplet_markov"
+        ],
+        "draws": 791,
+        "extra_hits": 499,
+        "extra_per_draw": 0.6308470290771175,
+        "adds_hit_pct": 48.798988621997474,
+        "mean_new_numbers": 5.006321112515803,
+        "mean_overlap": 0.9936788874841972,
+        "combined_hits": 1154,
+        "combined_per_draw": 1.458912768647282,
+        "union_at_least_3_pct": 13.90644753476612,
+        "union_all_6_draws": 0,
+        "companion_hits": 609,
+        "base_hits": 655,
+        "extra_when_base_zero": 221,
+        "base_zero_draws": 309,
+        "random_expected_extra": 484.8979591836735,
+        "extra_above_random": 14.102040816326507,
+        "hits_per_100_new_numbers": 12.6010101010101
+      },
+      {
+        "strategies": [
+          "border_group_bayesian"
+        ],
+        "draws": 791,
+        "extra_hits": 464,
+        "extra_per_draw": 0.5865992414664981,
+        "adds_hit_pct": 46.27054361567636,
+        "mean_new_numbers": 4.649810366624526,
+        "mean_overlap": 1.3501896333754742,
+        "combined_hits": 1119,
+        "combined_per_draw": 1.4146649810366625,
+        "union_at_least_3_pct": 14.917825537294563,
+        "union_all_6_draws": 0,
+        "companion_hits": 615,
+        "base_hits": 655,
+        "extra_when_base_zero": 213,
+        "base_zero_draws": 309,
+        "random_expected_extra": 450.3673469387755,
+        "extra_above_random": 13.632653061224516,
+        "hits_per_100_new_numbers": 12.615551930396954
+      },
+      {
+        "strategies": [
+          "categorical_chi_square"
+        ],
+        "draws": 791,
+        "extra_hits": 464,
+        "extra_per_draw": 0.5865992414664981,
+        "adds_hit_pct": 47.15549936788875,
+        "mean_new_numbers": 4.653603034134008,
+        "mean_overlap": 1.3463969658659924,
+        "combined_hits": 1119,
+        "combined_per_draw": 1.4146649810366625,
+        "union_at_least_3_pct": 13.147914032869785,
+        "union_all_6_draws": 0,
+        "companion_hits": 619,
+        "base_hits": 655,
+        "extra_when_base_zero": 216,
+        "base_zero_draws": 309,
+        "random_expected_extra": 450.734693877551,
+        "extra_above_random": 13.265306122448976,
+        "hits_per_100_new_numbers": 12.605270306981799
+      },
+      {
+        "strategies": [
+          "mksp"
+        ],
+        "draws": 791,
+        "extra_hits": 460,
+        "extra_per_draw": 0.5815423514538559,
+        "adds_hit_pct": 46.64981036662453,
+        "mean_new_numbers": 4.596713021491783,
+        "mean_overlap": 1.4032869785082174,
+        "combined_hits": 1115,
+        "combined_per_draw": 1.4096080910240203,
+        "union_at_least_3_pct": 13.527180783817952,
+        "union_all_6_draws": 0,
+        "companion_hits": 613,
+        "base_hits": 655,
+        "extra_when_base_zero": 213,
+        "base_zero_draws": 309,
+        "random_expected_extra": 445.2244897959184,
+        "extra_above_random": 14.775510204081627,
+        "hits_per_100_new_numbers": 12.651265126512651
+      },
+      {
+        "strategies": [
+          "bayesian"
+        ],
+        "draws": 791,
+        "extra_hits": 450,
+        "extra_per_draw": 0.5689001264222503,
+        "adds_hit_pct": 46.77623261694058,
+        "mean_new_numbers": 4.687737041719343,
+        "mean_overlap": 1.3122629582806573,
+        "combined_hits": 1105,
+        "combined_per_draw": 1.3969658659924147,
+        "union_at_least_3_pct": 12.13653603034134,
+        "union_all_6_draws": 0,
+        "companion_hits": 615,
+        "base_hits": 655,
+        "extra_when_base_zero": 213,
+        "base_zero_draws": 309,
+        "random_expected_extra": 454.0408163265306,
+        "extra_above_random": -4.040816326530603,
+        "hits_per_100_new_numbers": 12.135922330097088
+      },
+      {
+        "strategies": [
+          "decision_tree_selector"
+        ],
+        "draws": 791,
+        "extra_hits": 438,
+        "extra_per_draw": 0.5537294563843237,
+        "adds_hit_pct": 45.51201011378002,
+        "mean_new_numbers": 4.491782553729457,
+        "mean_overlap": 1.5082174462705435,
+        "combined_hits": 1093,
+        "combined_per_draw": 1.381795195954488,
+        "union_at_least_3_pct": 12.262958280657395,
+        "union_all_6_draws": 0,
+        "companion_hits": 624,
+        "base_hits": 655,
+        "extra_when_base_zero": 203,
+        "base_zero_draws": 309,
+        "random_expected_extra": 435.0612244897959,
+        "extra_above_random": 2.9387755102040956,
+        "hits_per_100_new_numbers": 12.32761047002533
+      },
+      {
+        "strategies": [
+          "emd"
+        ],
+        "draws": 791,
+        "extra_hits": 435,
+        "extra_per_draw": 0.549936788874842,
+        "adds_hit_pct": 46.52338811630847,
+        "mean_new_numbers": 4.433628318584071,
+        "mean_overlap": 1.5663716814159292,
+        "combined_hits": 1090,
+        "combined_per_draw": 1.3780025284450064,
+        "union_at_least_3_pct": 11.883691529709228,
+        "union_all_6_draws": 0,
+        "companion_hits": 612,
+        "base_hits": 655,
+        "extra_when_base_zero": 200,
+        "base_zero_draws": 309,
+        "random_expected_extra": 429.42857142857144,
+        "extra_above_random": 5.571428571428555,
+        "hits_per_100_new_numbers": 12.403763900769889
+      },
+      {
+        "strategies": [
+          "tbl"
+        ],
+        "draws": 791,
+        "extra_hits": 421,
+        "extra_per_draw": 0.5322376738305942,
+        "adds_hit_pct": 44.37420986093552,
+        "mean_new_numbers": 4.245259165613148,
+        "mean_overlap": 1.754740834386852,
+        "combined_hits": 1076,
+        "combined_per_draw": 1.3603034134007586,
+        "union_at_least_3_pct": 13.147914032869785,
+        "union_all_6_draws": 0,
+        "companion_hits": 612,
+        "base_hits": 655,
+        "extra_when_base_zero": 174,
+        "base_zero_draws": 309,
+        "random_expected_extra": 411.18367346938777,
+        "extra_above_random": 9.81632653061223,
+        "hits_per_100_new_numbers": 12.537224538415723
+      },
+      {
+        "strategies": [
+          "predictive_grid"
+        ],
+        "draws": 791,
+        "extra_hits": 419,
+        "extra_per_draw": 0.5297092288242731,
+        "adds_hit_pct": 43.99494310998736,
+        "mean_new_numbers": 4.415929203539823,
+        "mean_overlap": 1.584070796460177,
+        "combined_hits": 1074,
+        "combined_per_draw": 1.3577749683944373,
+        "union_at_least_3_pct": 12.642225031605562,
+        "union_all_6_draws": 0,
+        "companion_hits": 606,
+        "base_hits": 655,
+        "extra_when_base_zero": 196,
+        "base_zero_draws": 309,
+        "random_expected_extra": 427.7142857142857,
+        "extra_above_random": -8.714285714285722,
+        "hits_per_100_new_numbers": 11.99541941024907
+      },
+      {
+        "strategies": [
+          "recurrence_dynamics"
+        ],
+        "draws": 791,
+        "extra_hits": 339,
+        "extra_per_draw": 0.42857142857142855,
+        "adds_hit_pct": 36.40960809102402,
+        "mean_new_numbers": 3.424778761061947,
+        "mean_overlap": 2.575221238938053,
+        "combined_hits": 994,
+        "combined_per_draw": 1.2566371681415929,
+        "union_at_least_3_pct": 8.723135271807838,
+        "union_all_6_draws": 0,
+        "companion_hits": 638,
+        "base_hits": 655,
+        "extra_when_base_zero": 162,
+        "base_zero_draws": 309,
+        "random_expected_extra": 331.7142857142857,
+        "extra_above_random": 7.285714285714278,
+        "hits_per_100_new_numbers": 12.513842746400886
+      }
+    ],
+    "selection_first_70pct": [
+      {
+        "strategies": [
+          "residual_coverage"
+        ],
+        "draws": 553,
+        "extra_hits": 367,
+        "extra_per_draw": 0.6636528028933092,
+        "adds_hit_pct": 51.89873417721519,
+        "mean_new_numbers": 6.0,
+        "mean_overlap": 0.0,
+        "combined_hits": 824,
+        "combined_per_draw": 1.4900542495479205,
+        "union_at_least_3_pct": 17.540687160940326,
+        "union_all_6_draws": 0,
+        "companion_hits": 367,
+        "base_hits": 457,
+        "extra_when_base_zero": 154,
+        "base_zero_draws": 219,
+        "random_expected_extra": 406.2857142857143,
+        "extra_above_random": -39.28571428571428,
+        "hits_per_100_new_numbers": 11.06088004822182
+      },
+      {
+        "strategies": [
+          "entropy"
+        ],
+        "draws": 553,
+        "extra_hits": 366,
+        "extra_per_draw": 0.6618444846292948,
+        "adds_hit_pct": 52.079566003616634,
+        "mean_new_numbers": 5.012658227848101,
+        "mean_overlap": 0.9873417721518988,
+        "combined_hits": 823,
+        "combined_per_draw": 1.488245931283906,
+        "union_at_least_3_pct": 14.64737793851718,
+        "union_all_6_draws": 0,
+        "companion_hits": 435,
+        "base_hits": 457,
+        "extra_when_base_zero": 165,
+        "base_zero_draws": 219,
+        "random_expected_extra": 339.42857142857144,
+        "extra_above_random": 26.571428571428555,
+        "hits_per_100_new_numbers": 13.203463203463203
+      },
+      {
+        "strategies": [
+          "randomness"
+        ],
+        "draws": 553,
+        "extra_hits": 353,
+        "extra_per_draw": 0.6383363471971067,
+        "adds_hit_pct": 50.99457504520796,
+        "mean_new_numbers": 5.207956600361664,
+        "mean_overlap": 0.7920433996383364,
+        "combined_hits": 810,
+        "combined_per_draw": 1.4647377938517179,
+        "union_at_least_3_pct": 15.189873417721518,
+        "union_all_6_draws": 0,
+        "companion_hits": 417,
+        "base_hits": 457,
+        "extra_when_base_zero": 162,
+        "base_zero_draws": 219,
+        "random_expected_extra": 352.6530612244898,
+        "extra_above_random": 0.34693877551018204,
+        "hits_per_100_new_numbers": 12.256944444444445
+      },
+      {
+        "strategies": [
+          "doublet_triplet_markov"
+        ],
+        "draws": 553,
+        "extra_hits": 347,
+        "extra_per_draw": 0.6274864376130199,
+        "adds_hit_pct": 48.824593128390596,
+        "mean_new_numbers": 4.996383363471971,
+        "mean_overlap": 1.003616636528029,
+        "combined_hits": 804,
+        "combined_per_draw": 1.453887884267631,
+        "union_at_least_3_pct": 14.466546112115733,
+        "union_all_6_draws": 0,
+        "companion_hits": 422,
+        "base_hits": 457,
+        "extra_when_base_zero": 152,
+        "base_zero_draws": 219,
+        "random_expected_extra": 338.3265306122449,
+        "extra_above_random": 8.67346938775512,
+        "hits_per_100_new_numbers": 12.558812884545784
+      },
+      {
+        "strategies": [
+          "border_group_bayesian"
+        ],
+        "draws": 553,
+        "extra_hits": 338,
+        "extra_per_draw": 0.6112115732368897,
+        "adds_hit_pct": 48.282097649186255,
+        "mean_new_numbers": 4.6980108499095845,
+        "mean_overlap": 1.301989150090416,
+        "combined_hits": 795,
+        "combined_per_draw": 1.437613019891501,
+        "union_at_least_3_pct": 15.732368896925859,
+        "union_all_6_draws": 0,
+        "companion_hits": 443,
+        "base_hits": 457,
+        "extra_when_base_zero": 158,
+        "base_zero_draws": 219,
+        "random_expected_extra": 318.1224489795918,
+        "extra_above_random": 19.87755102040819,
+        "hits_per_100_new_numbers": 13.010007698229407
+      },
+      {
+        "strategies": [
+          "categorical_chi_square"
+        ],
+        "draws": 553,
+        "extra_hits": 323,
+        "extra_per_draw": 0.5840867992766727,
+        "adds_hit_pct": 47.377938517179025,
+        "mean_new_numbers": 4.613019891500904,
+        "mean_overlap": 1.3869801084990958,
+        "combined_hits": 780,
+        "combined_per_draw": 1.410488245931284,
+        "union_at_least_3_pct": 11.754068716094032,
+        "union_all_6_draws": 0,
+        "companion_hits": 440,
+        "base_hits": 457,
+        "extra_when_base_zero": 158,
+        "base_zero_draws": 219,
+        "random_expected_extra": 312.3673469387755,
+        "extra_above_random": 10.632653061224516,
+        "hits_per_100_new_numbers": 12.66170129361035
+      },
+      {
+        "strategies": [
+          "mksp"
+        ],
+        "draws": 553,
+        "extra_hits": 320,
+        "extra_per_draw": 0.5786618444846293,
+        "adds_hit_pct": 46.835443037974684,
+        "mean_new_numbers": 4.616636528028933,
+        "mean_overlap": 1.383363471971067,
+        "combined_hits": 777,
+        "combined_per_draw": 1.4050632911392404,
+        "union_at_least_3_pct": 13.743218806509946,
+        "union_all_6_draws": 0,
+        "companion_hits": 429,
+        "base_hits": 457,
+        "extra_when_base_zero": 149,
+        "base_zero_draws": 219,
+        "random_expected_extra": 312.61224489795916,
+        "extra_above_random": 7.387755102040842,
+        "hits_per_100_new_numbers": 12.534273403838622
+      },
+      {
+        "strategies": [
+          "bayesian"
+        ],
+        "draws": 553,
+        "extra_hits": 310,
+        "extra_per_draw": 0.5605786618444847,
+        "adds_hit_pct": 45.93128390596745,
+        "mean_new_numbers": 4.64376130198915,
+        "mean_overlap": 1.3562386980108498,
+        "combined_hits": 767,
+        "combined_per_draw": 1.3869801084990958,
+        "union_at_least_3_pct": 11.211573236889693,
+        "union_all_6_draws": 0,
+        "companion_hits": 432,
+        "base_hits": 457,
+        "extra_when_base_zero": 158,
+        "base_zero_draws": 219,
+        "random_expected_extra": 314.44897959183675,
+        "extra_above_random": -4.448979591836746,
+        "hits_per_100_new_numbers": 12.071651090342678
+      },
+      {
+        "strategies": [
+          "decision_tree_selector"
+        ],
+        "draws": 553,
+        "extra_hits": 304,
+        "extra_per_draw": 0.5497287522603979,
+        "adds_hit_pct": 45.02712477396022,
+        "mean_new_numbers": 4.468354430379747,
+        "mean_overlap": 1.5316455696202531,
+        "combined_hits": 761,
+        "combined_per_draw": 1.376130198915009,
+        "union_at_least_3_pct": 12.47739602169982,
+        "union_all_6_draws": 0,
+        "companion_hits": 435,
+        "base_hits": 457,
+        "extra_when_base_zero": 143,
+        "base_zero_draws": 219,
+        "random_expected_extra": 302.57142857142856,
+        "extra_above_random": 1.4285714285714448,
+        "hits_per_100_new_numbers": 12.302711452853096
+      },
+      {
+        "strategies": [
+          "emd"
+        ],
+        "draws": 553,
+        "extra_hits": 304,
+        "extra_per_draw": 0.5497287522603979,
+        "adds_hit_pct": 47.01627486437613,
+        "mean_new_numbers": 4.390596745027125,
+        "mean_overlap": 1.6094032549728752,
+        "combined_hits": 761,
+        "combined_per_draw": 1.376130198915009,
+        "union_at_least_3_pct": 11.211573236889693,
+        "union_all_6_draws": 0,
+        "companion_hits": 432,
+        "base_hits": 457,
+        "extra_when_base_zero": 145,
+        "base_zero_draws": 219,
+        "random_expected_extra": 297.3061224489796,
+        "extra_above_random": 6.693877551020421,
+        "hits_per_100_new_numbers": 12.520593080724877
+      },
+      {
+        "strategies": [
+          "predictive_grid"
+        ],
+        "draws": 553,
+        "extra_hits": 297,
+        "extra_per_draw": 0.5370705244122965,
+        "adds_hit_pct": 45.56962025316456,
+        "mean_new_numbers": 4.3779385171790235,
+        "mean_overlap": 1.6220614828209765,
+        "combined_hits": 754,
+        "combined_per_draw": 1.3634719710669079,
+        "union_at_least_3_pct": 12.115732368896927,
+        "union_all_6_draws": 0,
+        "companion_hits": 430,
+        "base_hits": 457,
+        "extra_when_base_zero": 143,
+        "base_zero_draws": 219,
+        "random_expected_extra": 296.44897959183675,
+        "extra_above_random": 0.5510204081632537,
+        "hits_per_100_new_numbers": 12.267657992565056
+      },
+      {
+        "strategies": [
+          "tbl"
+        ],
+        "draws": 553,
+        "extra_hits": 276,
+        "extra_per_draw": 0.49909584086799275,
+        "adds_hit_pct": 42.31464737793852,
+        "mean_new_numbers": 4.151898734177215,
+        "mean_overlap": 1.8481012658227849,
+        "combined_hits": 733,
+        "combined_per_draw": 1.3254972875226039,
+        "union_at_least_3_pct": 11.754068716094032,
+        "union_all_6_draws": 0,
+        "companion_hits": 417,
+        "base_hits": 457,
+        "extra_when_base_zero": 119,
+        "base_zero_draws": 219,
+        "random_expected_extra": 281.14285714285717,
+        "extra_above_random": -5.142857142857167,
+        "hits_per_100_new_numbers": 12.020905923344948
+      },
+      {
+        "strategies": [
+          "recurrence_dynamics"
+        ],
+        "draws": 553,
+        "extra_hits": 242,
+        "extra_per_draw": 0.4376130198915009,
+        "adds_hit_pct": 37.25135623869801,
+        "mean_new_numbers": 3.4358047016274864,
+        "mean_overlap": 2.5641952983725136,
+        "combined_hits": 699,
+        "combined_per_draw": 1.2640144665461122,
+        "union_at_least_3_pct": 9.764918625678119,
+        "union_all_6_draws": 0,
+        "companion_hits": 453,
+        "base_hits": 457,
+        "extra_when_base_zero": 113,
+        "base_zero_draws": 219,
+        "random_expected_extra": 232.6530612244898,
+        "extra_above_random": 9.34693877551021,
+        "hits_per_100_new_numbers": 12.736842105263158
+      }
+    ],
+    "evaluation_last_30pct": [
+      {
+        "strategies": [
+          "residual_coverage"
+        ],
+        "draws": 238,
+        "extra_hits": 174,
+        "extra_per_draw": 0.7310924369747899,
+        "adds_hit_pct": 56.30252100840336,
+        "mean_new_numbers": 6.0,
+        "mean_overlap": 0.0,
+        "combined_hits": 372,
+        "combined_per_draw": 1.5630252100840336,
+        "union_at_least_3_pct": 15.966386554621849,
+        "union_all_6_draws": 0,
+        "companion_hits": 174,
+        "base_hits": 198,
+        "extra_when_base_zero": 74,
+        "base_zero_draws": 90,
+        "random_expected_extra": 174.85714285714286,
+        "extra_above_random": -0.8571428571428612,
+        "hits_per_100_new_numbers": 12.184873949579831,
+        "bootstrap_extra_per_draw_95pct": [
+          0.634453781512605,
+          0.8235294117647058
+        ]
+      },
+      {
+        "strategies": [
+          "randomness"
+        ],
+        "draws": 238,
+        "extra_hits": 155,
+        "extra_per_draw": 0.6512605042016807,
+        "adds_hit_pct": 52.52100840336134,
+        "mean_new_numbers": 5.294117647058823,
+        "mean_overlap": 0.7058823529411765,
+        "combined_hits": 353,
+        "combined_per_draw": 1.4831932773109244,
+        "union_at_least_3_pct": 13.865546218487395,
+        "union_all_6_draws": 0,
+        "companion_hits": 173,
+        "base_hits": 198,
+        "extra_when_base_zero": 65,
+        "base_zero_draws": 90,
+        "random_expected_extra": 154.28571428571428,
+        "extra_above_random": 0.7142857142857224,
+        "hits_per_100_new_numbers": 12.301587301587302,
+        "bootstrap_extra_per_draw_95pct": [
+          0.5630252100840336,
+          0.7394957983193278
+        ]
+      },
+      {
+        "strategies": [
+          "doublet_triplet_markov"
+        ],
+        "draws": 238,
+        "extra_hits": 152,
+        "extra_per_draw": 0.6386554621848739,
+        "adds_hit_pct": 48.739495798319325,
+        "mean_new_numbers": 5.029411764705882,
+        "mean_overlap": 0.9705882352941176,
+        "combined_hits": 350,
+        "combined_per_draw": 1.4705882352941178,
+        "union_at_least_3_pct": 12.605042016806722,
+        "union_all_6_draws": 0,
+        "companion_hits": 187,
+        "base_hits": 198,
+        "extra_when_base_zero": 69,
+        "base_zero_draws": 90,
+        "random_expected_extra": 146.57142857142858,
+        "extra_above_random": 5.428571428571416,
+        "hits_per_100_new_numbers": 12.698412698412698,
+        "bootstrap_extra_per_draw_95pct": [
+          0.5461134453781512,
+          0.7352941176470589
+        ]
+      },
+      {
+        "strategies": [
+          "tbl"
+        ],
+        "draws": 238,
+        "extra_hits": 145,
+        "extra_per_draw": 0.6092436974789915,
+        "adds_hit_pct": 49.15966386554622,
+        "mean_new_numbers": 4.46218487394958,
+        "mean_overlap": 1.5378151260504203,
+        "combined_hits": 343,
+        "combined_per_draw": 1.4411764705882353,
+        "union_at_least_3_pct": 16.386554621848738,
+        "union_all_6_draws": 0,
+        "companion_hits": 195,
+        "base_hits": 198,
+        "extra_when_base_zero": 55,
+        "base_zero_draws": 90,
+        "random_expected_extra": 130.0408163265306,
+        "extra_above_random": 14.959183673469397,
+        "hits_per_100_new_numbers": 13.653483992467043,
+        "bootstrap_extra_per_draw_95pct": [
+          0.5252100840336135,
+          0.7016806722689075
+        ]
+      },
+      {
+        "strategies": [
+          "categorical_chi_square"
+        ],
+        "draws": 238,
+        "extra_hits": 141,
+        "extra_per_draw": 0.592436974789916,
+        "adds_hit_pct": 46.63865546218487,
+        "mean_new_numbers": 4.7478991596638656,
+        "mean_overlap": 1.2521008403361344,
+        "combined_hits": 339,
+        "combined_per_draw": 1.4243697478991597,
+        "union_at_least_3_pct": 16.386554621848738,
+        "union_all_6_draws": 0,
+        "companion_hits": 179,
+        "base_hits": 198,
+        "extra_when_base_zero": 58,
+        "base_zero_draws": 90,
+        "random_expected_extra": 138.3673469387755,
+        "extra_above_random": 2.632653061224488,
+        "hits_per_100_new_numbers": 12.47787610619469,
+        "bootstrap_extra_per_draw_95pct": [
+          0.5,
+          0.6890756302521008
+        ]
+      },
+      {
+        "strategies": [
+          "bayesian"
+        ],
+        "draws": 238,
+        "extra_hits": 140,
+        "extra_per_draw": 0.5882352941176471,
+        "adds_hit_pct": 48.739495798319325,
+        "mean_new_numbers": 4.7899159663865545,
+        "mean_overlap": 1.2100840336134453,
+        "combined_hits": 338,
+        "combined_per_draw": 1.4201680672268908,
+        "union_at_least_3_pct": 14.285714285714286,
+        "union_all_6_draws": 0,
+        "companion_hits": 183,
+        "base_hits": 198,
+        "extra_when_base_zero": 55,
+        "base_zero_draws": 90,
+        "random_expected_extra": 139.59183673469389,
+        "extra_above_random": 0.4081632653061149,
+        "hits_per_100_new_numbers": 12.280701754385966,
+        "bootstrap_extra_per_draw_95pct": [
+          0.5,
+          0.6764705882352942
+        ]
+      },
+      {
+        "strategies": [
+          "mksp"
+        ],
+        "draws": 238,
+        "extra_hits": 140,
+        "extra_per_draw": 0.5882352941176471,
+        "adds_hit_pct": 46.21848739495798,
+        "mean_new_numbers": 4.550420168067227,
+        "mean_overlap": 1.449579831932773,
+        "combined_hits": 338,
+        "combined_per_draw": 1.4201680672268908,
+        "union_at_least_3_pct": 13.025210084033613,
+        "union_all_6_draws": 0,
+        "companion_hits": 184,
+        "base_hits": 198,
+        "extra_when_base_zero": 64,
+        "base_zero_draws": 90,
+        "random_expected_extra": 132.6122448979592,
+        "extra_above_random": 7.387755102040813,
+        "hits_per_100_new_numbers": 12.927054478301015,
+        "bootstrap_extra_per_draw_95pct": [
+          0.5,
+          0.6764705882352942
+        ]
+      },
+      {
+        "strategies": [
+          "decision_tree_selector"
+        ],
+        "draws": 238,
+        "extra_hits": 134,
+        "extra_per_draw": 0.5630252100840336,
+        "adds_hit_pct": 46.63865546218487,
+        "mean_new_numbers": 4.546218487394958,
+        "mean_overlap": 1.453781512605042,
+        "combined_hits": 332,
+        "combined_per_draw": 1.3949579831932772,
+        "union_at_least_3_pct": 11.764705882352942,
+        "union_all_6_draws": 0,
+        "companion_hits": 189,
+        "base_hits": 198,
+        "extra_when_base_zero": 60,
+        "base_zero_draws": 90,
+        "random_expected_extra": 132.48979591836735,
+        "extra_above_random": 1.5102040816326507,
+        "hits_per_100_new_numbers": 12.384473197781885,
+        "bootstrap_extra_per_draw_95pct": [
+          0.4789915966386555,
+          0.6512605042016807
+        ]
+      },
+      {
+        "strategies": [
+          "entropy"
+        ],
+        "draws": 238,
+        "extra_hits": 134,
+        "extra_per_draw": 0.5630252100840336,
+        "adds_hit_pct": 46.21848739495798,
+        "mean_new_numbers": 5.235294117647059,
+        "mean_overlap": 0.7647058823529411,
+        "combined_hits": 332,
+        "combined_per_draw": 1.3949579831932772,
+        "union_at_least_3_pct": 15.126050420168067,
+        "union_all_6_draws": 0,
+        "companion_hits": 160,
+        "base_hits": 198,
+        "extra_when_base_zero": 53,
+        "base_zero_draws": 90,
+        "random_expected_extra": 152.57142857142858,
+        "extra_above_random": -18.571428571428584,
+        "hits_per_100_new_numbers": 10.754414125200642,
+        "bootstrap_extra_per_draw_95pct": [
+          0.4789915966386555,
+          0.6512605042016807
+        ]
+      },
+      {
+        "strategies": [
+          "emd"
+        ],
+        "draws": 238,
+        "extra_hits": 131,
+        "extra_per_draw": 0.5504201680672269,
+        "adds_hit_pct": 45.378151260504204,
+        "mean_new_numbers": 4.533613445378151,
+        "mean_overlap": 1.4663865546218486,
+        "combined_hits": 329,
+        "combined_per_draw": 1.3823529411764706,
+        "union_at_least_3_pct": 13.445378151260504,
+        "union_all_6_draws": 0,
+        "companion_hits": 180,
+        "base_hits": 198,
+        "extra_when_base_zero": 55,
+        "base_zero_draws": 90,
+        "random_expected_extra": 132.12244897959184,
+        "extra_above_random": -1.1224489795918373,
+        "hits_per_100_new_numbers": 12.140871177015756,
+        "bootstrap_extra_per_draw_95pct": [
+          0.46638655462184875,
+          0.6386554621848739
+        ]
+      },
+      {
+        "strategies": [
+          "border_group_bayesian"
+        ],
+        "draws": 238,
+        "extra_hits": 126,
+        "extra_per_draw": 0.5294117647058824,
+        "adds_hit_pct": 41.596638655462186,
+        "mean_new_numbers": 4.53781512605042,
+        "mean_overlap": 1.4621848739495797,
+        "combined_hits": 324,
+        "combined_per_draw": 1.361344537815126,
+        "union_at_least_3_pct": 13.025210084033613,
+        "union_all_6_draws": 0,
+        "companion_hits": 172,
+        "base_hits": 198,
+        "extra_when_base_zero": 55,
+        "base_zero_draws": 90,
+        "random_expected_extra": 132.24489795918367,
+        "extra_above_random": -6.244897959183675,
+        "hits_per_100_new_numbers": 11.666666666666666,
+        "bootstrap_extra_per_draw_95pct": [
+          0.4411764705882353,
+          0.6218487394957983
+        ]
+      },
+      {
+        "strategies": [
+          "predictive_grid"
+        ],
+        "draws": 238,
+        "extra_hits": 122,
+        "extra_per_draw": 0.5126050420168067,
+        "adds_hit_pct": 40.33613445378151,
+        "mean_new_numbers": 4.504201680672269,
+        "mean_overlap": 1.495798319327731,
+        "combined_hits": 320,
+        "combined_per_draw": 1.3445378151260505,
+        "union_at_least_3_pct": 13.865546218487395,
+        "union_all_6_draws": 0,
+        "companion_hits": 176,
+        "base_hits": 198,
+        "extra_when_base_zero": 53,
+        "base_zero_draws": 90,
+        "random_expected_extra": 131.26530612244898,
+        "extra_above_random": -9.265306122448976,
+        "hits_per_100_new_numbers": 11.380597014925373,
+        "bootstrap_extra_per_draw_95pct": [
+          0.42436974789915966,
+          0.6092436974789915
+        ]
+      },
+      {
+        "strategies": [
+          "recurrence_dynamics"
+        ],
+        "draws": 238,
+        "extra_hits": 97,
+        "extra_per_draw": 0.40756302521008403,
+        "adds_hit_pct": 34.45378151260504,
+        "mean_new_numbers": 3.399159663865546,
+        "mean_overlap": 2.600840336134454,
+        "combined_hits": 295,
+        "combined_per_draw": 1.2394957983193278,
+        "union_at_least_3_pct": 6.302521008403361,
+        "union_all_6_draws": 0,
+        "companion_hits": 185,
+        "base_hits": 198,
+        "extra_when_base_zero": 49,
+        "base_zero_draws": 90,
+        "random_expected_extra": 99.06122448979592,
+        "extra_above_random": -2.0612244897959187,
+        "hits_per_100_new_numbers": 11.990111248454882,
+        "bootstrap_extra_per_draw_95pct": [
+          0.3319327731092437,
+          0.4831932773109244
+        ]
+      }
+    ],
+    "latest_100": [
+      {
+        "strategies": [
+          "residual_coverage"
+        ],
+        "draws": 100,
+        "extra_hits": 70,
+        "extra_per_draw": 0.7,
+        "adds_hit_pct": 52.0,
+        "mean_new_numbers": 6.0,
+        "mean_overlap": 0.0,
+        "combined_hits": 157,
+        "combined_per_draw": 1.57,
+        "union_at_least_3_pct": 16.0,
+        "union_all_6_draws": 0,
+        "companion_hits": 70,
+        "base_hits": 87,
+        "extra_when_base_zero": 33,
+        "base_zero_draws": 37,
+        "random_expected_extra": 73.46938775510205,
+        "extra_above_random": -3.4693877551020478,
+        "hits_per_100_new_numbers": 11.666666666666666
+      },
+      {
+        "strategies": [
+          "randomness"
+        ],
+        "draws": 100,
+        "extra_hits": 68,
+        "extra_per_draw": 0.68,
+        "adds_hit_pct": 55.0,
+        "mean_new_numbers": 5.32,
+        "mean_overlap": 0.68,
+        "combined_hits": 155,
+        "combined_per_draw": 1.55,
+        "union_at_least_3_pct": 16.0,
+        "union_all_6_draws": 0,
+        "companion_hits": 80,
+        "base_hits": 87,
+        "extra_when_base_zero": 29,
+        "base_zero_draws": 37,
+        "random_expected_extra": 65.14285714285714,
+        "extra_above_random": 2.857142857142861,
+        "hits_per_100_new_numbers": 12.781954887218046
+      },
+      {
+        "strategies": [
+          "bayesian"
+        ],
+        "draws": 100,
+        "extra_hits": 66,
+        "extra_per_draw": 0.66,
+        "adds_hit_pct": 52.0,
+        "mean_new_numbers": 4.92,
+        "mean_overlap": 1.08,
+        "combined_hits": 153,
+        "combined_per_draw": 1.53,
+        "union_at_least_3_pct": 20.0,
+        "union_all_6_draws": 0,
+        "companion_hits": 83,
+        "base_hits": 87,
+        "extra_when_base_zero": 24,
+        "base_zero_draws": 37,
+        "random_expected_extra": 60.244897959183675,
+        "extra_above_random": 5.755102040816325,
+        "hits_per_100_new_numbers": 13.414634146341463
+      },
+      {
+        "strategies": [
+          "tbl"
+        ],
+        "draws": 100,
+        "extra_hits": 66,
+        "extra_per_draw": 0.66,
+        "adds_hit_pct": 52.0,
+        "mean_new_numbers": 4.53,
+        "mean_overlap": 1.47,
+        "combined_hits": 153,
+        "combined_per_draw": 1.53,
+        "union_at_least_3_pct": 20.0,
+        "union_all_6_draws": 0,
+        "companion_hits": 90,
+        "base_hits": 87,
+        "extra_when_base_zero": 26,
+        "base_zero_draws": 37,
+        "random_expected_extra": 55.46938775510204,
+        "extra_above_random": 10.53061224489796,
+        "hits_per_100_new_numbers": 14.56953642384106
+      },
+      {
+        "strategies": [
+          "categorical_chi_square"
+        ],
+        "draws": 100,
+        "extra_hits": 64,
+        "extra_per_draw": 0.64,
+        "adds_hit_pct": 46.0,
+        "mean_new_numbers": 4.91,
+        "mean_overlap": 1.09,
+        "combined_hits": 151,
+        "combined_per_draw": 1.51,
+        "union_at_least_3_pct": 20.0,
+        "union_all_6_draws": 0,
+        "companion_hits": 78,
+        "base_hits": 87,
+        "extra_when_base_zero": 25,
+        "base_zero_draws": 37,
+        "random_expected_extra": 60.12244897959184,
+        "extra_above_random": 3.8775510204081627,
+        "hits_per_100_new_numbers": 13.034623217922608
+      },
+      {
+        "strategies": [
+          "doublet_triplet_markov"
+        ],
+        "draws": 100,
+        "extra_hits": 56,
+        "extra_per_draw": 0.56,
+        "adds_hit_pct": 45.0,
+        "mean_new_numbers": 5.07,
+        "mean_overlap": 0.93,
+        "combined_hits": 143,
+        "combined_per_draw": 1.43,
+        "union_at_least_3_pct": 10.0,
+        "union_all_6_draws": 0,
+        "companion_hits": 70,
+        "base_hits": 87,
+        "extra_when_base_zero": 25,
+        "base_zero_draws": 37,
+        "random_expected_extra": 62.08163265306123,
+        "extra_above_random": -6.081632653061227,
+        "hits_per_100_new_numbers": 11.045364891518737
+      },
+      {
+        "strategies": [
+          "border_group_bayesian"
+        ],
+        "draws": 100,
+        "extra_hits": 52,
+        "extra_per_draw": 0.52,
+        "adds_hit_pct": 40.0,
+        "mean_new_numbers": 4.39,
+        "mean_overlap": 1.61,
+        "combined_hits": 139,
+        "combined_per_draw": 1.39,
+        "union_at_least_3_pct": 14.0,
+        "union_all_6_draws": 0,
+        "companion_hits": 77,
+        "base_hits": 87,
+        "extra_when_base_zero": 22,
+        "base_zero_draws": 37,
+        "random_expected_extra": 53.755102040816325,
+        "extra_above_random": -1.7551020408163254,
+        "hits_per_100_new_numbers": 11.845102505694761
+      },
+      {
+        "strategies": [
+          "emd"
+        ],
+        "draws": 100,
+        "extra_hits": 51,
+        "extra_per_draw": 0.51,
+        "adds_hit_pct": 41.0,
+        "mean_new_numbers": 4.64,
+        "mean_overlap": 1.36,
+        "combined_hits": 138,
+        "combined_per_draw": 1.38,
+        "union_at_least_3_pct": 12.0,
+        "union_all_6_draws": 0,
+        "companion_hits": 67,
+        "base_hits": 87,
+        "extra_when_base_zero": 21,
+        "base_zero_draws": 37,
+        "random_expected_extra": 56.816326530612244,
+        "extra_above_random": -5.816326530612244,
+        "hits_per_100_new_numbers": 10.991379310344827
+      },
+      {
+        "strategies": [
+          "entropy"
+        ],
+        "draws": 100,
+        "extra_hits": 51,
+        "extra_per_draw": 0.51,
+        "adds_hit_pct": 45.0,
+        "mean_new_numbers": 5.2,
+        "mean_overlap": 0.8,
+        "combined_hits": 138,
+        "combined_per_draw": 1.38,
+        "union_at_least_3_pct": 14.0,
+        "union_all_6_draws": 0,
+        "companion_hits": 66,
+        "base_hits": 87,
+        "extra_when_base_zero": 22,
+        "base_zero_draws": 37,
+        "random_expected_extra": 63.673469387755105,
+        "extra_above_random": -12.673469387755105,
+        "hits_per_100_new_numbers": 9.807692307692308
+      },
+      {
+        "strategies": [
+          "mksp"
+        ],
+        "draws": 100,
+        "extra_hits": 51,
+        "extra_per_draw": 0.51,
+        "adds_hit_pct": 40.0,
+        "mean_new_numbers": 4.43,
+        "mean_overlap": 1.57,
+        "combined_hits": 138,
+        "combined_per_draw": 1.38,
+        "union_at_least_3_pct": 15.0,
+        "union_all_6_draws": 0,
+        "companion_hits": 70,
+        "base_hits": 87,
+        "extra_when_base_zero": 21,
+        "base_zero_draws": 37,
+        "random_expected_extra": 54.244897959183675,
+        "extra_above_random": -3.2448979591836746,
+        "hits_per_100_new_numbers": 11.512415349887133
+      },
+      {
+        "strategies": [
+          "predictive_grid"
+        ],
+        "draws": 100,
+        "extra_hits": 51,
+        "extra_per_draw": 0.51,
+        "adds_hit_pct": 39.0,
+        "mean_new_numbers": 4.6,
+        "mean_overlap": 1.4,
+        "combined_hits": 138,
+        "combined_per_draw": 1.38,
+        "union_at_least_3_pct": 17.0,
+        "union_all_6_draws": 0,
+        "companion_hits": 73,
+        "base_hits": 87,
+        "extra_when_base_zero": 21,
+        "base_zero_draws": 37,
+        "random_expected_extra": 56.326530612244895,
+        "extra_above_random": -5.326530612244895,
+        "hits_per_100_new_numbers": 11.08695652173913
+      },
+      {
+        "strategies": [
+          "decision_tree_selector"
+        ],
+        "draws": 100,
+        "extra_hits": 47,
+        "extra_per_draw": 0.47,
+        "adds_hit_pct": 41.0,
+        "mean_new_numbers": 4.41,
+        "mean_overlap": 1.59,
+        "combined_hits": 134,
+        "combined_per_draw": 1.34,
+        "union_at_least_3_pct": 13.0,
+        "union_all_6_draws": 0,
+        "companion_hits": 72,
+        "base_hits": 87,
+        "extra_when_base_zero": 20,
+        "base_zero_draws": 37,
+        "random_expected_extra": 54.0,
+        "extra_above_random": -7.0,
+        "hits_per_100_new_numbers": 10.657596371882086
+      },
+      {
+        "strategies": [
+          "recurrence_dynamics"
+        ],
+        "draws": 100,
+        "extra_hits": 39,
+        "extra_per_draw": 0.39,
+        "adds_hit_pct": 36.0,
+        "mean_new_numbers": 3.37,
+        "mean_overlap": 2.63,
+        "combined_hits": 126,
+        "combined_per_draw": 1.26,
+        "union_at_least_3_pct": 8.0,
+        "union_all_6_draws": 0,
+        "companion_hits": 77,
+        "base_hits": 87,
+        "extra_when_base_zero": 16,
+        "base_zero_draws": 37,
+        "random_expected_extra": 41.265306122448976,
+        "extra_above_random": -2.265306122448976,
+        "hits_per_100_new_numbers": 11.572700296735905
+      }
+    ]
+  },
+  "frozen_single": {
+    "strategies": [
+      "residual_coverage"
+    ],
+    "draws": 238,
+    "extra_hits": 174,
+    "extra_per_draw": 0.7310924369747899,
+    "adds_hit_pct": 56.30252100840336,
+    "mean_new_numbers": 6.0,
+    "mean_overlap": 0.0,
+    "combined_hits": 372,
+    "combined_per_draw": 1.5630252100840336,
+    "union_at_least_3_pct": 15.966386554621849,
+    "union_all_6_draws": 0,
+    "companion_hits": 174,
+    "base_hits": 198,
+    "extra_when_base_zero": 74,
+    "base_zero_draws": 90,
+    "random_expected_extra": 174.85714285714286,
+    "extra_above_random": -0.8571428571428612,
+    "hits_per_100_new_numbers": 12.184873949579831
+  },
+  "frozen_pair": {
+    "strategies": [
+      "entropy",
+      "residual_coverage"
+    ],
+    "draws": 238,
+    "extra_hits": 308,
+    "extra_per_draw": 1.2941176470588236,
+    "adds_hit_pct": 79.83193277310924,
+    "mean_new_numbers": 11.231092436974789,
+    "mean_overlap": 0.7647058823529411,
+    "combined_hits": 506,
+    "combined_per_draw": 2.1260504201680672,
+    "union_at_least_3_pct": 39.49579831932773,
+    "union_all_6_draws": 0,
+    "companion_hits": 334,
+    "base_hits": 198,
+    "extra_when_base_zero": 127,
+    "base_zero_draws": 90,
+    "random_expected_extra": 327.3061224489796,
+    "extra_above_random": -19.30612244897958,
+    "hits_per_100_new_numbers": 11.522633744855968
+  },
+  "top_selection_pairs": [
+    {
+      "selection": {
+        "strategies": [
+          "entropy",
+          "residual_coverage"
+        ],
+        "draws": 553,
+        "extra_hits": 733,
+        "extra_per_draw": 1.3254972875226039,
+        "adds_hit_pct": 77.57685352622062,
+        "mean_new_numbers": 11.009041591320072,
+        "mean_overlap": 0.9873417721518988,
+        "combined_hits": 1190,
+        "combined_per_draw": 2.151898734177215,
+        "union_at_least_3_pct": 36.88969258589512,
+        "union_all_6_draws": 2,
+        "companion_hits": 802,
+        "base_hits": 457,
+        "extra_when_base_zero": 319,
+        "base_zero_draws": 219,
+        "random_expected_extra": 745.469387755102,
+        "extra_above_random": -12.469387755102048,
+        "hits_per_100_new_numbers": 12.040078843626807
+      },
+      "evaluation": {
+        "strategies": [
+          "entropy",
+          "residual_coverage"
+        ],
+        "draws": 238,
+        "extra_hits": 308,
+        "extra_per_draw": 1.2941176470588236,
+        "adds_hit_pct": 79.83193277310924,
+        "mean_new_numbers": 11.231092436974789,
+        "mean_overlap": 0.7647058823529411,
+        "combined_hits": 506,
+        "combined_per_draw": 2.1260504201680672,
+        "union_at_least_3_pct": 39.49579831932773,
+        "union_all_6_draws": 0,
+        "companion_hits": 334,
+        "base_hits": 198,
+        "extra_when_base_zero": 127,
+        "base_zero_draws": 90,
+        "random_expected_extra": 327.3061224489796,
+        "extra_above_random": -19.30612244897958,
+        "hits_per_100_new_numbers": 11.522633744855968
+      }
+    },
+    {
+      "selection": {
+        "strategies": [
+          "randomness",
+          "residual_coverage"
+        ],
+        "draws": 553,
+        "extra_hits": 720,
+        "extra_per_draw": 1.301989150090416,
+        "adds_hit_pct": 79.02350813743219,
+        "mean_new_numbers": 11.206148282097649,
+        "mean_overlap": 0.7920433996383364,
+        "combined_hits": 1177,
+        "combined_per_draw": 2.128390596745027,
+        "union_at_least_3_pct": 38.33634719710669,
+        "union_all_6_draws": 0,
+        "companion_hits": 784,
+        "base_hits": 457,
+        "extra_when_base_zero": 316,
+        "base_zero_draws": 219,
+        "random_expected_extra": 758.8163265306123,
+        "extra_above_random": -38.81632653061229,
+        "hits_per_100_new_numbers": 11.618525092786832
+      },
+      "evaluation": {
+        "strategies": [
+          "randomness",
+          "residual_coverage"
+        ],
+        "draws": 238,
+        "extra_hits": 329,
+        "extra_per_draw": 1.3823529411764706,
+        "adds_hit_pct": 83.19327731092437,
+        "mean_new_numbers": 11.294117647058824,
+        "mean_overlap": 0.7058823529411765,
+        "combined_hits": 527,
+        "combined_per_draw": 2.2142857142857144,
+        "union_at_least_3_pct": 36.134453781512605,
+        "union_all_6_draws": 0,
+        "companion_hits": 347,
+        "base_hits": 198,
+        "extra_when_base_zero": 139,
+        "base_zero_draws": 90,
+        "random_expected_extra": 329.14285714285717,
+        "extra_above_random": -0.14285714285716722,
+        "hits_per_100_new_numbers": 12.239583333333334
+      }
+    },
+    {
+      "selection": {
+        "strategies": [
+          "doublet_triplet_markov",
+          "residual_coverage"
+        ],
+        "draws": 553,
+        "extra_hits": 714,
+        "extra_per_draw": 1.2911392405063291,
+        "adds_hit_pct": 78.3001808318264,
+        "mean_new_numbers": 10.99638336347197,
+        "mean_overlap": 1.003616636528029,
+        "combined_hits": 1171,
+        "combined_per_draw": 2.11754068716094,
+        "union_at_least_3_pct": 36.88969258589512,
+        "union_all_6_draws": 1,
+        "companion_hits": 789,
+        "base_hits": 457,
+        "extra_when_base_zero": 306,
+        "base_zero_draws": 219,
+        "random_expected_extra": 744.6122448979592,
+        "extra_above_random": -30.612244897959158,
+        "hits_per_100_new_numbers": 11.74148988653182
+      },
+      "evaluation": {
+        "strategies": [
+          "doublet_triplet_markov",
+          "residual_coverage"
+        ],
+        "draws": 238,
+        "extra_hits": 326,
+        "extra_per_draw": 1.3697478991596639,
+        "adds_hit_pct": 77.73109243697479,
+        "mean_new_numbers": 11.029411764705882,
+        "mean_overlap": 0.9705882352941176,
+        "combined_hits": 524,
+        "combined_per_draw": 2.2016806722689077,
+        "union_at_least_3_pct": 38.65546218487395,
+        "union_all_6_draws": 0,
+        "companion_hits": 361,
+        "base_hits": 198,
+        "extra_when_base_zero": 143,
+        "base_zero_draws": 90,
+        "random_expected_extra": 321.42857142857144,
+        "extra_above_random": 4.571428571428555,
+        "hits_per_100_new_numbers": 12.41904761904762
+      }
+    },
+    {
+      "selection": {
+        "strategies": [
+          "border_group_bayesian",
+          "residual_coverage"
+        ],
+        "draws": 553,
+        "extra_hits": 705,
+        "extra_per_draw": 1.274864376130199,
+        "adds_hit_pct": 79.02350813743219,
+        "mean_new_numbers": 10.698010849909585,
+        "mean_overlap": 1.301989150090416,
+        "combined_hits": 1162,
+        "combined_per_draw": 2.1012658227848102,
+        "union_at_least_3_pct": 34.90054249547921,
+        "union_all_6_draws": 1,
+        "companion_hits": 810,
+        "base_hits": 457,
+        "extra_when_base_zero": 312,
+        "base_zero_draws": 219,
+        "random_expected_extra": 724.4081632653061,
+        "extra_above_random": -19.408163265306143,
+        "hits_per_100_new_numbers": 11.91683569979716
+      },
+      "evaluation": {
+        "strategies": [
+          "border_group_bayesian",
+          "residual_coverage"
+        ],
+        "draws": 238,
+        "extra_hits": 300,
+        "extra_per_draw": 1.2605042016806722,
+        "adds_hit_pct": 77.73109243697479,
+        "mean_new_numbers": 10.53781512605042,
+        "mean_overlap": 1.4621848739495797,
+        "combined_hits": 498,
+        "combined_per_draw": 2.092436974789916,
+        "union_at_least_3_pct": 35.294117647058826,
+        "union_all_6_draws": 0,
+        "companion_hits": 346,
+        "base_hits": 198,
+        "extra_when_base_zero": 129,
+        "base_zero_draws": 90,
+        "random_expected_extra": 307.1020408163265,
+        "extra_above_random": -7.102040816326507,
+        "hits_per_100_new_numbers": 11.961722488038278
+      }
+    },
+    {
+      "selection": {
+        "strategies": [
+          "categorical_chi_square",
+          "residual_coverage"
+        ],
+        "draws": 553,
+        "extra_hits": 690,
+        "extra_per_draw": 1.2477396021699818,
+        "adds_hit_pct": 78.48101265822785,
+        "mean_new_numbers": 10.613019891500905,
+        "mean_overlap": 1.3869801084990958,
+        "combined_hits": 1147,
+        "combined_per_draw": 2.0741410488245933,
+        "union_at_least_3_pct": 35.80470162748644,
+        "union_all_6_draws": 0,
+        "companion_hits": 807,
+        "base_hits": 457,
+        "extra_when_base_zero": 312,
+        "base_zero_draws": 219,
+        "random_expected_extra": 718.6530612244898,
+        "extra_above_random": -28.65306122448976,
+        "hits_per_100_new_numbers": 11.756687681035952
+      },
+      "evaluation": {
+        "strategies": [
+          "categorical_chi_square",
+          "residual_coverage"
+        ],
+        "draws": 238,
+        "extra_hits": 315,
+        "extra_per_draw": 1.3235294117647058,
+        "adds_hit_pct": 78.57142857142857,
+        "mean_new_numbers": 10.747899159663865,
+        "mean_overlap": 1.2521008403361344,
+        "combined_hits": 513,
+        "combined_per_draw": 2.1554621848739495,
+        "union_at_least_3_pct": 38.23529411764706,
+        "union_all_6_draws": 0,
+        "companion_hits": 353,
+        "base_hits": 198,
+        "extra_when_base_zero": 132,
+        "base_zero_draws": 90,
+        "random_expected_extra": 313.2244897959184,
+        "extra_above_random": 1.7755102040816269,
+        "hits_per_100_new_numbers": 12.314308053166537
+      }
+    },
+    {
+      "selection": {
+        "strategies": [
+          "entropy",
+          "doublet_triplet_markov"
+        ],
+        "draws": 553,
+        "extra_hits": 687,
+        "extra_per_draw": 1.2423146473779385,
+        "adds_hit_pct": 77.39602169981917,
+        "mean_new_numbers": 9.631103074141048,
+        "mean_overlap": 1.8499095840867992,
+        "combined_hits": 1144,
+        "combined_per_draw": 2.0687160940325495,
+        "union_at_least_3_pct": 32.91139240506329,
+        "union_all_6_draws": 0,
+        "companion_hits": 817,
+        "base_hits": 457,
+        "extra_when_base_zero": 306,
+        "base_zero_draws": 219,
+        "random_expected_extra": 652.1632653061224,
+        "extra_above_random": 34.83673469387759,
+        "hits_per_100_new_numbers": 12.898986105895606
+      },
+      "evaluation": {
+        "strategies": [
+          "entropy",
+          "doublet_triplet_markov"
+        ],
+        "draws": 238,
+        "extra_hits": 271,
+        "extra_per_draw": 1.138655462184874,
+        "adds_hit_pct": 72.6890756302521,
+        "mean_new_numbers": 9.72689075630252,
+        "mean_overlap": 1.680672268907563,
+        "combined_hits": 469,
+        "combined_per_draw": 1.9705882352941178,
+        "union_at_least_3_pct": 29.831932773109244,
+        "union_all_6_draws": 0,
+        "companion_hits": 330,
+        "base_hits": 198,
+        "extra_when_base_zero": 116,
+        "base_zero_draws": 90,
+        "random_expected_extra": 283.46938775510205,
+        "extra_above_random": -12.469387755102048,
+        "hits_per_100_new_numbers": 11.706263498920086
+      }
+    },
+    {
+      "selection": {
+        "strategies": [
+          "mksp",
+          "residual_coverage"
+        ],
+        "draws": 553,
+        "extra_hits": 687,
+        "extra_per_draw": 1.2423146473779385,
+        "adds_hit_pct": 77.39602169981917,
+        "mean_new_numbers": 10.616636528028932,
+        "mean_overlap": 1.383363471971067,
+        "combined_hits": 1144,
+        "combined_per_draw": 2.0687160940325495,
+        "union_at_least_3_pct": 32.5497287522604,
+        "union_all_6_draws": 0,
+        "companion_hits": 796,
+        "base_hits": 457,
+        "extra_when_base_zero": 303,
+        "base_zero_draws": 219,
+        "random_expected_extra": 718.8979591836735,
+        "extra_above_random": -31.897959183673493,
+        "hits_per_100_new_numbers": 11.701584057230455
+      },
+      "evaluation": {
+        "strategies": [
+          "mksp",
+          "residual_coverage"
+        ],
+        "draws": 238,
+        "extra_hits": 314,
+        "extra_per_draw": 1.319327731092437,
+        "adds_hit_pct": 78.99159663865547,
+        "mean_new_numbers": 10.550420168067227,
+        "mean_overlap": 1.449579831932773,
+        "combined_hits": 512,
+        "combined_per_draw": 2.1512605042016806,
+        "union_at_least_3_pct": 36.97478991596638,
+        "union_all_6_draws": 0,
+        "companion_hits": 358,
+        "base_hits": 198,
+        "extra_when_base_zero": 138,
+        "base_zero_draws": 90,
+        "random_expected_extra": 307.46938775510205,
+        "extra_above_random": 6.530612244897952,
+        "hits_per_100_new_numbers": 12.504978096375947
+      }
+    },
+    {
+      "selection": {
+        "strategies": [
+          "randomness",
+          "entropy"
+        ],
+        "draws": 553,
+        "extra_hits": 681,
+        "extra_per_draw": 1.2314647377938517,
+        "adds_hit_pct": 75.5877034358047,
+        "mean_new_numbers": 9.64376130198915,
+        "mean_overlap": 1.6564195298372513,
+        "combined_hits": 1138,
+        "combined_per_draw": 2.057866184448463,
+        "union_at_least_3_pct": 33.99638336347197,
+        "union_all_6_draws": 0,
+        "companion_hits": 809,
+        "base_hits": 457,
+        "extra_when_base_zero": 312,
+        "base_zero_draws": 219,
+        "random_expected_extra": 653.0204081632653,
+        "extra_above_random": 27.9795918367347,
+        "hits_per_100_new_numbers": 12.769548096756047
+      },
+      "evaluation": {
+        "strategies": [
+          "randomness",
+          "entropy"
+        ],
+        "draws": 238,
+        "extra_hits": 273,
+        "extra_per_draw": 1.1470588235294117,
+        "adds_hit_pct": 73.52941176470588,
+        "mean_new_numbers": 9.915966386554622,
+        "mean_overlap": 1.3571428571428572,
+        "combined_hits": 471,
+        "combined_per_draw": 1.9789915966386555,
+        "union_at_least_3_pct": 32.773109243697476,
+        "union_all_6_draws": 0,
+        "companion_hits": 316,
+        "base_hits": 198,
+        "extra_when_base_zero": 112,
+        "base_zero_draws": 90,
+        "random_expected_extra": 288.9795918367347,
+        "extra_above_random": -15.979591836734699,
+        "hits_per_100_new_numbers": 11.567796610169491
+      }
+    },
+    {
+      "selection": {
+        "strategies": [
+          "bayesian",
+          "residual_coverage"
+        ],
+        "draws": 553,
+        "extra_hits": 677,
+        "extra_per_draw": 1.2242314647377939,
+        "adds_hit_pct": 77.21518987341773,
+        "mean_new_numbers": 10.64376130198915,
+        "mean_overlap": 1.3562386980108498,
+        "combined_hits": 1134,
+        "combined_per_draw": 2.050632911392405,
+        "union_at_least_3_pct": 34.35804701627487,
+        "union_all_6_draws": 0,
+        "companion_hits": 799,
+        "base_hits": 457,
+        "extra_when_base_zero": 312,
+        "base_zero_draws": 219,
+        "random_expected_extra": 720.734693877551,
+        "extra_above_random": -43.73469387755097,
+        "hits_per_100_new_numbers": 11.501868841318382
+      },
+      "evaluation": {
+        "strategies": [
+          "bayesian",
+          "residual_coverage"
+        ],
+        "draws": 238,
+        "extra_hits": 314,
+        "extra_per_draw": 1.319327731092437,
+        "adds_hit_pct": 77.73109243697479,
+        "mean_new_numbers": 10.789915966386555,
+        "mean_overlap": 1.2100840336134453,
+        "combined_hits": 512,
+        "combined_per_draw": 2.1512605042016806,
+        "union_at_least_3_pct": 34.03361344537815,
+        "union_all_6_draws": 0,
+        "companion_hits": 357,
+        "base_hits": 198,
+        "extra_when_base_zero": 129,
+        "base_zero_draws": 90,
+        "random_expected_extra": 314.44897959183675,
+        "extra_above_random": -0.4489795918367463,
+        "hits_per_100_new_numbers": 12.22741433021807
+      }
+    },
+    {
+      "selection": {
+        "strategies": [
+          "entropy",
+          "border_group_bayesian"
+        ],
+        "draws": 553,
+        "extra_hits": 677,
+        "extra_per_draw": 1.2242314647377939,
+        "adds_hit_pct": 75.5877034358047,
+        "mean_new_numbers": 9.298372513562388,
+        "mean_overlap": 2.0524412296564196,
+        "combined_hits": 1134,
+        "combined_per_draw": 2.050632911392405,
+        "union_at_least_3_pct": 34.90054249547921,
+        "union_all_6_draws": 0,
+        "companion_hits": 835,
+        "base_hits": 457,
+        "extra_when_base_zero": 309,
+        "base_zero_draws": 219,
+        "random_expected_extra": 629.6326530612245,
+        "extra_above_random": 47.36734693877554,
+        "hits_per_100_new_numbers": 13.166083236094904
+      },
+      "evaluation": {
+        "strategies": [
+          "entropy",
+          "border_group_bayesian"
+        ],
+        "draws": 238,
+        "extra_hits": 254,
+        "extra_per_draw": 1.0672268907563025,
+        "adds_hit_pct": 71.84873949579831,
+        "mean_new_numbers": 9.302521008403362,
+        "mean_overlap": 2.0672268907563027,
+        "combined_hits": 452,
+        "combined_per_draw": 1.8991596638655461,
+        "union_at_least_3_pct": 29.831932773109244,
+        "union_all_6_draws": 1,
+        "companion_hits": 320,
+        "base_hits": 198,
+        "extra_when_base_zero": 104,
+        "base_zero_draws": 90,
+        "random_expected_extra": 271.1020408163265,
+        "extra_above_random": -17.102040816326507,
+        "hits_per_100_new_numbers": 11.472448057813912
+      }
+    }
+  ],
+  "greedy_curve": [
+    {
+      "selection": {
+        "strategies": [
+          "residual_coverage"
+        ],
+        "draws": 553,
+        "extra_hits": 367,
+        "extra_per_draw": 0.6636528028933092,
+        "adds_hit_pct": 51.89873417721519,
+        "mean_new_numbers": 6.0,
+        "mean_overlap": 0.0,
+        "combined_hits": 824,
+        "combined_per_draw": 1.4900542495479205,
+        "union_at_least_3_pct": 17.540687160940326,
+        "union_all_6_draws": 0,
+        "companion_hits": 367,
+        "base_hits": 457,
+        "extra_when_base_zero": 154,
+        "base_zero_draws": 219,
+        "random_expected_extra": 406.2857142857143,
+        "extra_above_random": -39.28571428571428,
+        "hits_per_100_new_numbers": 11.06088004822182
+      },
+      "evaluation": {
+        "strategies": [
+          "residual_coverage"
+        ],
+        "draws": 238,
+        "extra_hits": 174,
+        "extra_per_draw": 0.7310924369747899,
+        "adds_hit_pct": 56.30252100840336,
+        "mean_new_numbers": 6.0,
+        "mean_overlap": 0.0,
+        "combined_hits": 372,
+        "combined_per_draw": 1.5630252100840336,
+        "union_at_least_3_pct": 15.966386554621849,
+        "union_all_6_draws": 0,
+        "companion_hits": 174,
+        "base_hits": 198,
+        "extra_when_base_zero": 74,
+        "base_zero_draws": 90,
+        "random_expected_extra": 174.85714285714286,
+        "extra_above_random": -0.8571428571428612,
+        "hits_per_100_new_numbers": 12.184873949579831
+      }
+    },
+    {
+      "selection": {
+        "strategies": [
+          "residual_coverage",
+          "entropy"
+        ],
+        "draws": 553,
+        "extra_hits": 733,
+        "extra_per_draw": 1.3254972875226039,
+        "adds_hit_pct": 77.57685352622062,
+        "mean_new_numbers": 11.009041591320072,
+        "mean_overlap": 0.9873417721518988,
+        "combined_hits": 1190,
+        "combined_per_draw": 2.151898734177215,
+        "union_at_least_3_pct": 36.88969258589512,
+        "union_all_6_draws": 2,
+        "companion_hits": 802,
+        "base_hits": 457,
+        "extra_when_base_zero": 319,
+        "base_zero_draws": 219,
+        "random_expected_extra": 745.469387755102,
+        "extra_above_random": -12.469387755102048,
+        "hits_per_100_new_numbers": 12.040078843626807
+      },
+      "evaluation": {
+        "strategies": [
+          "residual_coverage",
+          "entropy"
+        ],
+        "draws": 238,
+        "extra_hits": 308,
+        "extra_per_draw": 1.2941176470588236,
+        "adds_hit_pct": 79.83193277310924,
+        "mean_new_numbers": 11.231092436974789,
+        "mean_overlap": 0.7647058823529411,
+        "combined_hits": 506,
+        "combined_per_draw": 2.1260504201680672,
+        "union_at_least_3_pct": 39.49579831932773,
+        "union_all_6_draws": 0,
+        "companion_hits": 334,
+        "base_hits": 198,
+        "extra_when_base_zero": 127,
+        "base_zero_draws": 90,
+        "random_expected_extra": 327.3061224489796,
+        "extra_above_random": -19.30612244897958,
+        "hits_per_100_new_numbers": 11.522633744855968
+      }
+    },
+    {
+      "selection": {
+        "strategies": [
+          "residual_coverage",
+          "entropy",
+          "doublet_triplet_markov"
+        ],
+        "draws": 553,
+        "extra_hits": 1054,
+        "extra_per_draw": 1.9059674502712478,
+        "adds_hit_pct": 91.13924050632912,
+        "mean_new_numbers": 15.62748643761302,
+        "mean_overlap": 1.8499095840867992,
+        "combined_hits": 1511,
+        "combined_per_draw": 2.732368896925859,
+        "union_at_least_3_pct": 58.047016274864376,
+        "union_all_6_draws": 6,
+        "companion_hits": 1184,
+        "base_hits": 457,
+        "extra_when_base_zero": 460,
+        "base_zero_draws": 219,
+        "random_expected_extra": 1058.204081632653,
+        "extra_above_random": -4.204081632653015,
+        "hits_per_100_new_numbers": 12.196250867854664
+      },
+      "evaluation": {
+        "strategies": [
+          "residual_coverage",
+          "entropy",
+          "doublet_triplet_markov"
+        ],
+        "draws": 238,
+        "extra_hits": 445,
+        "extra_per_draw": 1.8697478991596639,
+        "adds_hit_pct": 89.91596638655462,
+        "mean_new_numbers": 15.722689075630251,
+        "mean_overlap": 1.680672268907563,
+        "combined_hits": 643,
+        "combined_per_draw": 2.7016806722689077,
+        "union_at_least_3_pct": 55.88235294117647,
+        "union_all_6_draws": 0,
+        "companion_hits": 504,
+        "base_hits": 198,
+        "extra_when_base_zero": 190,
+        "base_zero_draws": 90,
+        "random_expected_extra": 458.2040816326531,
+        "extra_above_random": -13.204081632653072,
+        "hits_per_100_new_numbers": 11.892036344200962
+      }
+    },
+    {
+      "selection": {
+        "strategies": [
+          "residual_coverage",
+          "entropy",
+          "doublet_triplet_markov",
+          "randomness"
+        ],
+        "draws": 553,
+        "extra_hits": 1326,
+        "extra_per_draw": 2.397830018083183,
+        "adds_hit_pct": 94.9367088607595,
+        "mean_new_numbers": 19.569620253164558,
+        "mean_overlap": 2.392405063291139,
+        "combined_hits": 1783,
+        "combined_per_draw": 3.2242314647377937,
+        "union_at_least_3_pct": 74.32188065099457,
+        "union_all_6_draws": 13,
+        "companion_hits": 1506,
+        "base_hits": 457,
+        "extra_when_base_zero": 582,
+        "base_zero_draws": 219,
+        "random_expected_extra": 1325.142857142857,
+        "extra_above_random": 0.8571428571428896,
+        "hits_per_100_new_numbers": 12.252818333025319
+      },
+      "evaluation": {
+        "strategies": [
+          "residual_coverage",
+          "entropy",
+          "doublet_triplet_markov",
+          "randomness"
+        ],
+        "draws": 238,
+        "extra_hits": 569,
+        "extra_per_draw": 2.3907563025210083,
+        "adds_hit_pct": 94.53781512605042,
+        "mean_new_numbers": 19.764705882352942,
+        "mean_overlap": 2.1512605042016806,
+        "combined_hits": 767,
+        "combined_per_draw": 3.222689075630252,
+        "union_at_least_3_pct": 73.94957983193277,
+        "union_all_6_draws": 3,
+        "companion_hits": 641,
+        "base_hits": 198,
+        "extra_when_base_zero": 241,
+        "base_zero_draws": 90,
+        "random_expected_extra": 576.0,
+        "extra_above_random": -7.0,
+        "hits_per_100_new_numbers": 12.09608843537415
+      }
+    },
+    {
+      "selection": {
+        "strategies": [
+          "residual_coverage",
+          "entropy",
+          "doublet_triplet_markov",
+          "randomness",
+          "border_group_bayesian"
+        ],
+        "draws": 553,
+        "extra_hits": 1534,
+        "extra_per_draw": 2.7739602169981916,
+        "adds_hit_pct": 97.2875226039783,
+        "mean_new_numbers": 22.647377938517177,
+        "mean_overlap": 3.0687160940325495,
+        "combined_hits": 1991,
+        "combined_per_draw": 3.600361663652803,
+        "union_at_least_3_pct": 82.45931283905968,
+        "union_all_6_draws": 19,
+        "companion_hits": 1770,
+        "base_hits": 457,
+        "extra_when_base_zero": 678,
+        "base_zero_draws": 219,
+        "random_expected_extra": 1533.5510204081634,
+        "extra_above_random": 0.4489795918366326,
+        "hits_per_100_new_numbers": 12.24848291280741
+      },
+      "evaluation": {
+        "strategies": [
+          "residual_coverage",
+          "entropy",
+          "doublet_triplet_markov",
+          "randomness",
+          "border_group_bayesian"
+        ],
+        "draws": 238,
+        "extra_hits": 656,
+        "extra_per_draw": 2.7563025210084033,
+        "adds_hit_pct": 95.3781512605042,
+        "mean_new_numbers": 22.6218487394958,
+        "mean_overlap": 2.9327731092436973,
+        "combined_hits": 854,
+        "combined_per_draw": 3.588235294117647,
+        "union_at_least_3_pct": 82.77310924369748,
+        "union_all_6_draws": 4,
+        "companion_hits": 749,
+        "base_hits": 198,
+        "extra_when_base_zero": 279,
+        "base_zero_draws": 90,
+        "random_expected_extra": 659.265306122449,
+        "extra_above_random": -3.265306122449033,
+        "hits_per_100_new_numbers": 12.184249628528974
+      }
+    }
+  ],
+  "whole_portfolio": {
+    "full": {
+      "strategies": [
+        "emd",
+        "recurrence_dynamics",
+        "randomness",
+        "categorical_chi_square",
+        "entropy",
+        "mksp",
+        "bayesian",
+        "predictive_grid",
+        "doublet_triplet_markov",
+        "tbl",
+        "decision_tree_selector",
+        "border_group_bayesian",
+        "residual_coverage"
+      ],
+      "draws": 791,
+      "extra_hits": 2975,
+      "extra_per_draw": 3.7610619469026547,
+      "adds_hit_pct": 99.49431099873578,
+      "mean_new_numbers": 30.629582806573957,
+      "mean_overlap": 5.2187104930467765,
+      "combined_hits": 3630,
+      "combined_per_draw": 4.589127686472819,
+      "union_at_least_3_pct": 96.83944374209861,
+      "union_all_6_draws": 154,
+      "companion_hits": 3540,
+      "base_hits": 655,
+      "extra_when_base_zero": 1322,
+      "base_zero_draws": 309,
+      "random_expected_extra": 2966.6938775510203,
+      "extra_above_random": 8.30612244897975,
+      "hits_per_100_new_numbers": 12.279181112762094
+    },
+    "selection_first_70pct": {
+      "strategies": [
+        "emd",
+        "recurrence_dynamics",
+        "randomness",
+        "categorical_chi_square",
+        "entropy",
+        "mksp",
+        "bayesian",
+        "predictive_grid",
+        "doublet_triplet_markov",
+        "tbl",
+        "decision_tree_selector",
+        "border_group_bayesian",
+        "residual_coverage"
+      ],
+      "draws": 553,
+      "extra_hits": 2063,
+      "extra_per_draw": 3.7305605786618443,
+      "adds_hit_pct": 99.45750452079567,
+      "mean_new_numbers": 30.260397830018082,
+      "mean_overlap": 5.2025316455696204,
+      "combined_hits": 2520,
+      "combined_per_draw": 4.556962025316456,
+      "union_at_least_3_pct": 96.92585895117541,
+      "union_all_6_draws": 98,
+      "companion_hits": 2459,
+      "base_hits": 457,
+      "extra_when_base_zero": 929,
+      "base_zero_draws": 219,
+      "random_expected_extra": 2049.061224489796,
+      "extra_above_random": 13.938775510203868,
+      "hits_per_100_new_numbers": 12.328194095852755
+    },
+    "evaluation_last_30pct": {
+      "strategies": [
+        "emd",
+        "recurrence_dynamics",
+        "randomness",
+        "categorical_chi_square",
+        "entropy",
+        "mksp",
+        "bayesian",
+        "predictive_grid",
+        "doublet_triplet_markov",
+        "tbl",
+        "decision_tree_selector",
+        "border_group_bayesian",
+        "residual_coverage"
+      ],
+      "draws": 238,
+      "extra_hits": 912,
+      "extra_per_draw": 3.831932773109244,
+      "adds_hit_pct": 99.5798319327731,
+      "mean_new_numbers": 31.48739495798319,
+      "mean_overlap": 5.256302521008403,
+      "combined_hits": 1110,
+      "combined_per_draw": 4.663865546218488,
+      "union_at_least_3_pct": 96.63865546218487,
+      "union_all_6_draws": 56,
+      "companion_hits": 1081,
+      "base_hits": 198,
+      "extra_when_base_zero": 393,
+      "base_zero_draws": 90,
+      "random_expected_extra": 917.6326530612245,
+      "extra_above_random": -5.63265306122446,
+      "hits_per_100_new_numbers": 12.169735788630904
+    },
+    "latest_100": {
+      "strategies": [
+        "emd",
+        "recurrence_dynamics",
+        "randomness",
+        "categorical_chi_square",
+        "entropy",
+        "mksp",
+        "bayesian",
+        "predictive_grid",
+        "doublet_triplet_markov",
+        "tbl",
+        "decision_tree_selector",
+        "border_group_bayesian",
+        "residual_coverage"
+      ],
+      "draws": 100,
+      "extra_hits": 383,
+      "extra_per_draw": 3.83,
+      "adds_hit_pct": 99.0,
+      "mean_new_numbers": 31.67,
+      "mean_overlap": 5.38,
+      "combined_hits": 470,
+      "combined_per_draw": 4.7,
+      "union_at_least_3_pct": 97.0,
+      "union_all_6_draws": 24,
+      "companion_hits": 461,
+      "base_hits": 87,
+      "extra_when_base_zero": 161,
+      "base_zero_draws": 37,
+      "random_expected_extra": 387.7959183673469,
+      "extra_above_random": -4.795918367346928,
+      "hits_per_100_new_numbers": 12.093463845910957
+    }
+  }
+}

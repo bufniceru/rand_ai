@@ -1,0 +1,3 @@
+PASS: 52 single-strategy totals independently recomputed; union identities and slice counts checked.
+PASS: 100 forecasts match after removing all subsequent draws, for every enabled strategy.
+PASS: script lint and formatting.
