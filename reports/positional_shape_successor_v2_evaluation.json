@@ -1,0 +1,514 @@
+{
+  "source": "D:\\LOTTO\\lotto_results_2019.yaml",
+  "source_sha256": "3ed97ac331b5e442b8924389e09ff2f790811a2dfc216f1b0cabceb6920a794b",
+  "settings": {
+    "central_band_sd": 0.5,
+    "profile_weight": 0.5,
+    "neighbors": 32,
+    "prior": 8,
+    "confidence": "mean similarity * effective neighbors / (effective neighbors + 8)"
+  },
+  "method": "Fixed settings; chronological observed prefixes; no parameter tuning. Last 30% is a diagnostic subset, not a fresh holdout because history was examined previously. Other-strategy predictions reused after hash and draw alignment checks.",
+  "confidence_note": "Uniform shrinkage changes score strength, not mathematical rank; profile-only and V2 should select the same top six. Score MSE is a diagnostic, not proof of calibration.",
+  "full": {
+    "evaluated_draws": 791,
+    "strategies": {
+      "positional_shape_successor": {
+        "total_hits": 636,
+        "average_hits": 0.8040455120101138,
+        "hit_distribution": {
+          "0": 303,
+          "1": 354,
+          "2": 120,
+          "3": 14,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        },
+        "mean_squared_score_error": 0.10912390302401004
+      },
+      "positional_shape_successor_v2": {
+        "total_hits": 619,
+        "average_hits": 0.7825537294563844,
+        "hit_distribution": {
+          "0": 323,
+          "1": 335,
+          "2": 116,
+          "3": 16,
+          "4": 1,
+          "5": 0,
+          "6": 0
+        },
+        "mean_squared_score_error": 0.10822211719830016
+      },
+      "profile_only": {
+        "total_hits": 619,
+        "average_hits": 0.7825537294563844,
+        "hit_distribution": {
+          "0": 323,
+          "1": 335,
+          "2": 116,
+          "3": 16,
+          "4": 1,
+          "5": 0,
+          "6": 0
+        },
+        "mean_squared_score_error": 0.10935698071964886
+      },
+      "confidence_only": {
+        "total_hits": 636,
+        "average_hits": 0.8040455120101138,
+        "hit_distribution": {
+          "0": 303,
+          "1": 354,
+          "2": 120,
+          "3": 14,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        },
+        "mean_squared_score_error": 0.10802634345157576
+      },
+      "random_baseline": {
+        "total_hits": 590,
+        "average_hits": 0.7458912768647282,
+        "hit_distribution": {
+          "0": 331,
+          "1": 346,
+          "2": 98,
+          "3": 16,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "emd": {
+        "total_hits": 612,
+        "average_hits": 0.7737041719342604,
+        "hit_distribution": {
+          "0": 306,
+          "1": 373,
+          "2": 97,
+          "3": 15,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "svc_recurrence_hybrid": {
+        "total_hits": 655,
+        "average_hits": 0.8280657395701644,
+        "hit_distribution": {
+          "0": 309,
+          "1": 329,
+          "2": 133,
+          "3": 20,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      }
+    },
+    "v2_overlap": {
+      "positional_shape_successor": {
+        "average_shared_numbers": 4.5701643489254105,
+        "identical_tickets": 143,
+        "additional_v2_hits": 142,
+        "draws_with_additional_v2_hit": 135
+      },
+      "emd": {
+        "average_shared_numbers": 2.6118836915297092,
+        "identical_tickets": 23,
+        "additional_v2_hits": 343,
+        "draws_with_additional_v2_hit": 297
+      },
+      "svc_recurrence_hybrid": {
+        "average_shared_numbers": 1.5271807838179519,
+        "identical_tickets": 1,
+        "additional_v2_hits": 439,
+        "draws_with_additional_v2_hit": 362
+      }
+    }
+  },
+  "first_70_percent": {
+    "evaluated_draws": 553,
+    "strategies": {
+      "positional_shape_successor": {
+        "total_hits": 469,
+        "average_hits": 0.8481012658227848,
+        "hit_distribution": {
+          "0": 196,
+          "1": 253,
+          "2": 96,
+          "3": 8,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        },
+        "mean_squared_score_error": 0.10897654840792062
+      },
+      "positional_shape_successor_v2": {
+        "total_hits": 450,
+        "average_hits": 0.8137432188065099,
+        "hit_distribution": {
+          "0": 215,
+          "1": 240,
+          "2": 85,
+          "3": 12,
+          "4": 1,
+          "5": 0,
+          "6": 0
+        },
+        "mean_squared_score_error": 0.10806490190266999
+      },
+      "profile_only": {
+        "total_hits": 450,
+        "average_hits": 0.8137432188065099,
+        "hit_distribution": {
+          "0": 215,
+          "1": 240,
+          "2": 85,
+          "3": 12,
+          "4": 1,
+          "5": 0,
+          "6": 0
+        },
+        "mean_squared_score_error": 0.10919196052365494
+      },
+      "confidence_only": {
+        "total_hits": 469,
+        "average_hits": 0.8481012658227848,
+        "hit_distribution": {
+          "0": 196,
+          "1": 253,
+          "2": 96,
+          "3": 8,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        },
+        "mean_squared_score_error": 0.10787987724188274
+      },
+      "random_baseline": {
+        "total_hits": 417,
+        "average_hits": 0.7540687160940326,
+        "hit_distribution": {
+          "0": 231,
+          "1": 239,
+          "2": 71,
+          "3": 12,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "emd": {
+        "total_hits": 432,
+        "average_hits": 0.7811934900542495,
+        "hit_distribution": {
+          "0": 207,
+          "1": 266,
+          "2": 74,
+          "3": 6,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "svc_recurrence_hybrid": {
+        "total_hits": 457,
+        "average_hits": 0.8264014466546112,
+        "hit_distribution": {
+          "0": 219,
+          "1": 227,
+          "2": 91,
+          "3": 16,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      }
+    },
+    "v2_overlap": {
+      "positional_shape_successor": {
+        "average_shared_numbers": 4.6600361663652805,
+        "identical_tickets": 111,
+        "additional_v2_hits": 93,
+        "draws_with_additional_v2_hit": 90
+      },
+      "emd": {
+        "average_shared_numbers": 2.969258589511754,
+        "identical_tickets": 23,
+        "additional_v2_hits": 231,
+        "draws_with_additional_v2_hit": 197
+      },
+      "svc_recurrence_hybrid": {
+        "average_shared_numbers": 1.5370705244122966,
+        "identical_tickets": 1,
+        "additional_v2_hits": 319,
+        "draws_with_additional_v2_hit": 263
+      }
+    }
+  },
+  "last_30_percent": {
+    "evaluated_draws": 238,
+    "strategies": {
+      "positional_shape_successor": {
+        "total_hits": 167,
+        "average_hits": 0.7016806722689075,
+        "hit_distribution": {
+          "0": 107,
+          "1": 101,
+          "2": 24,
+          "3": 6,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        },
+        "mean_squared_score_error": 0.1094662858084531
+      },
+      "positional_shape_successor_v2": {
+        "total_hits": 169,
+        "average_hits": 0.7100840336134454,
+        "hit_distribution": {
+          "0": 108,
+          "1": 95,
+          "2": 31,
+          "3": 4,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        },
+        "mean_squared_score_error": 0.10858741156167616
+      },
+      "profile_only": {
+        "total_hits": 169,
+        "average_hits": 0.7100840336134454,
+        "hit_distribution": {
+          "0": 108,
+          "1": 95,
+          "2": 31,
+          "3": 4,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        },
+        "mean_squared_score_error": 0.10974040999857589
+      },
+      "confidence_only": {
+        "total_hits": 167,
+        "average_hits": 0.7016806722689075,
+        "hit_distribution": {
+          "0": 107,
+          "1": 101,
+          "2": 24,
+          "3": 6,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        },
+        "mean_squared_score_error": 0.10836666199762719
+      },
+      "random_baseline": {
+        "total_hits": 173,
+        "average_hits": 0.726890756302521,
+        "hit_distribution": {
+          "0": 100,
+          "1": 107,
+          "2": 27,
+          "3": 4,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "emd": {
+        "total_hits": 180,
+        "average_hits": 0.7563025210084033,
+        "hit_distribution": {
+          "0": 99,
+          "1": 107,
+          "2": 23,
+          "3": 9,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "svc_recurrence_hybrid": {
+        "total_hits": 198,
+        "average_hits": 0.8319327731092437,
+        "hit_distribution": {
+          "0": 90,
+          "1": 102,
+          "2": 42,
+          "3": 4,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      }
+    },
+    "v2_overlap": {
+      "positional_shape_successor": {
+        "average_shared_numbers": 4.361344537815126,
+        "identical_tickets": 32,
+        "additional_v2_hits": 49,
+        "draws_with_additional_v2_hit": 45
+      },
+      "emd": {
+        "average_shared_numbers": 1.781512605042017,
+        "identical_tickets": 0,
+        "additional_v2_hits": 112,
+        "draws_with_additional_v2_hit": 100
+      },
+      "svc_recurrence_hybrid": {
+        "average_shared_numbers": 1.504201680672269,
+        "identical_tickets": 0,
+        "additional_v2_hits": 120,
+        "draws_with_additional_v2_hit": 99
+      }
+    }
+  },
+  "latest_100": {
+    "evaluated_draws": 100,
+    "strategies": {
+      "positional_shape_successor": {
+        "total_hits": 64,
+        "average_hits": 0.64,
+        "hit_distribution": {
+          "0": 49,
+          "1": 40,
+          "2": 9,
+          "3": 2,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        },
+        "mean_squared_score_error": 0.10990204737498614
+      },
+      "positional_shape_successor_v2": {
+        "total_hits": 59,
+        "average_hits": 0.59,
+        "hit_distribution": {
+          "0": 52,
+          "1": 39,
+          "2": 7,
+          "3": 2,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        },
+        "mean_squared_score_error": 0.10882398263383453
+      },
+      "profile_only": {
+        "total_hits": 59,
+        "average_hits": 0.59,
+        "hit_distribution": {
+          "0": 52,
+          "1": 39,
+          "2": 7,
+          "3": 2,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        },
+        "mean_squared_score_error": 0.11007392635098678
+      },
+      "confidence_only": {
+        "total_hits": 64,
+        "average_hits": 0.64,
+        "hit_distribution": {
+          "0": 49,
+          "1": 40,
+          "2": 9,
+          "3": 2,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        },
+        "mean_squared_score_error": 0.10868154723366824
+      },
+      "random_baseline": {
+        "total_hits": 80,
+        "average_hits": 0.8,
+        "hit_distribution": {
+          "0": 36,
+          "1": 50,
+          "2": 12,
+          "3": 2,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "emd": {
+        "total_hits": 67,
+        "average_hits": 0.67,
+        "hit_distribution": {
+          "0": 50,
+          "1": 37,
+          "2": 9,
+          "3": 4,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "svc_recurrence_hybrid": {
+        "total_hits": 87,
+        "average_hits": 0.87,
+        "hit_distribution": {
+          "0": 37,
+          "1": 41,
+          "2": 20,
+          "3": 2,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      }
+    },
+    "v2_overlap": {
+      "positional_shape_successor": {
+        "average_shared_numbers": 4.34,
+        "identical_tickets": 11,
+        "additional_v2_hits": 13,
+        "draws_with_additional_v2_hit": 12
+      },
+      "emd": {
+        "average_shared_numbers": 1.77,
+        "identical_tickets": 0,
+        "additional_v2_hits": 44,
+        "draws_with_additional_v2_hit": 40
+      },
+      "svc_recurrence_hybrid": {
+        "average_shared_numbers": 1.54,
+        "identical_tickets": 0,
+        "additional_v2_hits": 37,
+        "draws_with_additional_v2_hit": 32
+      }
+    }
+  },
+  "latest_prediction": {
+    "reference_draw": 792,
+    "top_six": {
+      "positional_shape_successor": [
+        49,
+        28,
+        37,
+        14,
+        18,
+        7
+      ],
+      "positional_shape_successor_v2": [
+        49,
+        14,
+        28,
+        37,
+        7,
+        36
+      ]
+    }
+  }
+}

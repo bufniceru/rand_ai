@@ -7,6 +7,7 @@ export const strategyNames: Record<StrategyId, string> = {
   randomness: "Random baseline",
   recurrence_dynamics: "Recurrence Dynamics",
   positional_shape_successor: "Positional Shape Successor",
+  positional_shape_successor_v2: "Positional Shape Successor V2",
   fresh_random: "Fresh Random",
   chi_square: "Chi-square Frequency",
   categorical_chi_square: "Categorical Chi-square",

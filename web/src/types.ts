@@ -26,6 +26,7 @@ export type StrategyId =
   | "emd"
   | "recurrence_dynamics"
   | "positional_shape_successor"
+  | "positional_shape_successor_v2"
   | "randomness"
   | "fresh_random"
   | "chi_square"

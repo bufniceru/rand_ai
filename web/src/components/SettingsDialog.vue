@@ -40,6 +40,7 @@ const strategyDescriptions: Record<StrategyId, string> = {
   recurrence_dynamics:
     "Experimental V2 three-draw recurrence using eight causal value analogues.",
   randomness: "Deterministic random comparison baseline.",
+  positional_shape_successor_v2: "Joint center/tail patterns and central shares, with confidence shrinkage for weak or scarce historical matches. Experimental model scores.",
   positional_shape_successor: "Joint positional and group shapes: scores from the successors of 32 similar historical draws. Experimental model scores.",
   fresh_random: "Seeded random ranking guided 35% by freshness.",
   chi_square: "Signed frequency deviation from uniform random expectation.",

@@ -75,7 +75,7 @@ DEFAULT_STRATEGY_IDS = tuple(
         "decision_tree_selector",
         "recurrence_dynamics",
         "positional_shape_successor",
-        "positional_shape_successor",
+        "positional_shape_successor_v2",
         "svc_recurrence_hybrid",
         "svc_recurrence_proximity_hybrid",
         "srph_residual_diversity_hybrid",
@@ -88,7 +88,7 @@ STATISTICS_COMMAND_IDS = (
     "statistics.group-frequency",
     "statistics.gap-statistics",
 )
-STRATEGY_CACHE_SCHEMA_VERSION = 22
+STRATEGY_CACHE_SCHEMA_VERSION = 23
 STRATEGY_CACHE_MAX_ENTRIES = 20
 STRATEGY_CACHE_MAX_BYTES = 1024 * 1024 * 1024
 PROGRESS_PREFIX = "RAND_AI_PROGRESS "

@@ -22,6 +22,7 @@ from rand_ai.nonlinear_dynamics import (
 )
 from rand_ai.prediction import CombinedPrediction
 from rand_ai.positional_shape_successor import PositionalShapeSuccessorModel
+from rand_ai.positional_shape_successor_v2 import PositionalShapeSuccessorV2Model
 from rand_ai.sparse_neural_ticket import (
     SparseNeuralTicketArtifact,
     history_fingerprint,
@@ -199,6 +200,7 @@ _BASE_STRATEGY_IDS = (
     "emd",
     "recurrence_dynamics",
     "positional_shape_successor",
+    "positional_shape_successor_v2",
     "randomness",
     "fresh_random",
     "chi_square",
@@ -378,6 +380,7 @@ _STRATEGY_DEPENDENCIES = {
     "residual_coverage": set(_BASE_STRATEGY_IDS).difference(
         {
             "positional_shape_successor",
+            "positional_shape_successor_v2",
             "mknp",
             "mkrd",
             "mkgsv",
@@ -820,6 +823,11 @@ class _StrategyState:
         self.border_groups = (
             SpaceGroupForecaster(self.border_space, target_group_count)
             if self.enabled_strategy_ids.intersection(BORDER_GROUP_MODEL_IDS)
+            else None
+        )
+        self.positional_shape_successor_v2 = (
+            PositionalShapeSuccessorV2Model()
+            if "positional_shape_successor_v2" in self.enabled_strategy_ids
             else None
         )
         self.positional_shape_successor = (
@@ -2761,6 +2769,8 @@ class _StrategyState:
         )
         entropy_percent = _gap_entropy_percent(tuple(drawn)) if entropy_enabled else 0.0
         ordered = sorted(drawn)
+        if self.positional_shape_successor_v2 is not None:
+            self.positional_shape_successor_v2.observe(drawn)
         if self.positional_shape_successor is not None:
             self.positional_shape_successor.observe(drawn)
         if self.recurrence_dynamics is not None:
@@ -5048,6 +5058,21 @@ class _StrategyState:
                     shape_scores,
                     gaps,
                     shape_details,
+                )
+
+        if self.positional_shape_successor_v2 is not None:
+            shape_v2_scores, shape_v2_details = self.positional_shape_successor_v2.predict()
+            rankings["positional_shape_successor_v2"] = _ranking_from_scores(
+                shape_v2_scores, gaps
+            )
+            if "positional_shape_successor_v2" in requested:
+                built["positional_shape_successor_v2"] = _strategy(
+                    "positional_shape_successor_v2",
+                    "Positional Shape Successor V2",
+                    "Joint center/tail profiles with similarity confidence and known successors.",
+                    shape_v2_scores,
+                    gaps,
+                    shape_v2_details,
                 )
 
         random_ranking: list[int] = []

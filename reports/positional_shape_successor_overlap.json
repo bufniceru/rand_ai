@@ -1,0 +1,134 @@
+{
+  "draws": 791,
+  "source_sha256": "3ed97ac331b5e442b8924389e09ff2f790811a2dfc216f1b0cabceb6920a794b",
+  "comparison_source": "Previously saved other-strategy forecasts, border space 7; validated draw-by-draw alignment",
+  "random_expected_overlap": 0.7346938775510204,
+  "strategies": [
+    {
+      "strategy": "emd",
+      "average_overlap": 2.6055625790139065,
+      "same_ticket": 21,
+      "shared_hits": 273,
+      "additional_shape_hits": 363,
+      "draws_adding_hit": 312,
+      "partner_hits": 612
+    },
+    {
+      "strategy": "predictive_grid",
+      "average_overlap": 2.0240202275600505,
+      "same_ticket": 2,
+      "shared_hits": 214,
+      "additional_shape_hits": 422,
+      "draws_adding_hit": 353,
+      "partner_hits": 606
+    },
+    {
+      "strategy": "recurrence_dynamics",
+      "average_overlap": 1.8912768647281921,
+      "same_ticket": 1,
+      "shared_hits": 196,
+      "additional_shape_hits": 440,
+      "draws_adding_hit": 352,
+      "partner_hits": 638
+    },
+    {
+      "strategy": "categorical_chi_square",
+      "average_overlap": 1.8015170670037928,
+      "same_ticket": 2,
+      "shared_hits": 189,
+      "additional_shape_hits": 447,
+      "draws_adding_hit": 370,
+      "partner_hits": 619
+    },
+    {
+      "strategy": "bayesian",
+      "average_overlap": 1.6877370417193427,
+      "same_ticket": 4,
+      "shared_hits": 180,
+      "additional_shape_hits": 456,
+      "draws_adding_hit": 374,
+      "partner_hits": 615
+    },
+    {
+      "strategy": "svc_recurrence_hybrid",
+      "average_overlap": 1.4993678887484196,
+      "same_ticket": 0,
+      "shared_hits": 171,
+      "additional_shape_hits": 465,
+      "draws_adding_hit": 383,
+      "partner_hits": 655
+    },
+    {
+      "strategy": "decision_tree_selector",
+      "average_overlap": 1.2895069532237673,
+      "same_ticket": 1,
+      "shared_hits": 154,
+      "additional_shape_hits": 482,
+      "draws_adding_hit": 389,
+      "partner_hits": 624
+    },
+    {
+      "strategy": "mksp",
+      "average_overlap": 1.1946902654867257,
+      "same_ticket": 0,
+      "shared_hits": 132,
+      "additional_shape_hits": 504,
+      "draws_adding_hit": 401,
+      "partner_hits": 613
+    },
+    {
+      "strategy": "doublet_triplet_markov",
+      "average_overlap": 1.145385587863464,
+      "same_ticket": 0,
+      "shared_hits": 123,
+      "additional_shape_hits": 513,
+      "draws_adding_hit": 421,
+      "partner_hits": 609
+    },
+    {
+      "strategy": "tbl",
+      "average_overlap": 0.988621997471555,
+      "same_ticket": 2,
+      "shared_hits": 111,
+      "additional_shape_hits": 525,
+      "draws_adding_hit": 422,
+      "partner_hits": 612
+    },
+    {
+      "strategy": "border_group_bayesian",
+      "average_overlap": 0.9683944374209861,
+      "same_ticket": 0,
+      "shared_hits": 103,
+      "additional_shape_hits": 533,
+      "draws_adding_hit": 424,
+      "partner_hits": 615
+    },
+    {
+      "strategy": "randomness",
+      "average_overlap": 0.797724399494311,
+      "same_ticket": 0,
+      "shared_hits": 77,
+      "additional_shape_hits": 559,
+      "draws_adding_hit": 447,
+      "partner_hits": 590
+    },
+    {
+      "strategy": "entropy",
+      "average_overlap": 0.5562579013906448,
+      "same_ticket": 0,
+      "shared_hits": 60,
+      "additional_shape_hits": 576,
+      "draws_adding_hit": 452,
+      "partner_hits": 595
+    },
+    {
+      "strategy": "residual_coverage",
+      "average_overlap": 0.37041719342604296,
+      "same_ticket": 0,
+      "shared_hits": 40,
+      "additional_shape_hits": 596,
+      "draws_adding_hit": 472,
+      "partner_hits": 541
+    }
+  ]
+}
