@@ -971,8 +971,8 @@ function possibleDrawStateLabel(number: number): string {
                   'is-in-selected-coverage-zone':
                     selectedCoverageThreshold !== null &&
                     cell.reports.length >= selectedCoverageThreshold,
-                  'possible-candidate': possibleDrawState(cell.number) === 'candidate',
-                  'possible-fixed': possibleDrawState(cell.number) === 'fixed',
+                  'possible-candidate': isLatestPrediction && possibleDrawState(cell.number) === 'candidate',
+                  'possible-fixed': isLatestPrediction && possibleDrawState(cell.number) === 'fixed',
                   'possible-excluded': possibleDrawState(cell.number) === 'excluded',
                   'possible-readonly': !isLatestPrediction,
                 }"
