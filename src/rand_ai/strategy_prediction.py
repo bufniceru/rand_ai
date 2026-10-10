@@ -200,7 +200,7 @@ _BASE_STRATEGY_IDS = (
     "emd",
     "recurrence_dynamics",
     "positional_shape_successor",
-    "positional_shape_successor_v2",
+    "emd_positional_shape_v2_hybrid",
     "randomness",
     "fresh_random",
     "chi_square",
@@ -344,6 +344,7 @@ _DECISION_TREE_FEATURE_NAMES = (
     ),
 )
 _STRATEGY_DEPENDENCIES = {
+    "emd_positional_shape_v2_hybrid": {"emd", "positional_shape_successor_v2"},
     "mkgsv": {"markov100"},
     "tbl": {"freshness", "proximity", "randomness"},
     "fresh_random": {"freshness", "randomness"},
@@ -381,6 +382,7 @@ _STRATEGY_DEPENDENCIES = {
         {
             "positional_shape_successor",
             "positional_shape_successor_v2",
+            "emd_positional_shape_v2_hybrid",
             "mknp",
             "mkrd",
             "mkgsv",
@@ -555,6 +557,36 @@ def _ranking_from_scores(
         scores,
         key=lambda number: (-scores[number], -gaps[number], number),
     )
+
+
+def _emd_shape_v2_scores(
+    rankings: dict[str, list[int]],
+) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
+    """Blend EMD and V2 rank strengths equally without comparing raw score scales."""
+    rank_maps = {
+        strategy_id: {
+            number: rank for rank, number in enumerate(rankings[strategy_id], start=1)
+        }
+        for strategy_id in ("emd", "positional_shape_successor_v2")
+    }
+    scores = {
+        number: (
+            0.5 * (_NUMBER_COUNT - rank_maps["emd"][number]) / (_NUMBER_COUNT - 1)
+            + 0.5
+            * (_NUMBER_COUNT - rank_maps["positional_shape_successor_v2"][number])
+            / (_NUMBER_COUNT - 1)
+        )
+        for number in range(1, _NUMBER_COUNT + 1)
+    }
+    details: dict[int, tuple[str, ...]] = {
+        number: (
+            f"EMD weight 50%; rank #{rank_maps['emd'][number]}",
+            f"Positional Shape V2 weight 50%; rank #{rank_maps['positional_shape_successor_v2'][number]}",
+            "Equal-weight rank score; not a calibrated probability",
+        )
+        for number in range(1, _NUMBER_COUNT + 1)
+    }
+    return scores, details
 
 
 def _rank_strength(ranking: Sequence[int], number: int) -> float:
@@ -5065,14 +5097,20 @@ class _StrategyState:
             rankings["positional_shape_successor_v2"] = _ranking_from_scores(
                 shape_v2_scores, gaps
             )
-            if "positional_shape_successor_v2" in requested:
-                built["positional_shape_successor_v2"] = _strategy(
-                    "positional_shape_successor_v2",
-                    "Positional Shape Successor V2",
-                    "Joint center/tail profiles with similarity confidence and known successors.",
-                    shape_v2_scores,
+
+        if "emd_positional_shape_v2_hybrid" in enabled:
+            hybrid_scores, hybrid_details = _emd_shape_v2_scores(rankings)
+            rankings["emd_positional_shape_v2_hybrid"] = _ranking_from_scores(
+                hybrid_scores, gaps
+            )
+            if "emd_positional_shape_v2_hybrid" in requested:
+                built["emd_positional_shape_v2_hybrid"] = _strategy(
+                    "emd_positional_shape_v2_hybrid",
+                    "EMD + Positional Shape V2",
+                    "Equal-weight rank blend of EMD and Positional Shape Successor V2.",
+                    hybrid_scores,
                     gaps,
-                    shape_v2_details,
+                    hybrid_details,
                 )
 
         random_ranking: list[int] = []

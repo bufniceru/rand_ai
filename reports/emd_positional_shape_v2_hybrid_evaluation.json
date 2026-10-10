@@ -1,0 +1,286 @@
+{
+  "source": "D:\\LOTTO\\lotto_results_2019.yaml",
+  "source_sha256": "3ed97ac331b5e442b8924389e09ff2f790811a2dfc216f1b0cabceb6920a794b",
+  "method": "Chronological observed prefixes; fixed 50/50 rank-strength blend, no tuning. Last 30% is a diagnostic subset of previously examined history. Standalone V2 is an evaluation reference, not a selectable strategy.",
+  "full": {
+    "evaluated_draws": 791,
+    "strategies": {
+      "emd": {
+        "total_hits": 612,
+        "average_hits": 0.7737041719342604,
+        "hit_distribution": {
+          "0": 306,
+          "1": 373,
+          "2": 97,
+          "3": 15,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "positional_shape_successor": {
+        "total_hits": 636,
+        "average_hits": 0.8040455120101138,
+        "hit_distribution": {
+          "0": 303,
+          "1": 354,
+          "2": 120,
+          "3": 14,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "emd_positional_shape_v2_hybrid": {
+        "total_hits": 647,
+        "average_hits": 0.8179519595448799,
+        "hit_distribution": {
+          "0": 303,
+          "1": 349,
+          "2": 119,
+          "3": 20,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "standalone_v2_reference": {
+        "total_hits": 619,
+        "average_hits": 0.7825537294563844,
+        "hit_distribution": {
+          "0": 323,
+          "1": 335,
+          "2": 116,
+          "3": 16,
+          "4": 1,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "random_baseline": {
+        "total_hits": 590,
+        "average_hits": 0.7458912768647282,
+        "hit_distribution": {
+          "0": 331,
+          "1": 346,
+          "2": 98,
+          "3": 16,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      }
+    },
+    "hybrid_overlap": {
+      "emd": {
+        "average_shared_numbers": 3.9936788874841973,
+        "identical_tickets": 56,
+        "additional_hybrid_hits": 216,
+        "draws_adding_hit": 204
+      },
+      "standalone_v2_reference": {
+        "average_shared_numbers": 4.13527180783818,
+        "identical_tickets": 65,
+        "additional_hybrid_hits": 215,
+        "draws_adding_hit": 198
+      },
+      "positional_shape_successor": {
+        "average_shared_numbers": 3.8217446270543616,
+        "identical_tickets": 39,
+        "additional_hybrid_hits": 242,
+        "draws_adding_hit": 215
+      }
+    }
+  },
+  "last_30_percent": {
+    "evaluated_draws": 238,
+    "strategies": {
+      "emd": {
+        "total_hits": 180,
+        "average_hits": 0.7563025210084033,
+        "hit_distribution": {
+          "0": 99,
+          "1": 107,
+          "2": 23,
+          "3": 9,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "positional_shape_successor": {
+        "total_hits": 167,
+        "average_hits": 0.7016806722689075,
+        "hit_distribution": {
+          "0": 107,
+          "1": 101,
+          "2": 24,
+          "3": 6,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "emd_positional_shape_v2_hybrid": {
+        "total_hits": 198,
+        "average_hits": 0.8319327731092437,
+        "hit_distribution": {
+          "0": 87,
+          "1": 109,
+          "2": 37,
+          "3": 5,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "standalone_v2_reference": {
+        "total_hits": 169,
+        "average_hits": 0.7100840336134454,
+        "hit_distribution": {
+          "0": 108,
+          "1": 95,
+          "2": 31,
+          "3": 4,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "random_baseline": {
+        "total_hits": 173,
+        "average_hits": 0.726890756302521,
+        "hit_distribution": {
+          "0": 100,
+          "1": 107,
+          "2": 27,
+          "3": 4,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      }
+    },
+    "hybrid_overlap": {
+      "emd": {
+        "average_shared_numbers": 3.453781512605042,
+        "identical_tickets": 0,
+        "additional_hybrid_hits": 81,
+        "draws_adding_hit": 77
+      },
+      "standalone_v2_reference": {
+        "average_shared_numbers": 3.6470588235294117,
+        "identical_tickets": 4,
+        "additional_hybrid_hits": 88,
+        "draws_adding_hit": 77
+      },
+      "positional_shape_successor": {
+        "average_shared_numbers": 3.403361344537815,
+        "identical_tickets": 2,
+        "additional_hybrid_hits": 88,
+        "draws_adding_hit": 78
+      }
+    }
+  },
+  "latest_100": {
+    "evaluated_draws": 100,
+    "strategies": {
+      "emd": {
+        "total_hits": 67,
+        "average_hits": 0.67,
+        "hit_distribution": {
+          "0": 50,
+          "1": 37,
+          "2": 9,
+          "3": 4,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "positional_shape_successor": {
+        "total_hits": 64,
+        "average_hits": 0.64,
+        "hit_distribution": {
+          "0": 49,
+          "1": 40,
+          "2": 9,
+          "3": 2,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "emd_positional_shape_v2_hybrid": {
+        "total_hits": 80,
+        "average_hits": 0.8,
+        "hit_distribution": {
+          "0": 35,
+          "1": 50,
+          "2": 15,
+          "3": 0,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "standalone_v2_reference": {
+        "total_hits": 59,
+        "average_hits": 0.59,
+        "hit_distribution": {
+          "0": 52,
+          "1": 39,
+          "2": 7,
+          "3": 2,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      },
+      "random_baseline": {
+        "total_hits": 80,
+        "average_hits": 0.8,
+        "hit_distribution": {
+          "0": 36,
+          "1": 50,
+          "2": 12,
+          "3": 2,
+          "4": 0,
+          "5": 0,
+          "6": 0
+        }
+      }
+    },
+    "hybrid_overlap": {
+      "emd": {
+        "average_shared_numbers": 3.47,
+        "identical_tickets": 0,
+        "additional_hybrid_hits": 38,
+        "draws_adding_hit": 35
+      },
+      "standalone_v2_reference": {
+        "average_shared_numbers": 3.57,
+        "identical_tickets": 1,
+        "additional_hybrid_hits": 39,
+        "draws_adding_hit": 34
+      },
+      "positional_shape_successor": {
+        "average_shared_numbers": 3.41,
+        "identical_tickets": 1,
+        "additional_hybrid_hits": 36,
+        "draws_adding_hit": 33
+      }
+    }
+  },
+  "latest_prediction": {
+    "reference_draw": 792,
+    "hybrid_top_six": [
+      6,
+      36,
+      7,
+      26,
+      5,
+      14
+    ]
+  }
+}

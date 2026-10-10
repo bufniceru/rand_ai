@@ -76,7 +76,7 @@ const strategyPlugins = [
   },
   { id: "randomness", label: "Random baseline" },
   { id: "positional_shape_successor", label: "Positional Shape Successor" },
-  { id: "positional_shape_successor_v2", label: "Positional Shape Successor V2" },
+  { id: "emd_positional_shape_v2_hybrid", label: "EMD + Positional Shape V2" },
   { id: "fresh_random", label: "Fresh Random" },
   { id: "chi_square", label: "Chi-square Frequency" },
   { id: "categorical_chi_square", label: "Categorical Chi-square" },
@@ -142,7 +142,7 @@ const defaultStrategyPluginIds = strategyPlugins
       strategyId !== "decision_tree_selector" &&
       strategyId !== "recurrence_dynamics" &&
       strategyId !== "positional_shape_successor" &&
-      strategyId !== "positional_shape_successor_v2" &&
+      strategyId !== "emd_positional_shape_v2_hybrid" &&
       strategyId !== "svc_recurrence_hybrid" &&
       strategyId !== "svc_recurrence_proximity_hybrid" &&
       strategyId !== "srph_residual_diversity_hybrid" &&
@@ -416,7 +416,11 @@ function loadStrategyPreferences() {
     }
     const knownIds = new Set(strategyPlugins.map((plugin) => plugin.id));
     const selected = new Set(
-      parsed.enabledStrategies.filter(
+      parsed.enabledStrategies.map((strategyId) =>
+        strategyId === "positional_shape_successor_v2"
+          ? "emd_positional_shape_v2_hybrid"
+          : strategyId,
+      ).filter(
         (strategyId) =>
           typeof strategyId === "string" && knownIds.has(strategyId),
       ),

@@ -67,7 +67,7 @@ export const STRATEGY_FAMILY_BY_ID = {
   emd: "shape-similarity",
   recurrence_dynamics: "shape-similarity",
   positional_shape_successor: "shape-similarity",
-  positional_shape_successor_v2: "shape-similarity",
+  emd_positional_shape_v2_hybrid: "ensembles-coverage",
   randomness: "random-baselines",
   fresh_random: "random-baselines",
   chi_square: "frequency-recency",

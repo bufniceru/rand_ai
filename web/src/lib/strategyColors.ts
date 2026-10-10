@@ -18,7 +18,6 @@ export const STRATEGY_TONE_POSITION_BY_ID = {
   recurrence_dynamics: 2,
   predictive_grid: 3,
   positional_shape_successor: 4,
-  positional_shape_successor_v2: 5,
   markov100: 0,
   mkgsv: 1,
   mkfr: 2,
@@ -47,6 +46,7 @@ export const STRATEGY_TONE_POSITION_BY_ID = {
   border_group_hybrid: 5,
   residual_coverage: 7,
   chained: 8,
+  emd_positional_shape_v2_hybrid: 9,
   randomness: 0,
   fresh_random: 1,
 } as const satisfies Record<StrategyId, number>;

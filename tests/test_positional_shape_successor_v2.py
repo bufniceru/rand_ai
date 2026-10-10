@@ -20,7 +20,7 @@ from rand_ai.strategy_prediction import (
     build_prediction_suites,
 )
 
-ID = "positional_shape_successor_v2"
+ID = "emd_positional_shape_v2_hybrid"
 V1 = "positional_shape_successor"
 A = (1, 8, 20, 30, 40, 49)
 B = (2, 9, 21, 31, 41, 48)
