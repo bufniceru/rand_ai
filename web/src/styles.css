@@ -8996,3 +8996,20 @@ svg text {
   color: var(--monokai-muted);
   font-size: 0.8em;
 }
+
+.last-seen-header-number.possible-candidate,
+.last-seen-header-number.possible-fixed,
+.all-predictions-cell.possible-candidate,
+.all-predictions-cell.possible-fixed {
+  --theme-numbers-candidate: var(--theme-numbers-selectionGreen);
+  --theme-numbers-candidateBorder: var(--theme-numbers-selectionGreen);
+  --theme-numbers-candidateText: var(--theme-numbers-selectionGreenText);
+  --theme-numbers-fixed: var(--theme-numbers-selectionGreen);
+  --theme-numbers-fixedBorder: var(--theme-numbers-selectionGreen);
+  --theme-numbers-fixedText: var(--theme-numbers-selectionGreenText);
+}
+
+.all-predictions-cell.possible-candidate > strong,
+.all-predictions-cell.possible-fixed > strong {
+  color: var(--theme-numbers-selectionGreenText);
+}
