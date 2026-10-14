@@ -52,6 +52,7 @@ export type StrategyId =
   | "tbl"
   | "sklearn_svm"
   | "lag_logistic"
+  | "xgboost_classifier"
   | "sparse_neural_ticket"
   | "cis"
   | "decision_tree_selector"

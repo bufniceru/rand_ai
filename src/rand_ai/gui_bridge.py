@@ -71,6 +71,7 @@ DEFAULT_STRATEGY_IDS = tuple(
         "mkgsv",
         "sklearn_svm",
         "lag_logistic",
+        "xgboost_classifier",
         "sparse_neural_ticket",
         "decision_tree_selector",
         "recurrence_dynamics",
@@ -89,7 +90,7 @@ STATISTICS_COMMAND_IDS = (
     "statistics.group-frequency",
     "statistics.gap-statistics",
 )
-STRATEGY_CACHE_SCHEMA_VERSION = 25
+STRATEGY_CACHE_SCHEMA_VERSION = 26
 STRATEGY_CACHE_MAX_ENTRIES = 20
 STRATEGY_CACHE_MAX_BYTES = 1024 * 1024 * 1024
 PROGRESS_PREFIX = "RAND_AI_PROGRESS "

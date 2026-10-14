@@ -131,6 +131,7 @@ function strategyFullName(strategy: DrawComparisonStrategy): string {
     tbl: "Temporal Behavior Learning",
     sklearn_svm: "Scikit Online SVM",
     lag_logistic: "Lagged Logistic",
+    xgboost_classifier: "XGBoost Classifier",
     sparse_neural_ticket: "Sparse Neural Ticket",
     cis: "Collective Intelligence Strategy",
     decision_tree_selector: "Decision Tree Selector",

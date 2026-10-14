@@ -452,6 +452,7 @@ function strategyFullName(strategy: StrategyPrediction): string {
     tbl: "Trend Baseline",
     sklearn_svm: "Scikit Online SVM",
     lag_logistic: "Lagged Logistic",
+    xgboost_classifier: "XGBoost Classifier",
     sparse_neural_ticket: "Sparse Neural Ticket",
     cis: "Conditional Independence Score",
     decision_tree_selector: "Decision Tree Selector",

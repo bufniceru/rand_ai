@@ -1,0 +1,130 @@
+{
+  "dataset": "data\\lotto_results_2019.yaml",
+  "datasetSha256": "e46d899b32e8056580d68c86d7c7a623d96e25317e5469e1613600f531ca7a2b",
+  "seed": 20260626,
+  "initialCompletedTransitions": 120,
+  "trainingWindow": 500,
+  "retrainInterval": 10,
+  "bootstrapReplicates": 10000,
+  "bootstrapBlockLength": 20,
+  "expectedRandomHits": 0.7346938775510204,
+  "interpretation": "Exploratory; history previously used for strategy development.",
+  "strategies": {
+    "xgboost_classifier": {
+      "draws": 650,
+      "totalHits": 466,
+      "meanHits": 0.7169230769230769,
+      "liftOverRandom": -0.01777080062794356,
+      "hitDistribution": [
+        292,
+        262,
+        84,
+        12,
+        0,
+        0,
+        0
+      ],
+      "threePlusRate": 0.018461538461538463,
+      "blocks": [
+        0.6692307692307692,
+        0.7692307692307693,
+        0.6846153846153846,
+        0.7307692307692307,
+        0.7307692307692307
+      ]
+    },
+    "lag_logistic": {
+      "draws": 650,
+      "totalHits": 495,
+      "meanHits": 0.7615384615384615,
+      "liftOverRandom": 0.02684458398744105,
+      "hitDistribution": [
+        279,
+        261,
+        97,
+        12,
+        1,
+        0,
+        0
+      ],
+      "threePlusRate": 0.02,
+      "blocks": [
+        0.7461538461538462,
+        0.8153846153846154,
+        0.7538461538461538,
+        0.7846153846153846,
+        0.7076923076923077
+      ]
+    },
+    "smoothed_frequency": {
+      "draws": 650,
+      "totalHits": 511,
+      "meanHits": 0.7861538461538462,
+      "liftOverRandom": 0.051459968602825756,
+      "hitDistribution": [
+        267,
+        269,
+        100,
+        14,
+        0,
+        0,
+        0
+      ],
+      "threePlusRate": 0.021538461538461538,
+      "blocks": [
+        0.8307692307692308,
+        0.9076923076923077,
+        0.7230769230769231,
+        0.7615384615384615,
+        0.7076923076923077
+      ]
+    },
+    "randomness": {
+      "draws": 650,
+      "totalHits": 488,
+      "meanHits": 0.7507692307692307,
+      "liftOverRandom": 0.016075353218210298,
+      "hitDistribution": [
+        268,
+        289,
+        80,
+        13,
+        0,
+        0,
+        0
+      ],
+      "threePlusRate": 0.02,
+      "blocks": [
+        0.7615384615384615,
+        0.8846153846153846,
+        0.6538461538461539,
+        0.676923076923077,
+        0.7769230769230769
+      ]
+    }
+  },
+  "pairedComparisons": {
+    "lag_logistic": {
+      "meanDifference": -0.04461538461538461,
+      "ci95": [
+        -0.14,
+        0.033846153846153845
+      ]
+    },
+    "smoothed_frequency": {
+      "meanDifference": -0.06923076923076923,
+      "ci95": [
+        -0.13692307692307693,
+        -0.0015384615384615385
+      ]
+    },
+    "randomness": {
+      "meanDifference": -0.033846153846153845,
+      "ci95": [
+        -0.1,
+        0.03538461538461538
+      ]
+    }
+  },
+  "runtimeSeconds": 16.21167300012894
+}

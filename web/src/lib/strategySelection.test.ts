@@ -13,6 +13,14 @@ const plugins: StrategyPlugin[] = [
 ];
 
 describe("strategy selection", () => {
+  it("round-trips an opt-in XGBoost saved selection", () => {
+    const xgboost: StrategyPlugin = { id: "xgboost_classifier", label: "XGBoost Classifier", enabled: false };
+    const registry = [...plugins, xgboost];
+    const restored = JSON.parse(JSON.stringify(["xgboost_classifier", "freshness"])) as StrategyPlugin["id"][];
+    expect(orderedStrategySelection(registry, restored)).toEqual(["freshness", "xgboost_classifier"]);
+    expect(enabledStrategyPlugins(registry, restored)).toContainEqual(xgboost);
+    expect(enabledStrategyPlugins(registry, ["freshness"])).not.toContainEqual(xgboost);
+  });
   it("shows only strategies enabled in Settings", () => {
     expect(
       enabledStrategyPlugins(plugins, ["proximity", "freshness"]),

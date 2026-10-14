@@ -57,6 +57,7 @@ support-vector-classifier
 temporal-behavior-learning
 scikit-online-svm
 lagged-logistic
+xgboost-classifier
 ```
 
 ### Ensembles & Coverage

@@ -30,6 +30,7 @@ export const STRATEGY_TONE_POSITION_BY_ID = {
   tbl: 2,
   sklearn_svm: 3,
   lag_logistic: 4,
+  xgboost_classifier: 6,
   sparse_neural_ticket: 5,
   mixed: 0,
   svc_recurrence_hybrid: 1,

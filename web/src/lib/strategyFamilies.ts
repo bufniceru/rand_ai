@@ -93,6 +93,7 @@ export const STRATEGY_FAMILY_BY_ID = {
   tbl: "relationships-machine-learning",
   sklearn_svm: "relationships-machine-learning",
   lag_logistic: "relationships-machine-learning",
+  xgboost_classifier: "relationships-machine-learning",
   sparse_neural_ticket: "relationships-machine-learning",
   cis: "ensembles-coverage",
   decision_tree_selector: "ensembles-coverage",

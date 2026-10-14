@@ -37,6 +37,7 @@ from rand_ai.space_groups import (
     profile_for_numbers,
     validate_border_space,
 )
+from rand_ai.xgboost_classifier import XGBoostClassifierModel
 
 _NUMBER_COUNT = 49
 _NUMBERS_PER_DRAW = 6
@@ -227,6 +228,7 @@ _BASE_STRATEGY_IDS = (
     "tbl",
     "sklearn_svm",
     "lag_logistic",
+    "xgboost_classifier",
     "sparse_neural_ticket",
     "cis",
     "decision_tree_selector",
@@ -394,6 +396,7 @@ _STRATEGY_DEPENDENCIES = {
             "mkgsv",
             "sklearn_svm",
             "lag_logistic",
+            "xgboost_classifier",
             "sparse_neural_ticket",
             "decision_tree_selector",
             "categorical_chi_square",
@@ -509,7 +512,11 @@ def _strategy(
     details: dict[int, tuple[str, ...]] | None = None,
     evidence: StrategyEvidence | None = None,
 ) -> StrategyPrediction:
-    ranked = _ranking_from_scores(scores, gaps)
+    ranked = (
+        sorted(scores, key=lambda number: (-scores[number], number))
+        if strategy_id == "xgboost_classifier"
+        else _ranking_from_scores(scores, gaps)
+    )
     predictions = tuple(
         StrategyNumberPrediction(
             number=number,
@@ -1078,6 +1085,11 @@ class _StrategyState:
             strategy_id: deque(maxlen=_SKLEARN_SVM_RECENT_WINDOW)
             for strategy_id in _SKLEARN_SVM_EXPERT_IDS
         }
+        self.xgboost_classifier = (
+            XGBoostClassifierModel()
+            if "xgboost_classifier" in self.enabled_strategy_ids
+            else None
+        )
         self.lag_logistic = (
             SGDClassifier(
                 loss="log_loss",
@@ -1521,6 +1533,10 @@ class _StrategyState:
         return scores, details
 
     def _lag_logistic_features(self, number: int) -> tuple[float, ...]:
+        """Preserve the logistic feature interface over shared history inputs."""
+        return self._history_features(number)
+
+    def _history_features(self, number: int) -> tuple[float, ...]:
         """Build compact candidate features shared across all 49 labels."""
         lag_pattern = self._lag_logistic_pattern(number)
         gap = self.current_gaps()[number]
@@ -1557,6 +1573,9 @@ class _StrategyState:
                 "Unexpected Lagged Logistic feature count"
             )
         return features
+
+    def _history_feature_matrix(self) -> np.ndarray:
+        return np.asarray([self._history_features(n) for n in range(1, 50)], dtype=float)
 
     def _lag_logistic_feature_matrix(self) -> np.ndarray:
         return np.asarray(
@@ -2685,6 +2704,8 @@ class _StrategyState:
         if "sklearn_svm" in self.enabled_strategy_ids:
             self._train_sklearn_svm(drawn)
 
+        if self.xgboost_classifier is not None:
+            self.xgboost_classifier.observe(drawn)
         if "lag_logistic" in self.enabled_strategy_ids:
             self._train_lag_logistic(drawn)
 
@@ -2886,7 +2907,10 @@ class _StrategyState:
                 [draw_date, *sorted(drawn)]
             )
         if self.enabled_strategy_ids.intersection(
-            {"co_occurrence", "lag_logistic", "predictive_grid", "svc", "tbl"}
+            {
+                "co_occurrence", "lag_logistic", "xgboost_classifier",
+                "predictive_grid", "svc", "tbl",
+            }
         ):
             self.recent_draws.append(drawn)
         if "emd" in self.enabled_strategy_ids:
@@ -5735,6 +5759,16 @@ class _StrategyState:
                     gaps,
                     sklearn_svm_details,
                 )
+
+        if self.xgboost_classifier is not None:
+            xgb_scores, xgb_details = self.xgboost_classifier.predict(
+                self._history_feature_matrix(), self.appearances, self.draw_count,
+            )
+            built["xgboost_classifier"] = _strategy(
+                "xgboost_classifier", "XGBoost Classifier",
+                "History-only boosted trees using causal three-draw lags, gaps, and frequencies.",
+                xgb_scores, gaps, xgb_details,
+            )
 
         if "lag_logistic" in enabled:
             lag_logistic_scores, lag_logistic_details = (
