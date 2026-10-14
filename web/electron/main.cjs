@@ -116,6 +116,7 @@ const strategyPlugins = [
   { id: "tbl", label: "Temporal Behavior Learning" },
   { id: "sklearn_svm", label: "Scikit Online SVM" },
   { id: "lag_logistic", label: "Lagged Logistic" },
+  { id: "xgboost_classifier", label: "XGBoost Classifier" },
   {
     id: "sparse_neural_ticket",
     label: "Sparse Neural Ticket (Experimental)",
@@ -139,6 +140,7 @@ const defaultStrategyPluginIds = strategyPlugins
       strategyId !== "mkgsv" &&
       strategyId !== "sklearn_svm" &&
       strategyId !== "lag_logistic" &&
+      strategyId !== "xgboost_classifier" &&
       strategyId !== "sparse_neural_ticket" &&
       strategyId !== "decision_tree_selector" &&
       strategyId !== "recurrence_dynamics" &&
