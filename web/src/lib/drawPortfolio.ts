@@ -18,6 +18,45 @@ const MAX_POOL_SIZE = 24;
 const CANDIDATE_PRIORITY_BONUS = 0.1;
 const EXCLUDED_STRATEGIES = new Set(["randomness", "fresh_random"]);
 export const PORTFOLIO_ALGORITHM_VERSION = 3;
+export type PortfolioObjective = "blended" | "coverage_first";
+
+export interface ExactTripleCoverage {
+  total: number;
+  covered: number;
+  uncoveredCount: number;
+  uncovered: number[][];
+  fraction: number;
+  guaranteed: boolean;
+  condition: string | null;
+}
+
+/** Verify actual combinations independently of model weights and candidate IDs. */
+export function verifyTripleCoverage(pool: readonly number[], tickets: readonly (readonly number[])[]): ExactTripleCoverage {
+  if (pool.some((n) => !Number.isInteger(n) || n < 1 || n > 49) || tickets.some((ticket) =>
+    ticket.length !== 6 || new Set(ticket).size !== 6 || ticket.some((n) => !Number.isInteger(n) || n < 1 || n > 49 || !pool.includes(n))))
+    throw new Error("Coverage requires valid six-number tickets within the pool");
+  const numbers = [...new Set(pool)].sort((a, b) => a - b);
+  const covered = new Set<string>();
+  for (const ticket of tickets) {
+    const values = [...new Set(ticket)].filter((n) => numbers.includes(n)).sort((a, b) => a - b);
+    for (let i = 0; i < values.length - 2; i++)
+      for (let j = i + 1; j < values.length - 1; j++)
+        for (let k = j + 1; k < values.length; k++) covered.add(`${values[i]},${values[j]},${values[k]}`);
+  }
+  const uncovered: number[][] = [];
+  let total = 0;
+  for (let i = 0; i < numbers.length - 2; i++)
+    for (let j = i + 1; j < numbers.length - 1; j++)
+      for (let k = j + 1; k < numbers.length; k++) {
+        total++;
+        const triple = [numbers[i], numbers[j], numbers[k]];
+        if (!covered.has(triple.join(","))) uncovered.push(triple);
+      }
+  const guaranteed = total > 0 && uncovered.length === 0;
+  return { total, covered: total - uncovered.length, uncoveredCount: uncovered.length, uncovered,
+    fraction: total > 0 ? (total - uncovered.length) / total : 0, guaranteed,
+    condition: guaranteed ? "If at least three winning numbers belong to this pool, at least one generated ticket matches at least three." : null };
+}
 
 export type RelationshipLiftSource =
   | RelationshipEdge[]
@@ -406,11 +445,13 @@ function selectPortfolio(
   pool: PortfolioPoolNumber[],
   drawCount: number,
   fixedMask = 0,
+  objective: PortfolioObjective = "blended",
 ): CandidateDraw[] {
   candidates.sort(
     (left, right) =>
       right.quality - left.quality || compareNumbers(left.numbers, right.numbers),
   );
+  if (objective === "coverage_first") return selectCoverageFirst(candidates, drawCount);
   const shortlistSize = Math.min(
     candidates.length,
     Math.max(5000, drawCount * 250),
@@ -507,6 +548,56 @@ function selectPortfolio(
   return selected;
 }
 
+/** Lazy greedy: cached gains are upper bounds until their selection round is refreshed. */
+function selectCoverageFirst(candidates: CandidateDraw[], count: number): CandidateDraw[] {
+  type Entry = { index: number; gain: number; round: number };
+  const heap: Entry[] = [];
+  const better = (a: Entry, b: Entry) => a.gain > b.gain ||
+    (a.gain === b.gain && a.index < b.index); // candidates already sorted by quality, then numbers
+  function push(entry: Entry) {
+    heap.push(entry);
+    let i = heap.length - 1;
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (!better(heap[i], heap[parent])) break;
+      [heap[i], heap[parent]] = [heap[parent], heap[i]];
+      i = parent;
+    }
+  }
+  function pop(): Entry {
+    const result = heap[0];
+    const last = heap.pop()!;
+    if (heap.length) {
+      heap[0] = last;
+      let i = 0;
+      while (2 * i + 1 < heap.length) {
+        let child = 2 * i + 1;
+        if (child + 1 < heap.length && better(heap[child + 1], heap[child])) child++;
+        if (!better(heap[child], heap[i])) break;
+        [heap[i], heap[child]] = [heap[child], heap[i]];
+        i = child;
+      }
+    }
+    return result;
+  }
+  candidates.forEach((candidate, index) => push({ index, gain: candidate.tripleIds.length, round: 0 }));
+  const covered = new Set<number>();
+  const selected: CandidateDraw[] = [];
+  while (heap.length && selected.length < count) {
+    const entry = pop();
+    const candidate = candidates[entry.index];
+    if (entry.round !== selected.length) {
+      entry.gain = candidate.tripleIds.reduce((sum, id) => sum + Number(!covered.has(id)), 0);
+      entry.round = selected.length;
+      push(entry);
+    } else {
+      selected.push(candidate);
+      candidate.tripleIds.forEach((id) => covered.add(id));
+    }
+  }
+  return selected;
+}
+
 function buildMetrics(
   selected: CandidateDraw[],
   pool: PortfolioPoolNumber[],
@@ -561,6 +652,7 @@ export function generateDrawPortfolio(
   requestedDrawCount: number,
   constraints?: PossibleDrawConstraints,
   groupGuidance?: BorderGroupGuidance,
+  objective: PortfolioObjective = "blended",
 ): DrawPortfolioResult | null {
   const strategies = suite.strategies.filter(
     (strategy) => !EXCLUDED_STRATEGIES.has(strategy.id),
@@ -613,7 +705,7 @@ export function generateDrawPortfolio(
     (mask, entry, index) => fixedSet.has(entry.number) ? mask | (1 << index) : mask,
     0,
   );
-  const selected = selectPortfolio(candidates, pool, drawCount, fixedMask);
+  const selected = selectPortfolio(candidates, pool, drawCount, fixedMask, objective);
   const metrics = buildMetrics(selected, pool);
   const omittedCandidates = guided?.omittedCandidates ?? [];
   const constraintLimited = selected.length < drawCount || omittedCandidates.length > 0;

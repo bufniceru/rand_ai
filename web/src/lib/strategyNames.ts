@@ -21,6 +21,7 @@ export const strategyNames: Record<StrategyId, string> = {
   mknp: "Markov Normalized Positions",
   mkrd: "Markov Relative Dispersion",
   bayesian: "Bayesian",
+  cdm: "CDM",
   predictive_grid: "Predictive Score Grid",
   co_occurrence: "Next Draw Co-occurrence",
   doublet_triplet_markov: "Doublet & Triplet Markov",

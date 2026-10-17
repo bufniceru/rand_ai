@@ -1,6 +1,8 @@
 import {
   generateDrawPortfolio,
   PORTFOLIO_ALGORITHM_VERSION,
+  type PortfolioObjective,
+  type DrawPortfolioResult,
 } from "./drawPortfolio";
 import type {
   PortfolioBacktestAuditRow,
@@ -148,6 +150,12 @@ export function runPortfolioBacktest(
   data: PortfolioBacktestData,
   requestedPortfolioSize: number,
   onProgress?: (progress: PortfolioBacktestProgress) => void,
+  research?: {
+    objective?: PortfolioObjective;
+    initialHistory?: number;
+    maxTargets?: number;
+    onPortfolio?: (portfolio: DrawPortfolioResult, record: PortfolioBacktestData["records"][number], generationMs: number) => void;
+  },
 ): PortfolioBacktestResult {
   const portfolioSize = Math.min(Math.max(Math.trunc(requestedPortfolioSize || 10), 1), 100);
   const startedAt = performance.now();
@@ -160,6 +168,7 @@ export function runPortfolioBacktest(
 
   for (let recordIndex = 0; recordIndex < data.records.length; recordIndex += 1) {
     const record = data.records[recordIndex];
+    if (audit.length >= (research?.maxTargets ?? Number.POSITIVE_INFINITY)) break;
     while (
       includedDrawCount < record.referenceDrawNumber &&
       includedDrawCount < data.draws.length
@@ -167,7 +176,13 @@ export function runPortfolioBacktest(
       updatePairCounts(pairCounts, data.draws[includedDrawCount].numbers);
       includedDrawCount += 1;
     }
+    if (record.referenceDrawNumber < (research?.initialHistory ?? 0)) {
+      updateStrategyHits(record, hitsByStrategy);
+      evaluatedDraws += 1;
+      continue;
+    }
     const expectedPairCount = record.referenceDrawNumber * 15 / PAIR_UNIVERSE;
+    const generationStarted = performance.now();
     const portfolio = generateDrawPortfolio(
       predictionSuite(record, evaluatedDraws, hitsByStrategy),
       (left, right) => {
@@ -178,10 +193,14 @@ export function runPortfolioBacktest(
           : 0;
       },
       portfolioSize,
+      undefined,
+      undefined,
+      research?.objective,
     );
     if (!portfolio) {
       throw new Error("No predictive strategies are available for portfolio simulation.");
     }
+    research?.onPortfolio?.(portfolio, record, performance.now() - generationStarted);
     const actual = new Set(record.actualNumbers);
     const evaluatedTickets = portfolio.draws.map((draw) => ({
       numbers: draw.numbers,

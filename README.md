@@ -71,6 +71,42 @@ results remain exploratory because this dataset previously influenced
 strategy selection. Original statistics remain accessible in expandable
 panels; saved settings, exports and internal strategy dependencies are preserved.
 
+### Portfolio coverage research
+
+With Python dependencies and `web/node_modules` installed, run from the repository root:
+
+```powershell
+uv run python scripts/study_portfolio.py --stage smoke
+uv run python scripts/study_portfolio.py --stage historical
+uv run python scripts/study_portfolio.py --stage synthetic
+```
+
+`--stage all` runs both full stages. Smoke evaluates 30 targets after 120 warm-up
+draws, with ten tickets, on real history and three independent synthetic histories.
+Full stages compare five, ten and twenty tickets; synthetic uses twenty histories
+of 360 draws. The production default strategy roster is frozen in the manifest.
+
+The runner bundles the actual TypeScript portfolio engine using Vite. It compares
+the unchanged blended default with a research-only coverage-first objective,
+100 equal-budget random portfolios per target from 1–49, and 100 from the same
+selected pool. Random portfolios contain distinct tickets. It reports best-ticket
+hits, at least one 3+ match, exact triple coverage, separate model-weighted coverage,
+conditional guarantees, uncovered triples and runtime. Greedy coverage-first is
+not a minimum-wheel solver and does not improve fair-draw jackpot odds per ticket.
+
+Results live under `reports/portfolio_study/smoke/` and
+`reports/portfolio_study/full/`: `report.md`, `aggregate.json`, `protocol.json`,
+per-target audit and uncovered-triple JSONL, and dataset/budget checkpoints.
+Rerunning resumes completed compatible jobs; changing data, source, roster or
+protocol invalidates them. Historical and synthetic full stages share checkpoints
+and combine completed results in the report. Each job is checkpointed after its
+full dataset/budget comparison; an interrupted job restarts that job.
+
+Paired comparisons use five chronological blocks, moving-block bootstrap intervals
+and Holm-adjusted tests. Historical results remain exploratory; synthetic results
+diagnose leakage and false signals. UI controls and application defaults are
+unchanged. No Electron executable rebuild is needed for this study.
+
 ### Strategy documentation
 
 - [Chi-Square Frequency strategy](docs/chi-square-frequency-strategy.md) —

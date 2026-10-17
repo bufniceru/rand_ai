@@ -13,6 +13,7 @@ export const STRATEGY_TONE_POSITION_BY_ID = {
   categorical_chi_square: 2,
   entropy: 3,
   bayesian: 4,
+  cdm: 5,
   proximity: 0,
   emd: 1,
   recurrence_dynamics: 2,

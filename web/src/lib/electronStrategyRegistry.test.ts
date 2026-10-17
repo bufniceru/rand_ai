@@ -21,5 +21,28 @@ describe("Electron Settings strategy registry", () => {
     });
     expect(registry.defaults).not.toContain("xgboost_classifier_v2");
     expect(registry.defaults).not.toContain("xgboost_classifier");
+    expect(registry.defaults).toContain("cdm");
+    expect(registry.plugins.find((plugin) => plugin.id === "cdm")).toEqual({
+      id: "cdm", label: "CDM",
+    });
+  });
+});
+
+describe("CDM saved strategy preferences", () => {
+  it("enables CDM for fresh settings and preserves explicit saved choices", () => {
+    const start = source.indexOf("function loadStrategyPreferences() {");
+    const end = source.indexOf("function saveStrategyPreferences()", start);
+    const legacyStart = source.indexOf("const legacyStrategyPluginIds = [");
+    const registryEnd = source.indexOf("let enabledStrategyIds =", legacyStart);
+    const load = (saved: string[]) => new Function(
+      "fs", "strategyPreferencesPath",
+      source.slice(legacyStart, registryEnd) + source.slice(start, end)
+      + "; return loadStrategyPreferences();",
+    )({ readFileSync: () => JSON.stringify({ enabledStrategies: saved }) }, () => "unused") as Set<string>;
+    expect(load(["bayesian"])).toEqual(new Set(["bayesian"]));
+    expect(load(["cdm", "bayesian"])).toEqual(new Set(["cdm", "bayesian"]));
+    expect(load([])).toEqual(new Set());
+    const legacy = ["proximity", "freshness", "emd", "randomness", "entropy", "markov100", "mkfr", "bayesian", "svc", "tbl"];
+    expect(load(legacy).has("cdm")).toBe(false);
   });
 });

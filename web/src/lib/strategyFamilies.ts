@@ -82,6 +82,7 @@ export const STRATEGY_FAMILY_BY_ID = {
   mknp: "markov-sequence",
   mkrd: "markov-sequence",
   bayesian: "frequency-recency",
+  cdm: "frequency-recency",
   predictive_grid: "shape-similarity",
   co_occurrence: "relationships-machine-learning",
   doublet_triplet_markov: "markov-sequence",

@@ -156,6 +156,7 @@ def test_builds_complete_analysis_payload(tmp_path: Path) -> None:
         "MKSP",
         "MKNP",
         "Baye",
+        "CDM",
         "Grid",
         "CoOc",
         "Doublet & Triplet Markov",

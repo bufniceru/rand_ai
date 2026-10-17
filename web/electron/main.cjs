@@ -90,6 +90,7 @@ const strategyPlugins = [
   { id: "mknp", label: "Markov Normalized Positions" },
   { id: "mkrd", label: "Markov Relative Dispersion" },
   { id: "bayesian", label: "Bayesian" },
+  { id: "cdm", label: "CDM" },
   { id: "predictive_grid", label: "Predictive Score Grid" },
   { id: "co_occurrence", label: "Next Draw Co-occurrence" },
   {
@@ -434,7 +435,10 @@ function loadStrategyPreferences() {
       ),
     );
     if (legacyStrategyPluginIds.every((strategyId) => selected.has(strategyId))) {
-      for (const strategyId of defaultStrategyPluginIds) selected.add(strategyId);
+      for (const strategyId of defaultStrategyPluginIds) {
+        // Preserve an explicit saved choice when introducing CDM.
+        if (strategyId !== "cdm") selected.add(strategyId);
+      }
     }
     return selected;
   } catch (error) {

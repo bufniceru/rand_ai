@@ -97,6 +97,7 @@ def test_builds_thirty_eight_named_rankings_and_reports_progress() -> None:
         "MKNP",
         "MKRD",
         "Baye",
+        "CDM",
         "Grid",
         "CoOc",
         "Doublet & Triplet Markov",

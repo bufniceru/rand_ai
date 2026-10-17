@@ -27,6 +27,7 @@ const strategyIds: StrategyId[] = [
   "mknp",
   "mkrd",
   "bayesian",
+  "cdm",
   "predictive_grid",
   "co_occurrence",
   "doublet_triplet_markov",

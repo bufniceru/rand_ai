@@ -7,7 +7,7 @@ import type {
   StrategyId,
   StrategyPrediction,
 } from "../types";
-import { generateDrawPortfolio, portfolioPoolSize } from "./drawPortfolio";
+import { generateDrawPortfolio, portfolioPoolSize, verifyTripleCoverage } from "./drawPortfolio";
 
 function strategy(id: StrategyId, offset: number, averageHits = 1): StrategyPrediction {
   const ranking = Array.from(
@@ -63,6 +63,65 @@ function relationships(): RelationshipEdge[] {
   }
   return edges;
 }
+
+describe("verified coverage and research objective", () => {
+  it("certifies complete coverage but never treats duplicate tickets as new coverage", () => {
+    const pool = [1, 2, 3, 4, 5, 6];
+    expect(verifyTripleCoverage(pool, [pool, pool])).toMatchObject({ total: 20, covered: 20, fraction: 1, guaranteed: true, uncovered: [] });
+    expect(verifyTripleCoverage([], [])).toMatchObject({ guaranteed: false, condition: null });
+    const partial = verifyTripleCoverage([...pool, 7], [pool, pool]);
+    expect(partial).toMatchObject({ total: 35, covered: 20, guaranteed: false, condition: null });
+    expect(partial.uncovered).toHaveLength(15);
+    expect(partial.uncovered.every((triple) => triple.includes(7))).toBe(true);
+    expect(() => verifyTripleCoverage(pool, [[1, 2, 3]])).toThrow("valid six-number");
+  });
+
+  it("uses ascending ticket numbers when coverage gain and quality tie", () => {
+    const flat = strategy("freshness", 0);
+    flat.numbers = flat.numbers.map((entry) => ({ ...entry, rank: 1 }));
+    const result = generateDrawPortfolio(suite([flat]), [], 2, undefined, undefined, "coverage_first")!;
+    expect(result.draws[0].numbers).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(result.draws[1].numbers).toEqual([1, 2, 7, 8, 9, 10]);
+  });
+
+  it("preserves blended default and selects maximum new triples with deterministic quality ties", () => {
+    const input = suite([strategy("freshness", 0)]);
+    const original = generateDrawPortfolio(input, [], 3)!;
+    expect(generateDrawPortfolio(input, [], 3, undefined, undefined, "blended")).toEqual(original);
+    const coverage = generateDrawPortfolio(input, [], 3, undefined, undefined, "coverage_first")!;
+    expect(coverage.pool).toEqual(original.pool);
+    expect(coverage.draws[0].numbers).toEqual(original.draws[0].numbers);
+    const selected: number[][] = [];
+    const values = coverage.pool.map((entry) => entry.number);
+    // Independent exhaustive greedy oracle, including quality and number tie breaks.
+    const quality = (ticket: number[]) => ticket.reduce((sum, n) => sum + coverage.pool.find((e) => e.number === n)!.score, 0);
+    const candidates: number[][] = [];
+    function visit(start: number, ticket: number[]) {
+      if (ticket.length === 6) { candidates.push([...ticket].sort((a, b) => a - b)); return; }
+      for (let i = start; i <= values.length - (6 - ticket.length); i++) visit(i + 1, [...ticket, values[i]]);
+    }
+    visit(0, []);
+    for (const draw of coverage.draws) {
+      const before = verifyTripleCoverage(values, selected).covered;
+      const available = candidates.filter((ticket) => !selected.some((other) => other.join() === ticket.join()));
+      const gains = available.map((ticket) => ({ ticket, gain: verifyTripleCoverage(values, [...selected, ticket]).covered - before }));
+      const maximum = Math.max(...gains.map((entry) => entry.gain));
+      expect(verifyTripleCoverage(values, [...selected, draw.numbers]).covered - before).toBe(maximum);
+      expect(quality(draw.numbers)).toBeCloseTo(Math.max(...gains.filter((entry) => entry.gain === maximum).map((entry) => quality(entry.ticket))), 10);
+      selected.push(draw.numbers);
+    }
+    expect(generateDrawPortfolio(input, [], 3, undefined, undefined, "coverage_first")).toEqual(coverage);
+  });
+
+  it("reports the actual limited pool under fixed-number constraints", () => {
+    const input = suite([strategy("freshness", 0)]);
+    const result = generateDrawPortfolio(input, [], 10, {
+      mode: "guided", fixedNumbers: [1, 2, 3, 4, 5, 6], candidateNumbers: [], excludedNumbers: [],
+    }, undefined, "coverage_first")!;
+    expect(result.draws).toHaveLength(1);
+    expect(verifyTripleCoverage(result.pool.map((e) => e.number), result.draws.map((e) => e.numbers))).toMatchObject({ covered: 20, guaranteed: false });
+  });
+});
 
 describe("draw portfolio generation", () => {
   it("uses the adaptive 12-to-24-number pool boundaries", () => {

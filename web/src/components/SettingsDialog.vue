@@ -55,6 +55,7 @@ const strategyDescriptions: Record<StrategyId, string> = {
   mksp: "Order-20 space analogues decoded into complete valid draws.",
   mknp: "Order-20 normalized-position analogues decoded into valid translated draws.",
   mkrd: "Order-20 relative-shape and dispersion analogues decoded into valid translated draws.",
+  cdm: "Compound Dirichlet–Multinomial lifetime frequency posterior mean with a symmetric prior; not calibrated inclusion probabilities.",
   bayesian: "Hierarchically shrunk Bayesian model of gap and recent-number posteriors.",
   predictive_grid: "Seven-component history grid with earth-mover similarity.",
   co_occurrence: "Pair counts stabilized with candidate-adjusted recent lift.",

@@ -24,6 +24,7 @@ chi-square-frequency
 categorical-chi-square
 entropy
 bayesian
+cdm
 ```
 
 ### Shape & Similarity

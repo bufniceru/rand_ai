@@ -48,6 +48,7 @@ _EXPECTED_RANDOM_HITS_PER_DRAW = _NUMBERS_PER_DRAW * _NUMBERS_PER_DRAW / _NUMBER
 _MAX_GAP_BUCKET = 35
 _MARKOV_PRIOR_STRENGTH = 8.0
 _MARKOV_DECAY = 0.5 ** (1 / 500)
+_CDM_ALPHA = 1.0
 _BAYESIAN_GAP_PRIOR_STRENGTH = 1024.0
 _BAYESIAN_GAP_RECENCY_HALF_LIFE = 1000
 _BAYESIAN_GAP_DECAY = 0.5 ** (1 / _BAYESIAN_GAP_RECENCY_HALF_LIFE)
@@ -219,6 +220,7 @@ _BASE_STRATEGY_IDS = (
     "mknp",
     "mkrd",
     "bayesian",
+    "cdm",
     "predictive_grid",
     "co_occurrence",
     "doublet_triplet_markov",
@@ -3128,6 +3130,14 @@ class _StrategyState:
             for number in range(1, _NUMBER_COUNT + 1)
         }
 
+    def _cdm_predictive_shares(self) -> dict[int, float]:
+        """Return categorical posterior means, not draw-inclusion probabilities."""
+        denominator = _NUMBERS_PER_DRAW * self.draw_count + _NUMBER_COUNT * _CDM_ALPHA
+        return {
+            number: (self.appearances[number] + _CDM_ALPHA) / denominator
+            for number in range(1, _NUMBER_COUNT + 1)
+        }
+
     def _gap_model_scores(
         self,
         gaps: dict[int, int],
@@ -5412,6 +5422,32 @@ class _StrategyState:
                     gaps,
                     mkrd_details,
                 )
+
+        if "cdm" in requested:
+            shares = self._cdm_predictive_shares()
+            expected_counts = {
+                number: _NUMBERS_PER_DRAW * share for number, share in shares.items()
+            }
+            cdm_details: dict[int, tuple[str, ...]] = {
+                number: (
+                    f"Lifetime occurrences {self.appearances[number]}",
+                    f"Completed draws {self.draw_count}",
+                    f"Symmetric Dirichlet prior alpha {_CDM_ALPHA:g} per number",
+                    f"Categorical predictive share {shares[number]:.8%}",
+                    f"Expected count (multinomial approximation) {expected_counts[number]:.8f}",
+                    "Not a calibrated probability of inclusion in a distinct-number draw",
+                )
+                for number in shares
+            }
+            built["cdm"] = _strategy(
+                "cdm",
+                "CDM",
+                "Compound Dirichlet–Multinomial lifetime frequency posterior mean; "
+                "multinomial approximation, not calibrated inclusion probabilities.",
+                _scale_scores(expected_counts),
+                gaps,
+                cdm_details,
+            )
 
         if "bayesian" in enabled:
             bayesian_scores, bayesian_details = self._gap_model_scores(

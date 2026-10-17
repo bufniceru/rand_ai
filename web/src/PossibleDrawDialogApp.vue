@@ -85,7 +85,7 @@ const highlightedLastSeen = computed(() => lastSeenRows.value[lastSeenIndex.valu
 const orderedStrategies = computed(() => {
   const fallbackOrder: StrategyId[] = [
     "freshness", "proximity", "emd", "chi_square", "categorical_chi_square", "entropy", "markov100", "mkgsv",
-    "mkfr", "mksp", "mknp", "mkrd", "bayesian", "predictive_grid", "co_occurrence",
+    "mkfr", "mksp", "mknp", "mkrd", "bayesian", "cdm", "predictive_grid", "co_occurrence",
     "doublet_triplet_markov", "mixed", "svc", "svc_recurrence_hybrid", "svc_recurrence_proximity_hybrid", "srph_residual_diversity_hybrid", "srph_minimax_regret_hybrid", "tbl",
     "cis", "fresh_random", "randomness",
     "decision_tree_selector",
@@ -438,6 +438,7 @@ function strategyFullName(strategy: StrategyPrediction): string {
     mknp: "Markov Normalized Positions",
     mkrd: "Markov Relative Dispersion",
     bayesian: "Bayesian",
+    cdm: "CDM",
     predictive_grid: "Predictive Grid",
     co_occurrence: "Co-occurrence",
     doublet_triplet_markov: "Doublet & Triplet Markov",
