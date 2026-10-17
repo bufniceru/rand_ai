@@ -187,7 +187,7 @@ def test_bridge_serialization_cache_and_portfolio(tmp_path):
         parse_strategy_ids,
     )
 
-    assert STRATEGY_CACHE_SCHEMA_VERSION == 26
+    assert STRATEGY_CACHE_SCHEMA_VERSION == 27
     assert "xgboost_classifier" not in DEFAULT_STRATEGY_IDS
     assert parse_strategy_ids("xgboost_classifier") == ("xgboost_classifier",)
     draws = history(3)
@@ -232,7 +232,7 @@ def test_xgboost_cache_reuse_schema_change_and_export(tmp_path, monkeypatch):
     )
     assert counted.call_count == 1
     assert first["predictionSuites"] == second["predictionSuites"]
-    monkeypatch.setattr(gui_bridge, "STRATEGY_CACHE_SCHEMA_VERSION", 27)
+    monkeypatch.setattr(gui_bridge, "STRATEGY_CACHE_SCHEMA_VERSION", 28)
     gui_bridge.analyze_file(source, strategy_cache_dir=tmp_path / "cache", **options)
     assert counted.call_count == 2
     archive_path = tmp_path / "export.zip"

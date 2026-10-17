@@ -73,6 +73,9 @@ const strategyDescriptions: Record<StrategyId, string> = {
   tbl: "Temporal behavior learning ensemble.",
   sklearn_svm:
     "Scikit-learn online linear SVM with temporal, expert-rank, and prior-efficacy inputs.",
+  arima: "Experimental positional ARIMA(5,1,0) using past draws and a rolling 250-draw window.",
+  xgboost_classifier_v2:
+    "Experimental history-only XGBoost with chronological model selection and conservative evidence-gated frequency fallback.",
   xgboost_classifier:
     "History-only XGBoost classifier using three-draw lags, gaps, and frequencies; retrained every ten transitions.",
   lag_logistic:

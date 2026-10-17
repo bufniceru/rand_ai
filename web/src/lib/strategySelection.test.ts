@@ -13,6 +13,15 @@ const plugins: StrategyPlugin[] = [
 ];
 
 describe("strategy selection", () => {
+  it("restores V2 as an opt-in strategy alongside V1", () => {
+    const v1: StrategyPlugin = { id: "xgboost_classifier", label: "XGBoost Classifier", enabled: false };
+    const v2: StrategyPlugin = { id: "xgboost_classifier_v2", label: "XGBoost V2 (Experimental)", enabled: false };
+    const registry = [...plugins, v1, v2];
+    const restored = JSON.parse(JSON.stringify(["xgboost_classifier_v2", "xgboost_classifier"])) as StrategyPlugin["id"][];
+    expect(orderedStrategySelection(registry, restored)).toEqual([v1.id, v2.id]);
+    expect(enabledStrategyPlugins(registry, restored)).toEqual([v1, v2]);
+    expect(enabledStrategyPlugins(registry, ["freshness"])).not.toContainEqual(v2);
+  });
   it("round-trips an opt-in XGBoost saved selection", () => {
     const xgboost: StrategyPlugin = { id: "xgboost_classifier", label: "XGBoost Classifier", enabled: false };
     const registry = [...plugins, xgboost];

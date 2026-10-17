@@ -13,6 +13,7 @@ import numpy as np
 from sklearn.linear_model import SGDClassifier
 from sklearn.tree import DecisionTreeRegressor
 
+from rand_ai.arima import ArimaModel
 from rand_ai.adaptive_shape_recurrence import AdaptiveShapeRecurrenceModel
 from rand_ai.categorical_chi_square import CategoricalChiSquareModel
 from rand_ai.draw import Draw
@@ -38,6 +39,7 @@ from rand_ai.space_groups import (
     validate_border_space,
 )
 from rand_ai.xgboost_classifier import XGBoostClassifierModel
+from rand_ai.xgboost_classifier_v2 import XGBoostV2Model
 
 _NUMBER_COUNT = 49
 _NUMBERS_PER_DRAW = 6
@@ -209,6 +211,7 @@ _BASE_STRATEGY_IDS = (
     "chi_square",
     "categorical_chi_square",
     "entropy",
+    "arima",
     "markov100",
     "mkgsv",
     "mkfr",
@@ -229,6 +232,7 @@ _BASE_STRATEGY_IDS = (
     "sklearn_svm",
     "lag_logistic",
     "xgboost_classifier",
+    "xgboost_classifier_v2",
     "sparse_neural_ticket",
     "cis",
     "decision_tree_selector",
@@ -397,8 +401,10 @@ _STRATEGY_DEPENDENCIES = {
             "sklearn_svm",
             "lag_logistic",
             "xgboost_classifier",
+            "xgboost_classifier_v2",
             "sparse_neural_ticket",
             "decision_tree_selector",
+            "arima",
             "categorical_chi_square",
             "svc_recurrence_hybrid",
             "svc_recurrence_proximity_hybrid",
@@ -514,7 +520,7 @@ def _strategy(
 ) -> StrategyPrediction:
     ranked = (
         sorted(scores, key=lambda number: (-scores[number], number))
-        if strategy_id == "xgboost_classifier"
+        if strategy_id in {"xgboost_classifier", "xgboost_classifier_v2"}
         else _ranking_from_scores(scores, gaps)
     )
     predictions = tuple(
@@ -890,6 +896,7 @@ class _StrategyState:
             if "recurrence_dynamics" in self.enabled_strategy_ids
             else None
         )
+        self.arima = ArimaModel() if "arima" in self.enabled_strategy_ids else None
         self.categorical_chi_square = (
             CategoricalChiSquareModel()
             if "categorical_chi_square" in self.enabled_strategy_ids
@@ -1085,6 +1092,11 @@ class _StrategyState:
             strategy_id: deque(maxlen=_SKLEARN_SVM_RECENT_WINDOW)
             for strategy_id in _SKLEARN_SVM_EXPERT_IDS
         }
+        self.xgboost_classifier_v2 = (
+            XGBoostV2Model()
+            if "xgboost_classifier_v2" in self.enabled_strategy_ids
+            else None
+        )
         self.xgboost_classifier = (
             XGBoostClassifierModel()
             if "xgboost_classifier" in self.enabled_strategy_ids
@@ -2704,6 +2716,10 @@ class _StrategyState:
         if "sklearn_svm" in self.enabled_strategy_ids:
             self._train_sklearn_svm(drawn)
 
+        if self.arima is not None:
+            self.arima.observe(drawn)
+        if self.xgboost_classifier_v2 is not None:
+            self.xgboost_classifier_v2.observe(drawn)
         if self.xgboost_classifier is not None:
             self.xgboost_classifier.observe(drawn)
         if "lag_logistic" in self.enabled_strategy_ids:
@@ -2908,7 +2924,7 @@ class _StrategyState:
             )
         if self.enabled_strategy_ids.intersection(
             {
-                "co_occurrence", "lag_logistic", "xgboost_classifier",
+                "co_occurrence", "lag_logistic", "xgboost_classifier", "xgboost_classifier_v2",
                 "predictive_grid", "svc", "tbl",
             }
         ):
@@ -5759,6 +5775,24 @@ class _StrategyState:
                     gaps,
                     sklearn_svm_details,
                 )
+
+        if self.arima is not None and "arima" in requested:
+            arima_scores, arima_details = self.arima.predict()
+            built["arima"] = _strategy(
+                "arima", "ARIMA (Experimental)",
+                "Positional ARIMA(5,1,0) fitted by conditional least squares on past draws.",
+                arima_scores, gaps, arima_details,
+            )
+
+        if self.xgboost_classifier_v2 is not None:
+            v2_scores, v2_details = self.xgboost_classifier_v2.predict(
+                self._history_feature_matrix(), self.appearances, self.draw_count,
+            )
+            built["xgboost_classifier_v2"] = _strategy(
+                "xgboost_classifier_v2", "XGBoost V2 (Experimental)",
+                "Chronologically selected XGBoost with independent forecast evidence and smoothed-frequency fallback.",
+                v2_scores, gaps, v2_details,
+            )
 
         if self.xgboost_classifier is not None:
             xgb_scores, xgb_details = self.xgboost_classifier.predict(

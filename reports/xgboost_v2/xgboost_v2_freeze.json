@@ -1,0 +1,220 @@
+{
+  "cutoff": 771,
+  "prefixSha256": "e800db8b4911a51cd6083af9f58cf5eefe431191765848f2c8763dbf0a3155ce",
+  "protocol": {
+    "formatVersion": 1,
+    "candidates": [
+      {
+        "feature_count": 4,
+        "depth": 1,
+        "window": 250
+      },
+      {
+        "feature_count": 4,
+        "depth": 1,
+        "window": 500
+      },
+      {
+        "feature_count": 4,
+        "depth": 2,
+        "window": 250
+      },
+      {
+        "feature_count": 4,
+        "depth": 2,
+        "window": 500
+      },
+      {
+        "feature_count": 14,
+        "depth": 1,
+        "window": 250
+      },
+      {
+        "feature_count": 14,
+        "depth": 1,
+        "window": 500
+      },
+      {
+        "feature_count": 14,
+        "depth": 2,
+        "window": 250
+      },
+      {
+        "feature_count": 14,
+        "depth": 2,
+        "window": 500
+      }
+    ],
+    "estimatorParameters": [
+      {
+        "objective": "binary:logistic",
+        "eval_metric": "logloss",
+        "tree_method": "hist",
+        "device": "cpu",
+        "n_jobs": 1,
+        "n_estimators": 100,
+        "max_depth": 1,
+        "learning_rate": 0.05,
+        "min_child_weight": 10,
+        "reg_lambda": 10,
+        "reg_alpha": 0,
+        "subsample": 1,
+        "colsample_bytree": 1,
+        "scale_pos_weight": 1,
+        "base_score": 0.12244897959183673,
+        "random_state": 20260626
+      },
+      {
+        "objective": "binary:logistic",
+        "eval_metric": "logloss",
+        "tree_method": "hist",
+        "device": "cpu",
+        "n_jobs": 1,
+        "n_estimators": 100,
+        "max_depth": 1,
+        "learning_rate": 0.05,
+        "min_child_weight": 10,
+        "reg_lambda": 10,
+        "reg_alpha": 0,
+        "subsample": 1,
+        "colsample_bytree": 1,
+        "scale_pos_weight": 1,
+        "base_score": 0.12244897959183673,
+        "random_state": 20260626
+      },
+      {
+        "objective": "binary:logistic",
+        "eval_metric": "logloss",
+        "tree_method": "hist",
+        "device": "cpu",
+        "n_jobs": 1,
+        "n_estimators": 100,
+        "max_depth": 2,
+        "learning_rate": 0.05,
+        "min_child_weight": 10,
+        "reg_lambda": 10,
+        "reg_alpha": 0,
+        "subsample": 1,
+        "colsample_bytree": 1,
+        "scale_pos_weight": 1,
+        "base_score": 0.12244897959183673,
+        "random_state": 20260626
+      },
+      {
+        "objective": "binary:logistic",
+        "eval_metric": "logloss",
+        "tree_method": "hist",
+        "device": "cpu",
+        "n_jobs": 1,
+        "n_estimators": 100,
+        "max_depth": 2,
+        "learning_rate": 0.05,
+        "min_child_weight": 10,
+        "reg_lambda": 10,
+        "reg_alpha": 0,
+        "subsample": 1,
+        "colsample_bytree": 1,
+        "scale_pos_weight": 1,
+        "base_score": 0.12244897959183673,
+        "random_state": 20260626
+      },
+      {
+        "objective": "binary:logistic",
+        "eval_metric": "logloss",
+        "tree_method": "hist",
+        "device": "cpu",
+        "n_jobs": 1,
+        "n_estimators": 100,
+        "max_depth": 1,
+        "learning_rate": 0.05,
+        "min_child_weight": 10,
+        "reg_lambda": 10,
+        "reg_alpha": 0,
+        "subsample": 1,
+        "colsample_bytree": 1,
+        "scale_pos_weight": 1,
+        "base_score": 0.12244897959183673,
+        "random_state": 20260626
+      },
+      {
+        "objective": "binary:logistic",
+        "eval_metric": "logloss",
+        "tree_method": "hist",
+        "device": "cpu",
+        "n_jobs": 1,
+        "n_estimators": 100,
+        "max_depth": 1,
+        "learning_rate": 0.05,
+        "min_child_weight": 10,
+        "reg_lambda": 10,
+        "reg_alpha": 0,
+        "subsample": 1,
+        "colsample_bytree": 1,
+        "scale_pos_weight": 1,
+        "base_score": 0.12244897959183673,
+        "random_state": 20260626
+      },
+      {
+        "objective": "binary:logistic",
+        "eval_metric": "logloss",
+        "tree_method": "hist",
+        "device": "cpu",
+        "n_jobs": 1,
+        "n_estimators": 100,
+        "max_depth": 2,
+        "learning_rate": 0.05,
+        "min_child_weight": 10,
+        "reg_lambda": 10,
+        "reg_alpha": 0,
+        "subsample": 1,
+        "colsample_bytree": 1,
+        "scale_pos_weight": 1,
+        "base_score": 0.12244897959183673,
+        "random_state": 20260626
+      },
+      {
+        "objective": "binary:logistic",
+        "eval_metric": "logloss",
+        "tree_method": "hist",
+        "device": "cpu",
+        "n_jobs": 1,
+        "n_estimators": 100,
+        "max_depth": 2,
+        "learning_rate": 0.05,
+        "min_child_weight": 10,
+        "reg_lambda": 10,
+        "reg_alpha": 0,
+        "subsample": 1,
+        "colsample_bytree": 1,
+        "scale_pos_weight": 1,
+        "base_score": 0.12244897959183673,
+        "random_state": 20260626
+      }
+    ],
+    "minimumTransitions": 240,
+    "trainingWindow": 500,
+    "selectionInterval": 40,
+    "refitInterval": 10,
+    "validationBlocks": [
+      40,
+      40,
+      40
+    ],
+    "gateWindow": 120,
+    "gateRule": "lower95LogLossAdvantage>0 and meanTopSixHitAdvantage>0",
+    "bootstrapReplicates": 2000,
+    "bootstrapBlock": 10,
+    "seed": 20260626,
+    "baselinePrior": 24,
+    "lossClipping": [
+      1e-07,
+      0.9999999
+    ],
+    "codeSha256": "24c09a4bf9bf699fa64726671e120a90e341f8dd51b059ac8af1ca791825b96d",
+    "versions": {
+      "xgboost": "3.4.1",
+      "numpy": "2.5.1",
+      "scikit-learn": "1.9.0"
+    }
+  }
+}

@@ -81,6 +81,7 @@ const strategyPlugins = [
   { id: "fresh_random", label: "Fresh Random" },
   { id: "chi_square", label: "Chi-square Frequency" },
   { id: "categorical_chi_square", label: "Categorical Chi-square" },
+  { id: "arima", label: "ARIMA (Experimental)" },
   { id: "entropy", label: "Entropy" },
   { id: "markov100", label: "Markov 100" },
   { id: "mkgsv", label: "Markov Gap-Space Vector (Experimental)" },
@@ -117,6 +118,7 @@ const strategyPlugins = [
   { id: "sklearn_svm", label: "Scikit Online SVM" },
   { id: "lag_logistic", label: "Lagged Logistic" },
   { id: "xgboost_classifier", label: "XGBoost Classifier" },
+  { id: "xgboost_classifier_v2", label: "XGBoost V2 (Experimental)" },
   {
     id: "sparse_neural_ticket",
     label: "Sparse Neural Ticket (Experimental)",
@@ -141,6 +143,8 @@ const defaultStrategyPluginIds = strategyPlugins
       strategyId !== "sklearn_svm" &&
       strategyId !== "lag_logistic" &&
       strategyId !== "xgboost_classifier" &&
+      strategyId !== "arima" &&
+      strategyId !== "xgboost_classifier_v2" &&
       strategyId !== "sparse_neural_ticket" &&
       strategyId !== "decision_tree_selector" &&
       strategyId !== "recurrence_dynamics" &&

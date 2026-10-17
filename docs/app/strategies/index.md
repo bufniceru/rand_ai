@@ -41,6 +41,7 @@ predictive-score-grid
 ```{toctree}
 :maxdepth: 1
 
+arima
 markov-freshness
 markov-spaces
 markov-normalized-positions
@@ -58,6 +59,7 @@ temporal-behavior-learning
 scikit-online-svm
 lagged-logistic
 xgboost-classifier
+xgboost-classifier-v2
 ```
 
 ### Ensembles & Coverage

@@ -16,6 +16,10 @@ describe("Electron Settings strategy registry", () => {
     expect(registry.plugins.find((plugin) => plugin.id === "xgboost_classifier")).toEqual({
       id: "xgboost_classifier", label: "XGBoost Classifier",
     });
+    expect(registry.plugins.find((plugin) => plugin.id === "xgboost_classifier_v2")).toEqual({
+      id: "xgboost_classifier_v2", label: "XGBoost V2 (Experimental)",
+    });
+    expect(registry.defaults).not.toContain("xgboost_classifier_v2");
     expect(registry.defaults).not.toContain("xgboost_classifier");
   });
 });

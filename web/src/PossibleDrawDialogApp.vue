@@ -453,6 +453,8 @@ function strategyFullName(strategy: StrategyPrediction): string {
     sklearn_svm: "Scikit Online SVM",
     lag_logistic: "Lagged Logistic",
     xgboost_classifier: "XGBoost Classifier",
+    arima: "ARIMA (Experimental)",
+    xgboost_classifier_v2: "XGBoost V2 (Experimental)",
     sparse_neural_ticket: "Sparse Neural Ticket",
     cis: "Conditional Independence Score",
     decision_tree_selector: "Decision Tree Selector",
