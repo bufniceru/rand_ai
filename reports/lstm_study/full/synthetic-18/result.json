@@ -1,0 +1,1856 @@
+{
+  "splits": {
+    "trainTargets": [
+      8,
+      371
+    ],
+    "validationTargets": [
+      372,
+      521
+    ],
+    "holdoutTargets": [
+      522,
+      771
+    ]
+  },
+  "training": [
+    {
+      "seed": 20260626,
+      "bestEpoch": 4,
+      "epochs": 14,
+      "validationLosses": [
+        0.371716171503067,
+        0.3717229962348938,
+        0.3717305362224579,
+        0.3717111051082611,
+        0.37171506881713867,
+        0.37176239490509033,
+        0.37183627486228943,
+        0.3720841109752655,
+        0.3723513185977936,
+        0.37250298261642456,
+        0.37304186820983887,
+        0.37359118461608887,
+        0.373748779296875,
+        0.37450873851776123
+      ],
+      "parityMaxAbsError": 2.4374549545402857e-08,
+      "seconds": 0.33824800001457334
+    },
+    {
+      "seed": 20260627,
+      "bestEpoch": 1,
+      "epochs": 11,
+      "validationLosses": [
+        0.371648907661438,
+        0.3716680407524109,
+        0.3716655373573303,
+        0.3716695308685303,
+        0.37173327803611755,
+        0.37185773253440857,
+        0.372059166431427,
+        0.37226539850234985,
+        0.3724333643913269,
+        0.372702956199646,
+        0.3728773295879364
+      ],
+      "parityMaxAbsError": 2.47820829968326e-08,
+      "seconds": 0.2588866997975856
+    },
+    {
+      "seed": 20260628,
+      "bestEpoch": 3,
+      "epochs": 13,
+      "validationLosses": [
+        0.37204107642173767,
+        0.37200644612312317,
+        0.37199845910072327,
+        0.3720114529132843,
+        0.37204089760780334,
+        0.3721272349357605,
+        0.3721880614757538,
+        0.37236252427101135,
+        0.3726164698600769,
+        0.3727685213088989,
+        0.37307947874069214,
+        0.3733677566051483,
+        0.3734437823295593
+      ],
+      "parityMaxAbsError": 2.483550687326641e-08,
+      "seconds": 0.308344200020656
+    },
+    {
+      "seed": 20260629,
+      "bestEpoch": 3,
+      "epochs": 13,
+      "validationLosses": [
+        0.3716820180416107,
+        0.3715949058532715,
+        0.3715565800666809,
+        0.3715592324733734,
+        0.37159180641174316,
+        0.371638685464859,
+        0.37177255749702454,
+        0.37191835045814514,
+        0.3720971941947937,
+        0.37242045998573303,
+        0.3726361095905304,
+        0.3728814721107483,
+        0.37322548031806946
+      ],
+      "parityMaxAbsError": 2.4163418932410252e-08,
+      "seconds": 0.3017027999740094
+    },
+    {
+      "seed": 20260630,
+      "bestEpoch": 3,
+      "epochs": 13,
+      "validationLosses": [
+        0.37180250883102417,
+        0.37176060676574707,
+        0.37172794342041016,
+        0.3717392086982727,
+        0.37173885107040405,
+        0.37173065543174744,
+        0.37178656458854675,
+        0.37191149592399597,
+        0.37212955951690674,
+        0.3724214732646942,
+        0.37267816066741943,
+        0.3730296790599823,
+        0.3739895224571228
+      ],
+      "parityMaxAbsError": 2.3683318500777872e-08,
+      "seconds": 0.30327480006963015
+    }
+  ],
+  "validation": {
+    "ensemble": {
+      "draws": 150,
+      "meanHits": 0.8533333333333334,
+      "matchCounts": [
+        55,
+        67,
+        24,
+        3,
+        1,
+        0,
+        0
+      ],
+      "atLeastThreeRate": 0.02666666666666667,
+      "brier": 0.10742206476142321,
+      "logLoss": 0.3716217115793162,
+      "calibration": [
+        {
+          "lower": 0.0,
+          "upper": 0.1,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        },
+        {
+          "lower": 0.1,
+          "upper": 0.2,
+          "count": 7350,
+          "meanPrediction": 0.12274281397571256,
+          "observedRate": 0.12244897959183673
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.3,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        },
+        {
+          "lower": 0.3,
+          "upper": 0.4,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.5,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        },
+        {
+          "lower": 0.5,
+          "upper": 0.6,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.7,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        },
+        {
+          "lower": 0.7,
+          "upper": 0.8,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 0.9,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        },
+        {
+          "lower": 0.9,
+          "upper": 1.0,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        }
+      ]
+    },
+    "individualSeeds": [
+      {
+        "draws": 150,
+        "meanHits": 0.6666666666666666,
+        "matchCounts": [
+          65,
+          72,
+          11,
+          2,
+          0,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.013333333333333334,
+        "brier": 0.10744558316154285,
+        "logLoss": 0.3717110902102419,
+        "calibration": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 19,
+            "meanPrediction": 0.0979481940590213,
+            "observedRate": 0.15789473684210525
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 7331,
+            "meanPrediction": 0.12223171504073649,
+            "observedRate": 0.12235711362706315
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          }
+        ]
+      },
+      {
+        "draws": 150,
+        "meanHits": 0.82,
+        "matchCounts": [
+          60,
+          61,
+          25,
+          4,
+          0,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.02666666666666667,
+        "brier": 0.10742611320624505,
+        "logLoss": 0.37164888241460375,
+        "calibration": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 7350,
+            "meanPrediction": 0.12331751126131102,
+            "observedRate": 0.12244897959183673
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          }
+        ]
+      },
+      {
+        "draws": 150,
+        "meanHits": 0.6933333333333334,
+        "matchCounts": [
+          65,
+          67,
+          17,
+          1,
+          0,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.006666666666666667,
+        "brier": 0.10750435589271697,
+        "logLoss": 0.3719984336173624,
+        "calibration": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 1,
+            "meanPrediction": 0.0999054252351804,
+            "observedRate": 1.0
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 7349,
+            "meanPrediction": 0.12285833407074281,
+            "observedRate": 0.12232956864879575
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          }
+        ]
+      },
+      {
+        "draws": 150,
+        "meanHits": 0.86,
+        "matchCounts": [
+          56,
+          68,
+          18,
+          7,
+          1,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.05333333333333334,
+        "brier": 0.10740892602607247,
+        "logLoss": 0.37155656981164964,
+        "calibration": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 3,
+            "meanPrediction": 0.09877997221578483,
+            "observedRate": 0.0
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 7347,
+            "meanPrediction": 0.12233342085861193,
+            "observedRate": 0.12249897917517354
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          }
+        ]
+      },
+      {
+        "draws": 150,
+        "meanHits": 0.72,
+        "matchCounts": [
+          67,
+          62,
+          18,
+          2,
+          1,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.02,
+        "brier": 0.10744506340755228,
+        "logLoss": 0.37172795323664065,
+        "calibration": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 7350,
+            "meanPrediction": 0.12304859887211525,
+            "observedRate": 0.12244897959183673
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          }
+        ]
+      }
+    ],
+    "baselines": {
+      "uniform": {
+        "draws": 150,
+        "meanHits": 0.7466666666666667,
+        "matchCounts": [
+          63,
+          64,
+          21,
+          2,
+          0,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.013333333333333334,
+        "brier": 0.10745522698875468,
+        "logLoss": 0.3717761799434528,
+        "calibration": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 7350,
+            "meanPrediction": 0.1224489795918367,
+            "observedRate": 0.12244897959183673
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          }
+        ]
+      },
+      "random": {
+        "draws": 150,
+        "meanHits": 0.7933333333333333,
+        "matchCounts": [
+          59,
+          69,
+          17,
+          4,
+          1,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.03333333333333333
+      },
+      "frequency": {
+        "draws": 150,
+        "meanHits": 0.72,
+        "matchCounts": [
+          63,
+          66,
+          21,
+          0,
+          0,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.0,
+        "brier": 0.10757515916505568,
+        "logLoss": 0.3723402287597906,
+        "calibration": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 901,
+            "meanPrediction": 0.09466131887319724,
+            "observedRate": 0.10432852386237514
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 6449,
+            "meanPrediction": 0.12633123766401755,
+            "observedRate": 0.12498061714994572
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          }
+        ]
+      },
+      "cdm": {
+        "draws": 150,
+        "meanHits": 0.72,
+        "matchCounts": [
+          63,
+          66,
+          21,
+          0,
+          0,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.0
+      },
+      "bayesian": {
+        "draws": 150,
+        "meanHits": 0.7266666666666667,
+        "matchCounts": [
+          70,
+          54,
+          23,
+          3,
+          0,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.02,
+        "brier": 0.10746348968558951,
+        "logLoss": 0.3718168657247484,
+        "calibration": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 7350,
+            "meanPrediction": 0.12235634645862511,
+            "observedRate": 0.12244897959183673
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          }
+        ]
+      }
+    },
+    "pairedMeanHits": {
+      "random": {
+        "difference": 0.06,
+        "ci95": [
+          -0.16666666666666666,
+          0.22666666666666666
+        ],
+        "p": 0.196980301969803,
+        "holmP": 0.196980301969803
+      },
+      "frequency": {
+        "difference": 0.13333333333333333,
+        "ci95": [
+          -0.013333333333333334,
+          0.20666666666666667
+        ],
+        "p": 0.0011998800119988001,
+        "holmP": 0.0047995200479952005
+      },
+      "cdm": {
+        "difference": 0.13333333333333333,
+        "ci95": [
+          -0.013333333333333334,
+          0.20666666666666667
+        ],
+        "p": 0.0011998800119988001,
+        "holmP": 0.0047995200479952005
+      },
+      "bayesian": {
+        "difference": 0.12666666666666668,
+        "ci95": [
+          -0.07333333333333333,
+          0.25333333333333335
+        ],
+        "p": 0.029197080291970802,
+        "holmP": 0.058394160583941604
+      }
+    }
+  },
+  "holdout": {
+    "ensemble": {
+      "draws": 250,
+      "meanHits": 0.792,
+      "matchCounts": [
+        101,
+        105,
+        39,
+        5,
+        0,
+        0,
+        0
+      ],
+      "atLeastThreeRate": 0.02,
+      "brier": 0.10744986971428665,
+      "logLoss": 0.37175453049365975,
+      "calibration": [
+        {
+          "lower": 0.0,
+          "upper": 0.1,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        },
+        {
+          "lower": 0.1,
+          "upper": 0.2,
+          "count": 12250,
+          "meanPrediction": 0.12272269961186978,
+          "observedRate": 0.12244897959183673
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.3,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        },
+        {
+          "lower": 0.3,
+          "upper": 0.4,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.5,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        },
+        {
+          "lower": 0.5,
+          "upper": 0.6,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.7,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        },
+        {
+          "lower": 0.7,
+          "upper": 0.8,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        },
+        {
+          "lower": 0.8,
+          "upper": 0.9,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        },
+        {
+          "lower": 0.9,
+          "upper": 1.0,
+          "count": 0,
+          "meanPrediction": null,
+          "observedRate": null
+        }
+      ]
+    },
+    "individualSeeds": [
+      {
+        "draws": 250,
+        "meanHits": 0.724,
+        "matchCounts": [
+          113,
+          101,
+          29,
+          6,
+          1,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.028,
+        "brier": 0.10745345603909322,
+        "logLoss": 0.3717640938068148,
+        "calibration": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 16,
+            "meanPrediction": 0.09847064924269196,
+            "observedRate": 0.1875
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 12234,
+            "meanPrediction": 0.12217889870786815,
+            "observedRate": 0.12236390387444826
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          }
+        ]
+      },
+      {
+        "draws": 250,
+        "meanHits": 0.748,
+        "matchCounts": [
+          109,
+          101,
+          34,
+          6,
+          0,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.024,
+        "brier": 0.10747547280836395,
+        "logLoss": 0.3718644138137051,
+        "calibration": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 12250,
+            "meanPrediction": 0.12325349671079479,
+            "observedRate": 0.12244897959183673
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          }
+        ]
+      },
+      {
+        "draws": 250,
+        "meanHits": 0.74,
+        "matchCounts": [
+          108,
+          104,
+          33,
+          5,
+          0,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.02,
+        "brier": 0.10749223352583646,
+        "logLoss": 0.3719433500339541,
+        "calibration": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 1,
+            "meanPrediction": 0.09926214132123118,
+            "observedRate": 0.0
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 12249,
+            "meanPrediction": 0.12290710032831909,
+            "observedRate": 0.12245897624295861
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          }
+        ]
+      },
+      {
+        "draws": 250,
+        "meanHits": 0.704,
+        "matchCounts": [
+          112,
+          103,
+          32,
+          3,
+          0,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.012,
+        "brier": 0.10750573065904129,
+        "logLoss": 0.3720127789221705,
+        "calibration": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 8,
+            "meanPrediction": 0.09835599817552859,
+            "observedRate": 0.0
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 12242,
+            "meanPrediction": 0.12229047130907554,
+            "observedRate": 0.12252899852965202
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          }
+        ]
+      },
+      {
+        "draws": 250,
+        "meanHits": 0.756,
+        "matchCounts": [
+          110,
+          95,
+          41,
+          4,
+          0,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.016,
+        "brier": 0.10744315941522131,
+        "logLoss": 0.37172639540009833,
+        "calibration": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 1,
+            "meanPrediction": 0.09967717686973933,
+            "observedRate": 0.0
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 12249,
+            "meanPrediction": 0.12303396443374698,
+            "observedRate": 0.12245897624295861
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          }
+        ]
+      }
+    ],
+    "baselines": {
+      "uniform": {
+        "draws": 250,
+        "meanHits": 0.708,
+        "matchCounts": [
+          108,
+          110,
+          29,
+          3,
+          0,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.012,
+        "brier": 0.10745522698875468,
+        "logLoss": 0.37177617994345274,
+        "calibration": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 12250,
+            "meanPrediction": 0.12244897959183672,
+            "observedRate": 0.12244897959183673
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          }
+        ]
+      },
+      "random": {
+        "draws": 250,
+        "meanHits": 0.772,
+        "matchCounts": [
+          98,
+          115,
+          33,
+          4,
+          0,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.016
+      },
+      "frequency": {
+        "draws": 250,
+        "meanHits": 0.748,
+        "matchCounts": [
+          111,
+          97,
+          38,
+          2,
+          2,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.016,
+        "brier": 0.1075654639219056,
+        "logLoss": 0.37229415118285053,
+        "calibration": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 919,
+            "meanPrediction": 0.09380410885326203,
+            "observedRate": 0.11207834602829161
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 11331,
+            "meanPrediction": 0.12477221992444198,
+            "observedRate": 0.12329008913599859
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          }
+        ]
+      },
+      "cdm": {
+        "draws": 250,
+        "meanHits": 0.748,
+        "matchCounts": [
+          111,
+          97,
+          38,
+          2,
+          2,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.016
+      },
+      "bayesian": {
+        "draws": 250,
+        "meanHits": 0.792,
+        "matchCounts": [
+          108,
+          96,
+          37,
+          8,
+          1,
+          0,
+          0
+        ],
+        "atLeastThreeRate": 0.036,
+        "brier": 0.10745808766253004,
+        "logLoss": 0.3717879785577058,
+        "calibration": [
+          {
+            "lower": 0.0,
+            "upper": 0.1,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.2,
+            "count": 12250,
+            "meanPrediction": 0.12238293737380995,
+            "observedRate": 0.12244897959183673
+          },
+          {
+            "lower": 0.2,
+            "upper": 0.3,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.3,
+            "upper": 0.4,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.6,
+            "upper": 0.7,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.7,
+            "upper": 0.8,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.8,
+            "upper": 0.9,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          },
+          {
+            "lower": 0.9,
+            "upper": 1.0,
+            "count": 0,
+            "meanPrediction": null,
+            "observedRate": null
+          }
+        ]
+      }
+    },
+    "pairedMeanHits": {
+      "random": {
+        "difference": 0.02,
+        "ci95": [
+          -0.14,
+          0.156
+        ],
+        "p": 0.39436056394360564,
+        "holmP": 0.7185281471852815
+      },
+      "frequency": {
+        "difference": 0.044,
+        "ci95": [
+          -0.096,
+          0.148
+        ],
+        "p": 0.16098390160983903,
+        "holmP": 0.6439356064393561
+      },
+      "cdm": {
+        "difference": 0.044,
+        "ci95": [
+          -0.096,
+          0.148
+        ],
+        "p": 0.16098390160983903,
+        "holmP": 0.6439356064393561
+      },
+      "bayesian": {
+        "difference": 0.0,
+        "ci95": [
+          -0.16,
+          0.124
+        ],
+        "p": 0.35926407359264073,
+        "holmP": 0.7185281471852815
+      }
+    }
+  },
+  "historicalGatePassed": false
+}

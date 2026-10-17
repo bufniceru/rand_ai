@@ -1,0 +1,11 @@
+{
+  "histories": 20,
+  "independentUnit": "history (not training seed)",
+  "meanMetrics": {
+    "meanHits": 0.7646,
+    "atLeastThreeRate": 0.022000000000000002,
+    "brier": 0.10746553185280114,
+    "logLoss": 0.3718252154629653
+  },
+  "gatePassCount": 0
+}

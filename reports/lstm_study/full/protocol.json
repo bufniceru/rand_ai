@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "history": "e800db8b4911a51cd6083af9f58cf5eefe431191765848f2c8763dbf0a3155ce",
+  "datasetSha256": "e46d899b32e8056580d68c86d7c7a623d96e25317e5469e1613600f531ca7a2b",
+  "source": "88531499876a25aa4c6227f52024a3c1bcbdae7c001faa5b8debd5ee3df64afb",
+  "config": {
+    "validation": 150,
+    "holdout": 250,
+    "minimum_train": 200,
+    "max_epochs": 100,
+    "patience": 10,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "bootstrap": 10000,
+    "block": 20
+  },
+  "seeds": [
+    20260626,
+    20260627,
+    20260628,
+    20260629,
+    20260630
+  ],
+  "python": "3.14.6",
+  "numpy": "2.5.1",
+  "torch": "2.13.0+cpu",
+  "syntheticHistories": 20,
+  "architecture": "LSTM(49,32), Dense(32,49); unweighted BCE; sigmoid inference",
+  "training": "CPU deterministic; clip norm 1; independent windows; no scaling; no refit",
+  "command": "uv run --group research python scripts/benchmark_lstm.py --stage all --dataset C:\\code_py\\rand_ai\\data\\lotto_results_2019.yaml --output reports\\lstm_study\\full"
+}

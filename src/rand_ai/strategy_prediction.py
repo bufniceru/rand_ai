@@ -3143,6 +3143,7 @@ class _StrategyState:
         gaps: dict[int, int],
         *,
         weighted: bool,
+        raw_probabilities: bool = False,
     ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]]:
         if weighted:
             raw = self._markov_gap_probabilities(gaps)
@@ -3153,7 +3154,7 @@ class _StrategyState:
                 )
                 for number in raw
             }
-            return _scale_scores(raw), details
+            return (raw if raw_probabilities else _scale_scores(raw)), details
 
         lifetime_gap_probabilities = [
             (hit + _BAYESIAN_GAP_PRIOR_STRENGTH * _BASE_PROBABILITY)
@@ -3217,7 +3218,7 @@ class _StrategyState:
                     f"{_BAYESIAN_NUMBER_PRIOR_STRENGTH:.0f} number"
                 ),
             )
-        return _scale_scores(raw), details
+        return (raw if raw_probabilities else _scale_scores(raw)), details
 
     def _mkfr_baseline_probability(self, number: int) -> float:
         return (self.appearances[number] + _MKFR_PRIOR_STRENGTH * _BASE_PROBABILITY) / (

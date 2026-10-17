@@ -1,0 +1,18 @@
+{
+  "history": "014e64129b77b8119eb1985230825df502d6e6cadd71ae96c5d814b41f573f33",
+  "config": {
+    "validation": 150,
+    "holdout": 250,
+    "minimum_train": 200,
+    "max_epochs": 100,
+    "patience": 10,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "bootstrap": 10000,
+    "block": 20
+  },
+  "source": "88531499876a25aa4c6227f52024a3c1bcbdae7c001faa5b8debd5ee3df64afb",
+  "torch": "2.13.0+cpu",
+  "python": "3.14.6",
+  "numpy": "2.5.1"
+}

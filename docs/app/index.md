@@ -34,6 +34,7 @@ proposed-commands
 architecture
 data-and-security
 contributing
+lstm-research
 ```
 
 ```{toctree}
