@@ -75,7 +75,9 @@ activation reference and when its dated training/validation prefix matches.
 The six selected numbers are distinct; the scores are model estimates, not
 calibrated guarantees or a joint distribution over valid tickets.
 
-No artifact is automatically installed or bundled. No desktop strategy is
-registered and no existing ensemble roster or saved settings change. Desktop
-integration is a subsequent decision after reviewing the benchmark results;
-it would be optional and use NumPy, without adding PyTorch to the portable app.
+Benchmark exports are never automatically installed. The desktop explicitly
+bundles the reviewed frozen artifact as `lstm_v1.npz` and offers it as
+[LSTM (Experimental)](strategies/lstm.md), disabled by default. It uses NumPy
+without PyTorch. The historical research gate failed; integration supports
+continued observation and does not establish an advantage. Existing fixed
+ensemble rosters and saved strategy choices remain unchanged.

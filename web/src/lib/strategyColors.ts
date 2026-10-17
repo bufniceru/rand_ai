@@ -35,6 +35,7 @@ export const STRATEGY_TONE_POSITION_BY_ID = {
   xgboost_classifier: 6,
   xgboost_classifier_v2: 7,
   sparse_neural_ticket: 5,
+  lstm: 8,
   mixed: 0,
   svc_recurrence_hybrid: 1,
   svc_recurrence_proximity_hybrid: 2,

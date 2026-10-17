@@ -81,6 +81,7 @@ const strategyDescriptions: Record<StrategyId, string> = {
     "History-only XGBoost classifier using three-draw lags, gaps, and frequencies; retrained every ten transitions.",
   lag_logistic:
     "Compact probability model combining exact three-draw lags with gap and frequency context.",
+  lstm: "Frozen seven-draw LSTM ensemble. Experimental; historical research gate failed. Requires the matching dated training prefix and at least 521 completed draws; no forecast is available for incompatible histories.",
   sparse_neural_ticket:
     "Experimental frozen five-seed neural ticket; its historical promotion gate failed.",
   cis: "Online learner combining ten strategy experts.",

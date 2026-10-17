@@ -502,6 +502,7 @@ function strategyFullName(strategy: StrategyPrediction): string {
     arima: "ARIMA (Experimental)",
     xgboost_classifier_v2: "XGBoost V2 (Experimental)",
     sparse_neural_ticket: "Sparse Neural Ticket",
+    lstm: "LSTM (Experimental)",
     cis: "Collective Intelligence Strategy",
     decision_tree_selector: "Decision Tree Selector",
     residual_coverage: "Residual Coverage",

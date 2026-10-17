@@ -17,6 +17,7 @@ from rand_ai.arima import ArimaModel
 from rand_ai.adaptive_shape_recurrence import AdaptiveShapeRecurrenceModel
 from rand_ai.categorical_chi_square import CategoricalChiSquareModel
 from rand_ai.draw import Draw
+from rand_ai.lstm import LstmArtifact, load_packaged_lstm
 from rand_ai.mkgsv import MkgsvModel
 from rand_ai.nonlinear_dynamics import (
     RecurrenceDynamicsModel,
@@ -235,6 +236,7 @@ _BASE_STRATEGY_IDS = (
     "lag_logistic",
     "xgboost_classifier",
     "xgboost_classifier_v2",
+    "lstm",
     "sparse_neural_ticket",
     "cis",
     "decision_tree_selector",
@@ -405,6 +407,7 @@ _STRATEGY_DEPENDENCIES = {
             "xgboost_classifier",
             "xgboost_classifier_v2",
             "sparse_neural_ticket",
+            "lstm",
             "decision_tree_selector",
             "arima",
             "categorical_chi_square",
@@ -522,7 +525,7 @@ def _strategy(
 ) -> StrategyPrediction:
     ranked = (
         sorted(scores, key=lambda number: (-scores[number], number))
-        if strategy_id in {"xgboost_classifier", "xgboost_classifier_v2"}
+        if strategy_id in {"xgboost_classifier", "xgboost_classifier_v2", "lstm"}
         else _ranking_from_scores(scores, gaps)
     )
     predictions = tuple(
@@ -1120,6 +1123,11 @@ class _StrategyState:
         self.lag_logistic_fitted = False
         self.lag_logistic_trained_draws = 0
         self.lag_logistic_pending_features: np.ndarray | None = None
+        self.lstm: LstmArtifact | None = (
+            load_packaged_lstm() if "lstm" in self.enabled_strategy_ids else None
+        )
+        self.lstm_history: list[Draw] = []
+        self.lstm_invalid = False
         self.sparse_neural_ticket: SparseNeuralTicketArtifact | None = (
             load_sparse_neural_ticket()
             if "sparse_neural_ticket" in self.enabled_strategy_ids
@@ -1666,6 +1674,40 @@ class _StrategyState:
                 "Compact shared model; no future-draw inputs",
             )
             for number in range(1, _NUMBER_COUNT + 1)
+        }
+        return scores, details
+
+    def _lstm_scores(
+        self,
+    ) -> tuple[dict[int, float], dict[int, tuple[str, ...]]] | None:
+        artifact = self.lstm
+        if artifact is None or self.lstm_invalid:
+            return None
+        if self.draw_count < artifact.activation_reference_draw:
+            return None
+        try:
+            probabilities = artifact.predict(self.lstm_history)
+        except ValueError:
+            # A different fitted prefix must never receive leaked historical forecasts.
+            self.lstm_invalid = True
+            return None
+        if (
+            probabilities.shape != (_NUMBER_COUNT,)
+            or not np.isfinite(probabilities).all()
+            or np.any((probabilities < 0) | (probabilities > 1))
+        ):
+            raise ValueError("LSTM must return 49 finite probabilities in [0, 1]")
+        gate = "passed" if artifact.historical_gate_passed else "failed"
+        scores = {number: float(probabilities[number - 1]) for number in range(1, 50)}
+        details: dict[int, tuple[str, ...]] = {
+            number: (
+                f"Five-seed LSTM estimate {scores[number]:.8%}",
+                "Seven completed draws; 32 hidden units; frozen weights",
+                f"Activation reference draw {artifact.activation_reference_draw}",
+                f"Historical research gate {gate}; exploratory evidence only",
+                "Model estimate, not a calibrated guarantee",
+            )
+            for number in scores
         }
         return scores, details
 
@@ -2920,6 +2962,8 @@ class _StrategyState:
             self.previous_previous_draw = self.previous_draw
             self.previous_draw = set(drawn)
         self.current_month = int(draw_date[5:7]) if draw_date else 0
+        if "lstm" in self.enabled_strategy_ids:
+            self.lstm_history.append(Draw(*sorted(drawn), date=draw_date))
         if "sparse_neural_ticket" in self.enabled_strategy_ids:
             self.sparse_neural_ticket_history.append(
                 [draw_date, *sorted(drawn)]
@@ -5860,6 +5904,20 @@ class _StrategyState:
                     lag_logistic_scores,
                     gaps,
                     lag_logistic_details,
+                )
+
+        if "lstm" in requested:
+            lstm_result = self._lstm_scores()
+            if lstm_result is not None:
+                lstm_scores, lstm_details = lstm_result
+                built["lstm"] = _strategy(
+                    "lstm",
+                    "LSTM (Experimental)",
+                    "Frozen five-seed LSTM using seven completed draws. "
+                    "Its historical research gate failed; optional continued observation only.",
+                    lstm_scores,
+                    gaps,
+                    lstm_details,
                 )
 
         if "sparse_neural_ticket" in enabled:

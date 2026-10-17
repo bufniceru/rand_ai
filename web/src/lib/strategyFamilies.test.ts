@@ -43,6 +43,7 @@ const strategyIds: StrategyId[] = [
   "xgboost_classifier",
   "xgboost_classifier_v2",
   "sparse_neural_ticket",
+  "lstm",
   "cis",
   "decision_tree_selector",
   "border_group_statistical",

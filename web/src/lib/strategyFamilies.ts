@@ -98,6 +98,7 @@ export const STRATEGY_FAMILY_BY_ID = {
   xgboost_classifier: "relationships-machine-learning",
   xgboost_classifier_v2: "relationships-machine-learning",
   sparse_neural_ticket: "relationships-machine-learning",
+  lstm: "relationships-machine-learning",
   cis: "ensembles-coverage",
   decision_tree_selector: "ensembles-coverage",
   border_group_statistical: "border-space-groups",

@@ -61,6 +61,7 @@ scikit-online-svm
 lagged-logistic
 xgboost-classifier
 xgboost-classifier-v2
+lstm
 ```
 
 ### Ensembles & Coverage

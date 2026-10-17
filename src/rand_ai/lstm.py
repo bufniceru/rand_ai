@@ -7,6 +7,8 @@ import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from functools import lru_cache
+from importlib import resources
 
 import numpy as np
 
@@ -134,3 +136,11 @@ def load_lstm_artifact(path: str | Path) -> LstmArtifact:
                 weights[name] = values
             models.append(weights)
     return LstmArtifact(activation, fingerprint, gate, tuple(models))
+
+
+@lru_cache(maxsize=1)
+def load_packaged_lstm() -> LstmArtifact:
+    """Load the desktop's explicitly frozen experimental artifact without torch."""
+    artifact = resources.files("rand_ai").joinpath("lstm_v1.npz")
+    with resources.as_file(artifact) as path:
+        return load_lstm_artifact(path)

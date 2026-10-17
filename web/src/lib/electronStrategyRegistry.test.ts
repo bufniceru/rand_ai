@@ -22,6 +22,10 @@ describe("Electron Settings strategy registry", () => {
     expect(registry.defaults).not.toContain("xgboost_classifier_v2");
     expect(registry.defaults).not.toContain("xgboost_classifier");
     expect(registry.defaults).toContain("cdm");
+    expect(registry.defaults).not.toContain("lstm");
+    expect(registry.plugins.find((plugin) => plugin.id === "lstm")).toEqual({
+      id: "lstm", label: "LSTM (Experimental)",
+    });
     expect(registry.plugins.find((plugin) => plugin.id === "cdm")).toEqual({
       id: "cdm", label: "CDM",
     });
@@ -42,6 +46,8 @@ describe("CDM saved strategy preferences", () => {
     expect(load(["bayesian"])).toEqual(new Set(["bayesian"]));
     expect(load(["cdm", "bayesian"])).toEqual(new Set(["cdm", "bayesian"]));
     expect(load([])).toEqual(new Set());
+    expect(load(["lstm"])).toEqual(new Set(["lstm"]));
+    expect(load(["bayesian"]).has("lstm")).toBe(false);
     const legacy = ["proximity", "freshness", "emd", "randomness", "entropy", "markov100", "mkfr", "bayesian", "svc", "tbl"];
     expect(load(legacy).has("cdm")).toBe(false);
   });

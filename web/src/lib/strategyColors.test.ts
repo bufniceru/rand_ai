@@ -49,6 +49,6 @@ describe("family-based strategy colors", () => {
   it("keeps strategy colors stable", () => {
     expect(strategyColor("freshness")).toBe("#C87B56");
     expect(strategyColor("fresh_random")).toBe("#FFE085");
-    expect(strategyColor("sparse_neural_ticket")).toBe("#84DFEA");
+    expect(strategyColor("sparse_neural_ticket")).toBe("#7FDEE9");
   });
 });

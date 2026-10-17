@@ -39,6 +39,7 @@ export const strategyNames: Record<StrategyId, string> = {
   xgboost_classifier: "XGBoost Classifier",
   xgboost_classifier_v2: "XGBoost V2 (Experimental)",
   sparse_neural_ticket: "Sparse Neural Ticket",
+  lstm: "LSTM (Experimental)",
   cis: "Collective Intelligence Strategy",
   decision_tree_selector: "Decision Tree Selector",
   border_group_statistical: "Border Group Statistical",

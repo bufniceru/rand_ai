@@ -124,6 +124,7 @@ const strategyPlugins = [
     id: "sparse_neural_ticket",
     label: "Sparse Neural Ticket (Experimental)",
   },
+  { id: "lstm", label: "LSTM (Experimental)" },
   { id: "cis", label: "Collective Intelligence Strategy" },
   { id: "decision_tree_selector", label: "Decision Tree Selector" },
   { id: "border_group_statistical", label: "Border Group Statistical" },
@@ -147,6 +148,7 @@ const defaultStrategyPluginIds = strategyPlugins
       strategyId !== "arima" &&
       strategyId !== "xgboost_classifier_v2" &&
       strategyId !== "sparse_neural_ticket" &&
+      strategyId !== "lstm" &&
       strategyId !== "decision_tree_selector" &&
       strategyId !== "recurrence_dynamics" &&
       strategyId !== "positional_shape_successor" &&
