@@ -26,6 +26,7 @@ const reportPlugins = [
   { id: "randomness", label: "Randomness" },
   { id: "nonlinear-dynamics", label: "Nonlinear Dynamics" },
   { id: "autocorrelation", label: "Autocorrelation" },
+  { id: "first-number-direction", label: "First Number Direction" },
   { id: "co-occurrence", label: "Co-occurrence" },
   { id: "prediction-audit", label: "Prediction Audit" },
   { id: "draw-comparison", label: "Latest Draw vs Predictions" },
@@ -45,6 +46,7 @@ const legacyReportPluginIds = reportPlugins
     (reportId) =>
       reportId !== "nonlinear-dynamics" &&
       reportId !== "autocorrelation" &&
+      reportId !== "first-number-direction" &&
       reportId !== "co-occurrence" &&
       reportId !== "prediction-audit" &&
       reportId !== "draw-comparison" &&
@@ -170,6 +172,7 @@ const dashboardViews = [
   ["randomness", "Randomness"],
   ["nonlinear-dynamics", "Nonlinear Dynamics"],
   ["autocorrelation", "Autocorrelation"],
+  ["first-number-direction", "First Number Direction"],
   ["co-occurrence", "Co-occurrence"],
   ["prediction-audit", "Prediction Audit"],
   ["draw-comparison", "Latest Draw vs Predictions"],

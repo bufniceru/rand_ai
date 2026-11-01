@@ -21,6 +21,7 @@ import {
   type CommandResultOverlayState,
 } from "./lib/commands";
 import PossibleDrawDialogApp from "./PossibleDrawDialogApp.vue";
+import FirstNumberDirectionView from "./views/FirstNumberDirectionView.vue";
 import AutocorrelationView from "./views/AutocorrelationView.vue";
 import CoOccurrenceView from "./views/CoOccurrenceView.vue";
 import CircleNumberSelectorView from "./views/CircleNumberSelectorView.vue";
@@ -77,6 +78,7 @@ const views: { id: ViewId; label: string; shortLabel: string }[] = [
     label: "Autocorrelation",
     shortLabel: "Autocorrelation",
   },
+  { id: "first-number-direction", label: "First Number Direction", shortLabel: "First Number Direction" },
   {
     id: "co-occurrence",
     label: "Co-occurrence",
@@ -1011,6 +1013,10 @@ onBeforeUnmount(() => {
         />
         <NonlinearDynamicsView
           v-else-if="activeView === 'nonlinear-dynamics' && analysis.options.enabledReports.includes('nonlinear-dynamics')"
+          :analysis="analysis"
+        />
+        <FirstNumberDirectionView
+          v-else-if="activeView === 'first-number-direction' && analysis.options.enabledReports.includes('first-number-direction')"
           :analysis="analysis"
         />
         <AutocorrelationView

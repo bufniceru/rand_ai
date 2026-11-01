@@ -157,3 +157,18 @@ YAML imports use the safe YAML loader and Rand AI trusts only the pickle it
 generates from that selected source. Existing `.pkl` and `.pickle` datasets
 still require explicit trust confirmation because Python pickle loading can
 execute code; never analyze an unknown or untrusted pickle file.
+
+### First Number Direction
+
+The **First Number Direction** report estimates whether the next draw’s smallest
+number is lower, equal to or higher than the latest minimum. Exact 6/49
+probabilities remain active unless chronological evidence supports a learned
+candidate. See the [guide](docs/app/first-number-direction.md).
+
+Run the reproducible historical and 20-history synthetic study with:
+
+```powershell
+uv run python scripts/study_first_number_direction.py --stage all
+```
+
+Results are written to `reports/first_number_direction/`.

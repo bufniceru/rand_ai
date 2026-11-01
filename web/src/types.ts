@@ -8,6 +8,7 @@ export type ReportId =
   | "randomness"
   | "nonlinear-dynamics"
   | "autocorrelation"
+  | "first-number-direction"
   | "co-occurrence"
   | "prediction-audit"
   | "draw-comparison"
@@ -77,6 +78,7 @@ export type ViewId =
   | "randomness"
   | "nonlinear-dynamics"
   | "autocorrelation"
+  | "first-number-direction"
   | "co-occurrence"
   | "prediction-audit"
   | "draw-comparison"
@@ -216,6 +218,7 @@ export interface AnalysisPayload {
   possibleDraw: PossibleDrawAnalysis;
   spaceGroups: SpaceGroupAnalysis | null;
   nonlinearDynamics: NonlinearDynamicsAnalysis | null;
+  firstNumberDirection?: FirstNumberDirectionAnalysis | null;
 }
 
 export type NonlinearEvidenceStatus =
@@ -796,4 +799,28 @@ declare global {
   interface Window {
     randAiDesktop?: DesktopApi;
   }
+}
+
+export type FirstDirection = "lower" | "equal" | "higher";
+export interface DirectionMetrics {
+  count: number; logLoss: number | null; brier: number | null; accuracy: number | null;
+  confusionMatrix: number[][]; recall: (number | null)[];
+}
+export interface DirectionEvidence {
+  scoredCount: number; eligible: boolean;
+  candidates: Record<string, { improvement: number; lower95: number; pValue: number; holmPValue: number; supported: boolean }>;
+}
+export interface DirectionForecast {
+  referenceDrawNumber: number; referenceDate: string | null; referenceMinimum: number;
+  targetDrawNumber: number; probabilities: number[]; baselineProbabilities: number[];
+  predictedDirection: FirstDirection; activeModel: string; activationEvidence: DirectionEvidence;
+  models: Record<string, number[]>;
+}
+export interface DirectionRecord extends DirectionForecast {
+  actualMinimum: number; actualDate: string | null; actualDirection: FirstDirection;
+}
+export interface FirstNumberDirectionAnalysis {
+  protocol: Record<string, string | number>; datasetFingerprint: string;
+  forecast: DirectionForecast | null; evaluation: Record<string, DirectionMetrics>;
+  blocks: Record<string, DirectionMetrics>[]; history: DirectionRecord[];
 }

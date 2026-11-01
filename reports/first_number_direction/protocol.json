@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "warmup": 120,
+  "refitInterval": 20,
+  "minimumScores": 200,
+  "priorStrength": 50,
+  "logisticC": 0.1,
+  "bootstrapBlockLength": 20,
+  "bootstrapReplicates": 2000,
+  "seed": 20261101,
+  "syntheticHistories": 20,
+  "interpretation": "Exploratory historical evidence; history previously used for research."
+}
