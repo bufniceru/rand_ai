@@ -160,7 +160,7 @@ execute code; never analyze an unknown or untrusted pickle file.
 
 ### First Number Direction
 
-The **First Number Direction** report estimates whether the next draw’s smallest
+The **First Number Direction** report estimates whether the next draw's smallest
 number is lower, equal to or higher than the latest minimum. Exact 6/49
 probabilities remain active unless chronological evidence supports a learned
 candidate. See the [guide](docs/app/first-number-direction.md).
