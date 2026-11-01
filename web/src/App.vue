@@ -78,7 +78,7 @@ const views: { id: ViewId; label: string; shortLabel: string }[] = [
     label: "Autocorrelation",
     shortLabel: "Autocorrelation",
   },
-  { id: "first-number-direction", label: "First Number Direction", shortLabel: "First Number Direction" },
+  { id: "first-number-direction", label: "Number Directions", shortLabel: "Number Directions" },
   {
     id: "co-occurrence",
     label: "Co-occurrence",

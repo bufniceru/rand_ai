@@ -158,10 +158,12 @@ generates from that selected source. Existing `.pkl` and `.pickle` datasets
 still require explicit trust confirmation because Python pickle loading can
 execute code; never analyze an unknown or untrusted pickle file.
 
-### First Number Direction
+### Number Directions
 
-The **First Number Direction** report estimates whether the next draw's smallest
-number is lower, equal to or higher than the latest minimum. Exact 6/49
+Enable **Reports → Number Directions** and open **View → Number Directions**.
+The page shows six cards estimating whether each sorted position in the next
+draw is lower, equal to or higher than the same previous position. A selector
+provides detailed evaluation and history for each position. Exact 6/49
 probabilities remain active unless chronological evidence supports a learned
 candidate. See the [guide](docs/app/first-number-direction.md).
 

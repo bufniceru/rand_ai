@@ -17,7 +17,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 import pandas as pd
 
 from rand_ai.draws import Draws
-from rand_ai.first_number_direction import cached_direction
+from rand_ai.first_number_direction import cached_number_directions
 from rand_ai.lotto_results import (
     create_lotto_results_pickle,
     lotto_results_editor_payload,
@@ -892,7 +892,7 @@ def build_analysis_payload(
         "spaceGroups": space_group_payload,
         "nonlinearDynamics": nonlinear_dynamics_payload,
         "firstNumberDirection": (
-            cached_direction(draws, strategy_cache_dir, refresh_strategy_cache)
+            cached_number_directions(draws, strategy_cache_dir, refresh_strategy_cache)
             if "first-number-direction" in report_set
             else None
         ),

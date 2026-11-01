@@ -1,6 +1,6 @@
 {
   "protocol": {
-    "version": 1,
+    "version": 2,
     "warmup": 120,
     "refitInterval": 20,
     "minimumScores": 200,

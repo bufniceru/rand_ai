@@ -811,16 +811,22 @@ export interface DirectionEvidence {
   candidates: Record<string, { improvement: number; lower95: number; pValue: number; holmPValue: number; supported: boolean }>;
 }
 export interface DirectionForecast {
-  referenceDrawNumber: number; referenceDate: string | null; referenceMinimum: number;
+  referenceDrawNumber: number; referenceDate: string | null; referenceValue: number;
   targetDrawNumber: number; probabilities: number[]; baselineProbabilities: number[];
   predictedDirection: FirstDirection; activeModel: string; activationEvidence: DirectionEvidence;
   models: Record<string, number[]>;
 }
 export interface DirectionRecord extends DirectionForecast {
-  actualMinimum: number; actualDate: string | null; actualDirection: FirstDirection;
+  actualValue: number; actualDate: string | null; actualDirection: FirstDirection;
 }
-export interface FirstNumberDirectionAnalysis {
+export interface PositionDirectionAnalysis {
+  position: number;
   protocol: Record<string, string | number>; datasetFingerprint: string;
   forecast: DirectionForecast | null; evaluation: Record<string, DirectionMetrics>;
   blocks: Record<string, DirectionMetrics>[]; history: DirectionRecord[];
+}
+
+export interface FirstNumberDirectionAnalysis {
+  schemaVersion: 2; protocol: Record<string, string | number>; datasetFingerprint: string;
+  positions: PositionDirectionAnalysis[];
 }

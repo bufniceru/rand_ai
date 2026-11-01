@@ -18,7 +18,7 @@ DIRECTIONS = ("lower", "equal", "higher")
 CANDIDATES = ("historical", "transition", "logistic")
 MODELS = ("baseline", *CANDIDATES, "gated")
 PROTOCOL = {
-    "version": 1,
+    "version": 2,
     "warmup": 120,
     "refitInterval": 20,
     "minimumScores": 200,
@@ -47,12 +47,40 @@ def baseline_probabilities(minimum: int) -> list[float]:
     ]
 
 
-def normalize(probabilities, minimum: int) -> list[float]:
+def position_distribution(position: int) -> np.ndarray:
+    """Exact probability mass over the 44 valid values of a sorted position."""
+    if type(position) is not int or not 1 <= position <= 6:
+        raise ValueError("Position must be an integer from 1 through 6")
+    return np.array(
+        [
+            math.comb(x - 1, position - 1)
+            * math.comb(49 - x, 6 - position)
+            / math.comb(49, 6)
+            for x in range(position, position + 44)
+        ]
+    )
+
+
+def position_baseline(value: int, position: int) -> list[float]:
+    prior = position_distribution(position)
+    if type(value) is not int or not position <= value <= position + 43:
+        raise ValueError("Value is outside the sorted position's valid range")
+    if position == 1:
+        return baseline_probabilities(value)
+    offset = value - position
+    return [
+        float(prior[:offset].sum()),
+        float(prior[offset]),
+        float(prior[offset + 1 :].sum()),
+    ]
+
+
+def normalize(probabilities, minimum: int, position: int = 1) -> list[float]:
     """Remove impossible classes and normalize with a safe exact fallback."""
     p = np.maximum(np.asarray(probabilities, dtype=float), 0)
-    p[np.asarray(baseline_probabilities(minimum)) == 0] = 0
+    p[np.asarray(position_baseline(minimum, position)) == 0] = 0
     if not np.isfinite(p).all() or p.sum() <= 0:
-        return baseline_probabilities(minimum)
+        return position_baseline(minimum, position)
     return (p / p.sum()).tolist()
 
 
@@ -138,13 +166,14 @@ def metrics(records: list[dict], model: str) -> dict:
     }
 
 
-def analyze_direction(draws: Draws) -> dict:
+def analyze_position(draws: Draws, position: int) -> dict:
     """Forecast before observing each target; never fit on future observations."""
+    prior = position_distribution(position)
     entries = draws.draws
     dates = [draw.date for draw in entries if draw.date is not None]
     if any(a > b for a, b in zip(dates, dates[1:])):
-        raise ValueError("First Number Direction requires chronological draw dates")
-    minima = [draw.num1.value for draw in entries]
+        raise ValueError("Number Directions requires chronological draw dates")
+    minima = [draw.balls[position - 1].value for draw in entries]
     identity = [[draw.date, *[b.value for b in draw.balls]] for draw in entries]
     fingerprint = hashlib.sha256(
         json.dumps(identity, separators=(",", ":")).encode()
@@ -159,9 +188,9 @@ def analyze_direction(draws: Draws) -> dict:
     forecast = None
     for target in range(1, len(minima) + 1):
         previous = minima[target - 1]
-        counts[previous - 1] += 1
+        counts[previous - position] += 1
         if target >= 2:
-            transitions[minima[target - 2] - 1, previous - 1] += 1
+            transitions[minima[target - 2] - position, previous - position] += 1
         if target >= 31:
             training_x.append(features(minima[: target - 1]))
             training_y.append(direction(minima[target - 2], previous))
@@ -180,23 +209,24 @@ def analyze_direction(draws: Draws) -> dict:
                 model.fit(training_x, training_y)
             active, evidence = select_model(losses)
         strength = PROTOCOL["priorStrength"]
-        historical = (counts + strength * MINIMUM_PRIOR) / (counts.sum() + strength)
-        transition = (transitions[previous - 1] + strength * historical) / (
-            transitions[previous - 1].sum() + strength
+        historical = (counts + strength * prior) / (counts.sum() + strength)
+        transition = (transitions[previous - position] + strength * historical) / (
+            transitions[previous - position].sum() + strength
         )
 
         def aggregate(distribution):
             return normalize(
                 [
-                    distribution[: previous - 1].sum(),
-                    distribution[previous - 1],
-                    distribution[previous:].sum(),
+                    distribution[: previous - position].sum(),
+                    distribution[previous - position],
+                    distribution[previous - position + 1 :].sum(),
                 ],
                 previous,
+                position,
             )
 
         probabilities = {
-            "baseline": baseline_probabilities(previous),
+            "baseline": position_baseline(previous, position),
             "historical": aggregate(historical),
             "transition": aggregate(transition),
         }
@@ -206,12 +236,12 @@ def analyze_direction(draws: Draws) -> dict:
             logistic[model.classes_.astype(int)] = model.predict_proba(
                 [features(minima[:target])]
             )[0]
-        probabilities["logistic"] = normalize(logistic, previous)
+        probabilities["logistic"] = normalize(logistic, previous, position)
         probabilities["gated"] = probabilities[active].copy()
         forecast = {
             "referenceDrawNumber": target,
             "referenceDate": entries[target - 1].date,
-            "referenceMinimum": previous,
+            "referenceValue": previous,
             "targetDrawNumber": target + 1,
             "probabilities": probabilities["gated"],
             "baselineProbabilities": probabilities["baseline"],
@@ -224,7 +254,7 @@ def analyze_direction(draws: Draws) -> dict:
             actual = direction(previous, minima[target])
             row = {
                 **forecast,
-                "actualMinimum": minima[target],
+                "actualValue": minima[target],
                 "actualDate": entries[target].date,
                 "actualDirection": DIRECTIONS[actual],
             }
@@ -232,11 +262,11 @@ def analyze_direction(draws: Draws) -> dict:
             for name in losses:
                 losses[name].append(-math.log(max(probabilities[name][actual], 1e-15)))
     if minima and forecast is None:
-        p = baseline_probabilities(minima[-1])
+        p = position_baseline(minima[-1], position)
         forecast = {
             "referenceDrawNumber": len(minima),
             "referenceDate": entries[-1].date,
-            "referenceMinimum": minima[-1],
+            "referenceValue": minima[-1],
             "targetDrawNumber": len(minima) + 1,
             "probabilities": p,
             "baselineProbabilities": p,
@@ -247,6 +277,7 @@ def analyze_direction(draws: Draws) -> dict:
         }
     blocks = [list(block) for block in np.array_split(np.arange(len(records)), 5)]
     return {
+        "position": position,
         "protocol": dict(PROTOCOL),
         "datasetFingerprint": fingerprint,
         "forecast": forecast,
@@ -257,6 +288,59 @@ def analyze_direction(draws: Draws) -> dict:
         ],
         "history": records,
     }
+
+
+def analyze_direction(draws: Draws) -> dict:
+    """Compatibility wrapper retaining the original position-one field names."""
+    result = analyze_position(draws, 1)
+    for row in [result["forecast"], *result["history"]]:
+        if row is not None:
+            row["referenceMinimum"] = row.pop("referenceValue")
+            if "actualValue" in row:
+                row["actualMinimum"] = row.pop("actualValue")
+    return result
+
+
+def analyze_number_directions(draws: Draws) -> dict:
+    reports = [analyze_position(draws, position) for position in range(1, 7)]
+    return {
+        "schemaVersion": 2,
+        "protocol": dict(PROTOCOL),
+        "datasetFingerprint": reports[0]["datasetFingerprint"],
+        "positions": reports,
+    }
+
+
+def cached_number_directions(
+    draws: Draws, cache_dir: Path | None = None, refresh: bool = False
+) -> dict:
+    """Cache the expanded report independently of legacy single-position payloads."""
+    identity = {
+        "protocol": PROTOCOL,
+        "schemaVersion": 2,
+        "draws": [[d.date, *[b.value for b in d.balls]] for d in draws.draws],
+    }
+    key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    path = cache_dir / f"number-directions-{key}.json" if cache_dir else None
+    if path and path.is_file() and not refresh:
+        try:
+            result = json.loads(path.read_text(encoding="utf-8"))
+            if (
+                result["schemaVersion"] == 2
+                and result["protocol"] == PROTOCOL
+                and [p["position"] for p in result["positions"]] == list(range(1, 7))
+            ):
+                return result
+        except ValueError, KeyError, TypeError, OSError:
+            pass
+    result = analyze_number_directions(draws)
+    if path:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(result, allow_nan=False), encoding="utf-8")
+        except OSError:
+            pass
+    return result
 
 
 def cached_direction(

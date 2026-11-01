@@ -1,4 +1,4 @@
-"""Run the frozen historical and synthetic minimum-direction study."""
+"""Run the frozen historical and synthetic sorted-position direction study."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import numpy as np
 
 from rand_ai.draw import Draw
 from rand_ai.draws import Draws
-from rand_ai.first_number_direction import PROTOCOL, analyze_direction
+from rand_ai.first_number_direction import PROTOCOL, analyze_number_directions
 from rand_ai.lotto_results import load_lotto_results_yaml
 
 
@@ -63,27 +63,39 @@ def main() -> None:
             datasets.append((f"synthetic-{index:02}", synthetic))
     summaries = {}
     for name, dataset in datasets:
-        result = analyze_direction(dataset)
+        result = analyze_number_directions(dataset)
         folder = args.output / name
         folder.mkdir(exist_ok=True)
-        records = result.pop("history")
+        position_summaries = []
+        for position_report in result["positions"]:
+            records = position_report.pop("history")
+            position_folder = folder / f"position-{position_report['position']}"
+            position_folder.mkdir(exist_ok=True)
+            (position_folder / "summary.json").write_text(
+                json.dumps(position_report, indent=2, allow_nan=False), encoding="utf-8"
+            )
+            with (position_folder / "predictions.jsonl").open(
+                "w", encoding="utf-8"
+            ) as stream:
+                for row in records:
+                    stream.write(json.dumps(row, allow_nan=False) + "\n")
+            position_summaries.append(
+                {
+                    "position": position_report["position"],
+                    "evaluation": position_report["evaluation"],
+                    "learnedPolicyForecasts": sum(
+                        row["activeModel"] != "baseline" for row in records
+                    ),
+                }
+            )
         (folder / "summary.json").write_text(
             json.dumps(result, indent=2, allow_nan=False), encoding="utf-8"
         )
-        with (folder / "predictions.jsonl").open("w", encoding="utf-8") as stream:
-            for row in records:
-                stream.write(json.dumps(row, allow_nan=False) + "\n")
         summaries[name] = {
             "datasetFingerprint": result["datasetFingerprint"],
-            "evaluation": result["evaluation"],
-            "learnedPolicyForecasts": sum(
-                row["activeModel"] != "baseline" for row in records
-            ),
+            "positions": position_summaries,
         }
-        print(
-            f"{name}: {len(records)} forecasts; gated loss {result['evaluation']['gated']['logLoss']}",
-            flush=True,
-        )
+        print(f"{name}: completed all six positions", flush=True)
     aggregate_path = args.output / "aggregate.json"
     if aggregate_path.exists() and compatible:
         existing = json.loads(aggregate_path.read_text(encoding="utf-8"))
@@ -91,44 +103,54 @@ def main() -> None:
         summaries = existing
     aggregate_path.write_text(json.dumps(summaries, indent=2), encoding="utf-8")
     lines = [
-        "# First Number Direction study",
+        "# Number Directions study",
         "",
         str(PROTOCOL["interpretation"]),
         "",
-        "Log loss is primary; smaller values are better. Synthetic histories diagnose false activation, not predictive skill.",
+        "Log loss is primary; smaller is better. Holm correction is per position, not simultaneous across six positions or repeated reviews.",
         "",
-        "| Dataset | Baseline loss | Gated loss | Gated accuracy | Learned policy forecasts |",
-        "|---|---:|---:|---:|---:|",
+        "| Dataset | Position | Baseline loss | Gated loss | Gated accuracy | Learned policy forecasts |",
+        "|---|---:|---:|---:|---:|---:|",
     ]
     for name, result in summaries.items():
-        evaluation = result["evaluation"]
-        lines.append(
-            f"| {name} | {evaluation['baseline']['logLoss']} | {evaluation['gated']['logLoss']} | {evaluation['gated']['accuracy']} | {result['learnedPolicyForecasts']} |"
-        )
+        for item in result["positions"]:
+            evaluation = item["evaluation"]
+            lines.append(
+                f"| {name} | {item['position']} | {evaluation['baseline']['logLoss']} | {evaluation['gated']['logLoss']} | {evaluation['gated']['accuracy']} | {item['learnedPolicyForecasts']} |"
+            )
     historical = summaries.get("historical")
     if historical:
         lines.extend(
             [
                 "",
-                "## Historical model comparison",
+                "## Historical candidate comparison",
                 "",
-                "| Model | Log loss | Brier | Accuracy |",
-                "|---|---:|---:|---:|",
+                "| Position | Model | Log loss | Brier | Accuracy |",
+                "|---:|---|---:|---:|---:|",
             ]
         )
-        for name, item in historical["evaluation"].items():
-            lines.append(
-                f"| {name} | {item['logLoss']} | {item['brier']} | {item['accuracy']} |"
-            )
+        for position in historical["positions"]:
+            for name, item in position["evaluation"].items():
+                lines.append(
+                    f"| {position['position']} | {name} | {item['logLoss']} | {item['brier']} | {item['accuracy']} |"
+                )
     synthetic = [
         value for name, value in summaries.items() if name.startswith("synthetic-")
     ]
-    activated = sum(item["learnedPolicyForecasts"] > 0 for item in synthetic)
+    for index in range(6):
+        activated = sum(
+            item["positions"][index]["learnedPolicyForecasts"] > 0 for item in synthetic
+        )
+        lines.extend(
+            [
+                "",
+                f"Position {index + 1}: synthetic histories with any learned-policy activation: {activated}/{len(synthetic)}.",
+            ]
+        )
     lines.extend(
         [
             "",
-            f"Synthetic histories with any learned-policy activation: {activated}/{len(synthetic)}.",
-            "Activation on independent synthetic draws is a false-signal diagnostic. The gate does not correct for repeated reviews over time.",
+            "Activation on independent synthetic draws is a false-signal diagnostic, not predictive skill.",
         ]
     )
     (args.output / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
